@@ -830,6 +830,51 @@ def sgo_debug_summary(events: list, teams) -> dict:
     return out
 
 
+def sgo_ou_debug(events: list, teams, roster_teams: dict) -> dict:
+    """Per team, per player SGO lists: every over/under prop market it
+    sent and what happened to it -- "ok", or why extract_player_ou_props
+    skipped it ("no-book": no bookmaker price/line, "no-under": no matching
+    under at that book, "roster": team doesn't match the roster). Players
+    SGO sent no o/u markets for at all show as {}. Answers "why is X
+    missing from the props" straight from data.json."""
+    out: dict = {}
+    for event in events:
+        players = event.get("players", {})
+        odds = event.get("odds", {})
+        short = {
+            event["teams"][s]["teamID"]: normalize_team(event["teams"][s]["names"]["short"])
+            for s in ("home", "away")
+        }
+        for pid, pl in players.items():
+            t = short.get(pl.get("teamID"))
+            if t in teams:
+                out.setdefault(t, {}).setdefault(pl.get("name"), {})
+        for odd in odds.values():
+            stat = odd.get("statID")
+            if stat not in PLAYER_OU_MARKETS or odd.get("betTypeID") != "ou" or odd.get("sideID") != "over" or odd.get("periodID") != "game":
+                continue
+            player = players.get(odd.get("playerID"))
+            if not player:
+                continue
+            t = short.get(player.get("teamID"))
+            if t not in teams:
+                continue
+            name = player.get("name")
+            known = roster_teams.get(name)
+            books = {b: i for b, i in (odd.get("byBookmaker") or {}).items() if i.get("available") and i.get("odds") is not None and i.get("overUnder") is not None}
+            under = (odds.get(odd.get("opposingOddID")) or {}).get("byBookmaker") or {}
+            if known and t not in known:
+                status = "roster"
+            elif not books:
+                status = "no-book"
+            elif not any((under.get(b) or {}).get("available") and (under.get(b) or {}).get("odds") is not None for b in books):
+                status = "no-under"
+            else:
+                status = "ok"
+            out.setdefault(t, {}).setdefault(name, {})[stat] = status
+    return out
+
+
 def extract_player_prop_odds(events: list, stat_id: str, teams, roster_teams: dict, roster_positions: dict = None, unavailable: set = None) -> dict:
     """Every player's "yes/no" odds for one statID (e.g. "touchdowns" for
     anytime-TD, "firstTouchdown" for first-TD) out of a fetch_sgo_events()
@@ -3781,6 +3826,7 @@ def main():
     general_odds = None
     player_prop_markets = None
     sgo_debug = None
+    sgo_props_debug = None
     if week_dates:
         starts_after = week_dates[0]
         # A plain date+1 cutoff is midnight UTC on the day after the last
@@ -3829,6 +3875,7 @@ def main():
                 and row.report_status.lower() in ("out", "doubtful", "injured reserve", "ir", "suspended")
             }
             sgo_debug = sgo_debug_summary(sgo_events, teams)
+            sgo_props_debug = sgo_ou_debug(sgo_events, teams, roster_teams)
             player_td_odds = extract_player_prop_odds(sgo_events, "touchdowns", teams, roster_teams, roster_positions, unavailable)
             player_first_td_odds = extract_player_prop_odds(sgo_events, "firstTouchdown", teams, roster_teams, roster_positions, unavailable)
             general_odds = extract_general_odds(sgo_events, teams)
@@ -3856,6 +3903,7 @@ def main():
                 general_odds = prev.get("general_odds")
                 player_prop_markets = prev.get("player_prop_markets")
                 sgo_debug = prev.get("sgo_debug")
+                sgo_props_debug = prev.get("sgo_props_debug")
                 if general_odds:
                     apply_sgo_schedule_odds(week_games, general_odds)
                 print("WARNING: SGO fetch failed this run -- reused last-known-good odds from the live site instead of clearing them.", file=sys.stderr)
@@ -3900,6 +3948,7 @@ def main():
         "general_odds": general_odds,
         "player_prop_markets": player_prop_markets,
         "sgo_debug": sgo_debug,
+        "sgo_props_debug": sgo_props_debug,
         "player_prop_market_labels": PLAYER_OU_MARKETS,
     }
 
