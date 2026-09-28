@@ -2167,6 +2167,13 @@ PROP_RATE_METRICS = {
     "ypa_deep": ("yds_deep", "att_deep"),
 }
 PROP_EXPLOSIVE_PASS_YARDS = 20  # completions long enough to decide a Longest Reception line
+PROP_CONTEXT_WEIGHT = 0.3  # weight of a bad-weather / backup-QB game in passing numbers
+PROP_BAD_WIND_MPH = 15
+PROP_PASSING_METRICS = {
+    "pass_att", "completions", "pass_yards", "pass_td", "ints", "sacks", "expl_pass", "long_pass",
+    "tgt_WR", "rec_WR", "recyds_WR", "tgt_TE", "rec_TE", "recyds_TE", "tgt_RB", "rec_RB", "recyds_RB",
+    "att_short", "att_int", "att_deep", "yds_short", "yds_int", "yds_deep",
+}
 
 
 def compute_prop_matchup_model(pbp: pd.DataFrame, pos_lookup) -> dict:
@@ -2247,12 +2254,35 @@ def compute_prop_matchup_model(pbp: pd.DataFrame, pos_lookup) -> dict:
     if sides.empty:
         return {"league": {}, "teams": {}}
 
+    # Context weights for PASSING numbers only: a game in rain/snow or 15+
+    # mph wind (outdoors) counts PROP_CONTEXT_WEIGHT as much for both teams,
+    # and a game where the offense had a backup QB throwing counts that much
+    # for the DEFENSE's numbers (a good day against Carson Wentz in the rain
+    # isn't proof of a good pass defense). Rushing numbers are unweighted.
+    gmeta = pbp.groupby("game_id").agg(weather=("weather", "first"), wind=("wind", "first"), roof=("roof", "first"))
+    wx = gmeta["weather"].fillna("").str.contains("rain|snow|sleet", case=False)
+    windy = pd.to_numeric(gmeta["wind"], errors="coerce").fillna(0) >= PROP_BAD_WIND_MPH
+    outdoors = gmeta["roof"].fillna("outdoors").isin(["outdoors", "open"])
+    bad_weather = ((wx | windy) & outdoors).to_dict()
+    lead_passer = passes.groupby(["game_id", "posteam", "passer_player_id"]).size().reset_index(name="n")
+    lead_passer = lead_passer.sort_values("n", ascending=False).drop_duplicates(["game_id", "posteam"])
+    usual = passes.groupby(["posteam", "passer_player_id"]).size().reset_index(name="n").sort_values("n", ascending=False).drop_duplicates("posteam")
+    usual_qb = dict(zip(usual["posteam"], usual["passer_player_id"]))
+    game_qb = {(r.game_id, r.posteam): r.passer_player_id for r in lead_passer.itertuples(index=False)}
+    backup = [game_qb.get((g, o)) not in (None, usual_qb.get(o)) for g, o in zip(sides["game_id"], sides["off"])]
+    wxw = [PROP_CONTEXT_WEIGHT if bad_weather.get(g) else 1.0 for g in sides["game_id"]]
+    sides["w_off"] = wxw
+    sides["w_def"] = [w * (PROP_CONTEXT_WEIGHT if b else 1.0) for w, b in zip(wxw, backup)]
+
     k = OPP_ADJ_SHRINK_GAMES
     out: dict = {}
     league: dict = {}
 
     def put(team, side, metric, v, raw):
         out.setdefault(team, {"off": {}, "def": {}})[side][metric] = {"v": v, "raw": raw}
+
+    def weight_col(metric, side):
+        return f"w_{side}" if metric in PROP_PASSING_METRICS else None
 
     def count_metric(col):
         L = sides[col].mean()
@@ -2265,11 +2295,14 @@ def compute_prop_matchup_model(pbp: pd.DataFrame, pos_lookup) -> dict:
 
         for side, other in (("off", "def"), ("def", "off")):
             res = sides.apply(lambda r: r[col] - normal(tables[other], r[other], r[col]), axis=1)
-            by = pd.DataFrame({"team": sides[side], "res": res, "val": sides[col]}).groupby("team")
+            wc = weight_col(col, side)
+            wts = sides[wc] if wc else pd.Series(1.0, index=sides.index)
+            by = pd.DataFrame({"team": sides[side], "res": res, "val": sides[col], "w": wts}).groupby("team")
             for team, grp in by:
-                n = len(grp)
-                adj = L + grp["res"].mean()
-                put(team, side, col, round((adj * n + k * L) / (n + k), 3), round(grp["val"].mean(), 2))
+                n = grp["w"].sum()
+                adj = L + (grp["res"] * grp["w"]).sum() / n
+                raw = (grp["val"] * grp["w"]).sum() / n
+                put(team, side, col, round(float((adj * n + k * L) / (n + k)), 3), round(float(raw), 2))
 
     def rate_metric(name, num, den):
         tot_den = sides[den].sum()
@@ -2287,11 +2320,13 @@ def compute_prop_matchup_model(pbp: pd.DataFrame, pos_lookup) -> dict:
         for side, other in (("off", "def"), ("def", "off")):
             valid = sides[sides[den] > 0]
             res = valid.apply(lambda r: r[num] / r[den] - normal(tables[other], r[other], r[num], r[den]), axis=1)
-            frame = pd.DataFrame({"team": valid[side], "res": res, "w": valid[den], "num": valid[num]})
+            wc = weight_col(num, side)
+            ctx = valid[wc] if wc else 1.0
+            frame = pd.DataFrame({"team": valid[side], "res": res, "w": valid[den] * ctx, "num": valid[num] * ctx})
             for team, grp in frame.groupby("team"):
                 w = grp["w"].sum()
                 adj = L + (grp["res"] * grp["w"]).sum() / w
-                put(team, side, name, round((adj * w + kw * L) / (w + kw), 4), round(grp["num"].sum() / w, 4))
+                put(team, side, name, round(float((adj * w + kw * L) / (w + kw)), 4), round(float(grp["num"].sum() / w), 4))
 
     for col in PROP_COUNT_METRICS:
         count_metric(col)

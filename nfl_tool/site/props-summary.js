@@ -684,48 +684,43 @@ function propClickEntry(r) {
   const { away, home } = propsSummaryContext();
   return encodeDataAttr({ team: r.team, name: r.name, oppTeam: r.team === away ? home : away });
 }
-// ---- Target / Fade spots: this offense vs this defense ----
-// Every spot pairs what the offense produces with what the defense allows
-// (both opponent-adjusted in build_stats.py prop_matchup_model, so schedule
-// strength is already in the ranks). Lean = average of the two, each from
-// rank 1 (+1, most) to rank 32 (-1, fewest), flipped where "more" is bad
-// for the offense (INTs thrown, sacks). A strong positive lean lands under
-// Target, a strong negative one under Fade.
+// ---- Target / Fade: players and packages with a good (or bad) matchup ----
+// Each package is a position group and the betting markets it plays in
+// (QB: Pass Yds / Completions / Pass Att / Pass TDs / Long Comp; RBs: Rush
+// Att / Rush Yds / Long Rush; WRs: Rec Yds / Receptions / Long Rec ...).
+// A market's lean averages, for each stat behind it, the offense's rank
+// producing it and the other defense's rank allowing it (both opponent-
+// adjusted in build_stats.py prop_matchup_model, where games against a
+// backup QB or in bad weather already count much less for passing). A
+// package shows when its markets lean the same way AND the betting market
+// agrees -- Novig's implied team total, which already knows about QB
+// changes, injuries and weather. INTs and sacks aren't used at all.
 const f1 = (v) => fmt(v, 1);
 const f0 = (v) => fmt(v, 0);
-const PROP_SPOT_MIN = 0.4; // |lean| needed to list a spot
-const PROP_SPOTS_SHOWN = 3; // per half
-// { label | {target, fade}, off, def (metric keys), fmt, bad: true when more
-// of it is bad for the offense }
-const PROP_SPOTS = {
-  pass: [
-    { label: "Pass yards", off: "pass_yards", def: "pass_yards", fmt: (v) => `${f0(v)}/g` },
-    { label: "Pass attempts", off: "pass_att", def: "pass_att", fmt: (v) => `${f1(v)}/g` },
-    { label: "Completions", off: "completions", def: "completions", fmt: (v) => `${f1(v)}/g` },
-    { label: "Yards per attempt", off: "ypa", def: "ypa", fmt: (v) => f1(v) },
-    { label: "Pass TDs", off: "pass_td", def: "pass_td", fmt: (v) => `${f1(v)}/g` },
-    { label: "Long completions", off: "expl_pass", def: "expl_pass", fmt: (v) => `${f1(v)} 20+/g` },
-    { label: { target: "Ball security", fade: "Interception risk" }, off: "ints", def: "ints", fmt: (v) => `${f1(v)} INT/g`, bad: true, offVerb: "throws", defVerb: "picks off" },
-    { label: { target: "Clean pocket", fade: "Pressure / sacks" }, off: "sacks", def: "sacks", fmt: (v) => `${f1(v)} sacks/g`, bad: true, offVerb: "gives up", defVerb: "gets" },
-  ],
-  rush: [
-    { label: "RB carries", off: "car_RB", def: "car_RB", fmt: (v) => `${f1(v)}/g` },
-    { label: "RB rush yards", off: "rushyds_RB", def: "rushyds_RB", fmt: (v) => `${f0(v)}/g` },
-    { label: "Yards per carry", off: "ypc_RB", def: "ypc_RB", fmt: (v) => f1(v) },
-    { label: "QB rushing", off: "rushyds_QB", def: "rushyds_QB", fmt: (v) => `${f0(v)} yds/g` },
-    { label: "Long runs", off: "expl_rush", def: "expl_rush", fmt: (v) => `${f1(v)} 10+/g` },
-  ],
-  rec: [
-    { label: "WR yards", off: "recyds_WR", def: "recyds_WR", fmt: (v) => `${f0(v)}/g` },
-    { label: "WR receptions", off: "rec_WR", def: "rec_WR", fmt: (v) => `${f1(v)}/g` },
-    { label: "TE yards", off: "recyds_TE", def: "recyds_TE", fmt: (v) => `${f0(v)}/g` },
-    { label: "TE receptions", off: "rec_TE", def: "rec_TE", fmt: (v) => `${f1(v)}/g` },
-    { label: "RB receiving", off: "recyds_RB", def: "recyds_RB", fmt: (v) => `${f0(v)} yds/g` },
-    { label: "Short throws", off: "yds_short", def: "yds_short", fmt: (v) => `${f0(v)} yds/g` },
-    { label: "10-19 yd throws", off: "yds_int", def: "yds_int", fmt: (v) => `${f0(v)} yds/g` },
-    { label: "Deep throws", off: "yds_deep", def: "yds_deep", fmt: (v) => `${f0(v)} yds/g` },
-    { label: "Long catches", off: "expl_pass", def: "expl_pass", fmt: (v) => `${f1(v)} 20+/g` },
-  ],
+const PROP_PACKAGE_MIN = 0.3; // its strongest market's lean needed to list a package
+const PROP_MARKET_MIN = 0.25; // a market's own lean needed to name it
+const PROP_TT_BLOCK_LOW = 18.5; // no passing/receiving target at or under this implied total
+const PROP_TT_BLOCK_HIGH = 25.5; // no passing/receiving fade at or over it
+const PROP_DOG_BLOCK = 7; // no RB rushing target as a 7+ point underdog (fade as a 7+ favorite)
+const PROP_TARGETS_SHOWN = 6;
+const PROP_FADES_SHOWN = 4;
+const PROP_PACKAGES = [
+  { pos: "QB", name: "QB", markets: [
+    ["passing_yards", ["pass_yards"]], ["passing_completions", ["completions"]], ["passing_attempts", ["pass_att"]],
+    ["passing_touchdowns", ["pass_td"]], ["passing_longestCompletion", ["expl_pass"]],
+  ] },
+  { pos: "QB", name: "QB rushing", markets: [["rushing_yards", ["rushyds_QB"]]] },
+  { pos: "RB", name: "RBs", script: "run", markets: [["rushing_attempts", ["car_RB"]], ["rushing_yards", ["rushyds_RB"]], ["rushing_longestRush", ["expl_rush"]]] },
+  { pos: "RB", name: "RBs receiving", markets: [["receiving_receptions", ["rec_RB"]], ["receiving_yards", ["recyds_RB"]]] },
+  { pos: "WR", name: "WRs", markets: [["receiving_yards", ["recyds_WR"]], ["receiving_receptions", ["rec_WR"]], ["receiving_longestReception", ["expl_pass", "yds_deep"]]] },
+  { pos: "TE", name: "TEs", markets: [["receiving_yards", ["recyds_TE"]], ["receiving_receptions", ["rec_TE"]]] },
+];
+// Short names for the reason tags.
+const PROP_STAT_WORDS = {
+  pass_yards: "pass yds", completions: "completions", pass_att: "pass att", pass_td: "pass TDs", expl_pass: "20+ yd plays",
+  rushyds_QB: "QB rush yds", car_RB: "RB carries", rushyds_RB: "RB rush yds", expl_rush: "10+ yd runs",
+  rec_RB: "RB catches", recyds_RB: "RB rec yds", recyds_WR: "WR yds", rec_WR: "WR catches", yds_deep: "deep yds",
+  recyds_TE: "TE yds", rec_TE: "TE catches",
 };
 
 // Rank 1 (most) -> +1, rank 32 (fewest) -> -1.
@@ -736,36 +731,99 @@ function propSide(team, side, metric) {
   const cell = ((propModel().teams[team] || {})[side] || {})[metric];
   return cell ? { raw: cell.raw, rk: cell.rk, lean: propRankLean(cell.rk) } : null;
 }
-function propOrd(rk) {
-  return propOrdinal(rk);
+function propRankTag(rk) {
+  return rk <= 16 ? `${propOrdinal(rk)}-most` : `${propOrdinal(33 - rk)}-fewest`;
 }
-function propSpots(section, offTeam, defTeam) {
-  const target = [];
-  const fade = [];
-  PROP_SPOTS[section].forEach((sp) => {
-    const o = propSide(offTeam, "off", sp.off);
-    const d = propSide(defTeam, "def", sp.def);
-    if (!o || !d) return;
-    const sign = sp.bad ? -1 : 1;
-    const lean = (sign * o.lean + sign * d.lean) / 2;
-    if (Math.abs(lean) < PROP_SPOT_MIN) return;
-    const isTarget = lean > 0;
-    const label = typeof sp.label === "string" ? sp.label : isTarget ? sp.label.target : sp.label.fade;
-    const blurb = `${offTeam} ${sp.offVerb ? `${sp.offVerb} ` : ""}${sp.fmt(o.raw)} <span class="ps-rk">${propOrd(o.rk)}</span> &middot; ${defTeam} ${sp.defVerb || "allows"} ${sp.fmt(d.raw)} <span class="ps-rk">${propOrd(d.rk)}</span>`;
-    (isTarget ? target : fade).push({ label, blurb, lean: Math.abs(lean) });
+// Novig's implied points for this team (Novig first, best-of-books fallback).
+function propTeamTotal(game, team) {
+  if (!game) return null;
+  const g = { ...game, ...(game.novig || {}) };
+  const spread = team === g.away ? g.away_team_spread : g.home_team_spread;
+  if (!g.total_line || spread === null || spread === undefined) return null;
+  return g.total_line / 2 - spread / 2;
+}
+
+function propPackages(offTeam, defTeam, game, lines) {
+  const tt = propTeamTotal(game, offTeam);
+  const g = game ? { ...game, ...(game.novig || {}) } : {};
+  const spread = offTeam === g.away ? g.away_team_spread : g.home_team_spread;
+  const fav = spread === null || spread === undefined ? 0 : -spread; // + = favored
+  const out = [];
+  PROP_PACKAGES.forEach((pkg) => {
+    const markets = pkg.markets
+      .map(([mk, metrics]) => {
+        const parts = metrics.map((m) => ({ m, o: propSide(offTeam, "off", m), d: propSide(defTeam, "def", m) })).filter((x) => x.o && x.d);
+        if (!parts.length) return null;
+        const lean = parts.reduce((sum, x) => sum + (x.o.lean + x.d.lean) / 2, 0) / parts.length;
+        return { mk, lean, parts };
+      })
+      .filter(Boolean);
+    if (!markets.length) return;
+    // Direction from the market that leans hardest; the package needs that
+    // lean to be real and the rest not to point the other way.
+    const lean = markets.reduce((a, m) => a + m.lean, 0) / markets.length;
+    const top = markets.slice().sort((a, b) => Math.abs(b.lean) - Math.abs(a.lean))[0];
+    const best = Math.abs(top.lean);
+    const dir = Math.sign(top.lean);
+    if (best < PROP_PACKAGE_MIN || lean * dir < 0.1) return;
+    // The betting market has to agree. RB rushing follows game script (the
+    // spread); everything else follows expected scoring (implied total).
+    if (pkg.script === "run") {
+      if (dir > 0 && fav <= -PROP_DOG_BLOCK) return;
+      if (dir < 0 && fav >= PROP_DOG_BLOCK) return;
+    } else if (tt !== null) {
+      if (dir > 0 && tt <= PROP_TT_BLOCK_LOW) return;
+      if (dir < 0 && tt >= PROP_TT_BLOCK_HIGH) return;
+    }
+    const shown = markets.filter((m) => Math.sign(m.lean) === dir && Math.abs(m.lean) >= PROP_MARKET_MIN).sort((a, b) => Math.abs(b.lean) - Math.abs(a.lean));
+    if (!shown.length) return;
+    // Reason tags: the defense stat and the offense stat that push hardest.
+    const parts = shown.flatMap((m) => m.parts);
+    const dPart = parts.slice().sort((a, b) => dir * (b.d.lean - a.d.lean))[0];
+    const oPart = parts.slice().sort((a, b) => dir * (b.o.lean - a.o.lean))[0];
+    const tags = [
+      `${defTeam} D ${propRankTag(dPart.d.rk)} ${PROP_STAT_WORDS[dPart.m]}`,
+      `${offTeam} ${propRankTag(oPart.o.rk)} ${PROP_STAT_WORDS[oPart.m]}`,
+    ];
+    // Players in this package with a posted line, biggest line first.
+    const mainMk = shown[0].mk;
+    const players = {};
+    lines
+      .filter((r) => r.position === pkg.pos && r.injury !== "out" && shown.some((m) => m.mk === r.marketKey))
+      .forEach((r) => {
+        const k = normName(r.name);
+        const cur = players[k];
+        const pri = r.marketKey === mainMk ? 1 : 0;
+        if (!cur || pri > cur.pri) players[k] = { r, pri };
+      });
+    // One QB (the starter has the biggest line), up to three others.
+    const plist = Object.values(players)
+      .map((x) => x.r)
+      .sort((a, b) => (b.marketKey === mainMk) - (a.marketKey === mainMk) || b.line - a.line)
+      .slice(0, pkg.pos === "QB" ? 1 : 3);
+    out.push({
+      team: offTeam,
+      name: pkg.name,
+      markets: shown.map((m) => PROP_MARKETS[m.mk].label),
+      lineMarket: PROP_MARKETS[mainMk].label,
+      players: plist,
+      tags,
+      lean: 0.6 * best + 0.4 * Math.abs(lean),
+      dir,
+      tt,
+    });
   });
-  const top = (list) => list.sort((a, b) => b.lean - a.lean).slice(0, PROP_SPOTS_SHOWN);
-  return { target: top(target), fade: top(fade) };
+  return out;
 }
-function propSpotList(items, kind) {
-  if (!items.length) return `<div class="ps-spot-none">Nothing stands out</div>`;
-  return items.map((i) => `<div class="ps-spot"><b>${i.label}</b><span>${i.blurb}</span></div>`).join("");
-}
-function propSectionColumn(section, offTeam, defTeam) {
-  const { target, fade } = propSpots(section, offTeam, defTeam);
-  return `<div class="sc-col ps-col">
-    <div class="ps-half ps-half-target"><div class="ps-half-title">Target</div>${propSpotList(target, "target")}</div>
-    <div class="ps-half ps-half-fade"><div class="ps-half-title">Fade</div>${propSpotList(fade, "fade")}</div>
+
+function propPackageHtml(p, lines) {
+  const players = p.players.length
+    ? p.players.map((r) => `<span class="ps-pk-player player-click" data-entry="${propClickEntry(r)}">${summaryHeadshot(r.team, r.name, 22)}${propDisplayName(lines, r)} <b>${fmt(r.line, 1)}</b></span>`).join("")
+    : `<span class="ps-pk-noline">No lines posted yet</span>`;
+  return `<div class="ps-pk">
+    <div class="ps-pk-head">${teamLogoMini(p.team, 22)}<span class="ps-pk-name">${p.team} ${p.name}</span><span class="ps-pk-mkts">${p.markets.map((m) => `<span>${m}</span>`).join("")}</span></div>
+    <div class="ps-pk-players">${p.players.length ? `<span class="ps-pk-for">${p.lineMarket}</span>` : ""}${players}</div>
+    <div class="ps-pk-tags">${p.tags.map((t) => `<span>${t}</span>`).join("")}</div>
   </div>`;
 }
 
@@ -816,7 +874,7 @@ function propsRail(away, home, linesByTeam, gameKey) {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(
         (r) =>
-          `<tr><td><span class="sc-player player-click" data-entry="${propClickEntry(r)}" title="Game log, odds, add to summary">${summaryHeadshot(team, r.name, 26)}<span class="ps-rail-name">${propDisplayName(linesByTeam[team], r)}<span class="ps-rail-mkt">${r.market} ${fmt(r.line, 1)}</span></span></span></td><td class="num"><div class="ps-rail-btns">${propSideButton(r, "over")}${propSideButton(r, "under")}</div></td></tr>`
+          `<tr><td class="ps-rail-who"><span class="sc-player player-click" data-entry="${propClickEntry(r)}" title="Game log, odds, add to summary">${summaryHeadshot(team, r.name, 32)}<span class="ps-rail-name">${propDisplayName(linesByTeam[team], r)}</span></span></td><td class="ps-rail-mid"><span>${r.market}</span><b>${fmt(r.line, 1)}</b></td><td class="num"><div class="ps-rail-btns">${propSideButton(r, "over")}${propSideButton(r, "under")}</div></td></tr>`
       )
       .join("");
     const rgb = teamAccentRgb(team);
@@ -851,13 +909,15 @@ function renderPropsSummaryCard(away, home) {
     game && game.home_team_spread !== null && game.home_team_spread !== undefined ? `${home} ${signed(game.home_team_spread)}` : null,
     game && game.total_line ? `O/U ${game.total_line}` : null,
   ].filter(Boolean).join(" &middot; ");
-  const section = (key, title) => `<section class="sc-section ps-section">
-      <div class="sc-section-title">${title}</div>
-      <div class="sc-cols">
-        ${propSectionColumn(key, away, home)}
-        ${propSectionColumn(key, home, away)}
-      </div>
-    </section>`;
+  const all = [...propPackages(away, home, game, linesByTeam[away]), ...propPackages(home, away, game, linesByTeam[home])];
+  const allLines = [...linesByTeam[away], ...linesByTeam[home]];
+  const targets = all.filter((p) => p.dir > 0).sort((a, b) => b.lean - a.lean).slice(0, PROP_TARGETS_SHOWN);
+  const fades = all.filter((p) => p.dir < 0).sort((a, b) => b.lean - a.lean).slice(0, PROP_FADES_SHOWN);
+  const list = (items, empty) => (items.length ? items.map((p) => propPackageHtml(p, allLines)).join("") : `<div class="ps-spot-none">${empty}</div>`);
+  const tt = (t) => {
+    const v = propTeamTotal(game, t);
+    return v === null ? "" : `<span class="ps-tt">${teamLogoMini(t, 16)} ${t} implied ${fmt(v, 1)}</span>`;
+  };
   card.dataset.kind = "props";
   card.innerHTML = `<div class="sc-inner ps-card">
     <div class="sc-header">
@@ -872,17 +932,18 @@ function renderPropsSummaryCard(away, home) {
 
     <div class="sc-body">
       <div class="sc-main">
-        <div class="sc-cols">${summaryTeamBanner(away)}${summaryTeamBanner(home)}</div>
-        ${section("pass", "Passing")}
-        ${section("rush", "Rushing")}
-        ${section("rec", "Receiving")}
+        <div class="ps-tts">${tt(away)}${tt(home)}</div>
+        <div class="ps-tf">
+          <section class="sc-section ps-tf-col ps-tf-target"><div class="sc-section-title">Target</div>${list(targets, "No clear good matchups")}</section>
+          <section class="sc-section ps-tf-col ps-tf-fade"><div class="sc-section-title">Fade</div>${list(fades, "No clear bad matchups")}</section>
+        </div>
       </div>
       ${propsRail(away, home, linesByTeam, gameKey)}
     </div>
 
     <div class="sc-footer">
-      <span>Each spot = this offense's rank for producing it + the other defense's rank for allowing it, both adjusted for the opponents they've faced</span>
-      <span>Ranks out of 32 (1st = most) &middot; ${statsNote()}</span>
+      <span>Matchup = offense's rank producing it + defense's rank allowing it, opponent-adjusted; backup-QB and bad-weather games count less; must agree with the implied team total</span>
+      <span>${statsNote()}</span>
     </div>
   </div>`;
   fitSummaryCard();

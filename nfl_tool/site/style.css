@@ -2640,3 +2640,40 @@ footer { border-top-color: var(--border); }
 .ps-rk { font-size: 0.62rem; opacity: 0.85; }
 .ps-spot-none { font-size: 0.74rem; color: var(--muted); font-style: italic; text-align: center; margin: auto 0; }
 .ps-col { grid-template-columns: minmax(0, 1fr); justify-content: stretch; }
+
+/* ---- Props Summary v5: Target / Fade package lists ---- */
+.ps-card .sc-main { gap: 8px; }
+.ps-tts { display: flex; justify-content: center; gap: 18px; }
+.ps-tt { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+.ps-tf { flex: 1 1 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ps-tf-col { display: flex; flex-direction: column; gap: 8px; }
+.ps-tf-target { background: rgba(var(--good-rgb), 0.05); border-color: rgba(var(--good-rgb), 0.4); }
+.ps-tf-fade { background: rgba(var(--bad-rgb), 0.05); border-color: rgba(var(--bad-rgb), 0.35); }
+.ps-tf-target .sc-section-title { color: var(--good-text); }
+.ps-tf-target .sc-section-title::before { background: rgb(var(--good-rgb)); }
+.ps-tf-fade .sc-section-title { color: var(--bad-text); }
+.ps-tf-fade .sc-section-title::before { background: rgb(var(--bad-rgb)); }
+.ps-pk { display: flex; flex-direction: column; gap: 5px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--border); }
+.ps-pk-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.ps-pk-name { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; letter-spacing: 0.02em; }
+.ps-pk-mkts { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.ps-pk-mkts span { padding: 1px 7px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; background: var(--table-head); border: 1px solid var(--border-strong); }
+.ps-tf-target .ps-pk-mkts span { color: var(--good-text); border-color: rgba(var(--good-rgb), 0.5); background: rgba(var(--good-rgb), 0.1); }
+.ps-tf-fade .ps-pk-mkts span { color: var(--bad-text); border-color: rgba(var(--bad-rgb), 0.45); background: rgba(var(--bad-rgb), 0.08); }
+.ps-pk-players { display: flex; flex-wrap: wrap; gap: 8px; }
+.ps-pk-player { display: inline-flex; align-items: center; gap: 5px; font-size: 0.84rem; font-weight: 700; }
+.ps-pk-player b { font-weight: 800; color: var(--accent); }
+.ps-pk-noline { font-size: 0.74rem; color: var(--muted); font-style: italic; }
+.ps-pk-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.ps-pk-tags span { font-size: 0.64rem; font-weight: 700; color: var(--muted); padding: 0 6px; border-radius: 4px; background: var(--table-head); }
+
+/* Prop Picks rail rows: name beside the photo, market + line in the middle, taller */
+.ps-rail td { padding: 8px 3px; }
+.ps-rail-who .sc-player { gap: 7px; }
+.ps-rail-name { display: inline; font-size: 0.92rem; font-weight: 800; line-height: 1.1; white-space: nowrap; }
+.ps-rail-mid { text-align: center; line-height: 1.15; }
+.ps-rail-mid span { display: block; font-size: 0.66rem; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.ps-rail-mid b { font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; }
+.ps-rail-btns { gap: 4px; }
+.ps-rail .sc-pp { font-size: 0.72rem; padding: 2px 6px; }
+.ps-pk-for { align-self: center; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
