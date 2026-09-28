@@ -160,6 +160,39 @@ function gsLines(game) {
   </div>`;
 }
 
+// ---- Ratings: ESPN FPI (offense, defense, overall) as 1-100 league-normed
+// ratings (build_stats.py compute_espn_ratings), plus schedule strength.
+// Red (1) -> yellow (50) -> green (99); SOS rank 1 = toughest schedule so
+// far, colored red, 32 = easiest, green. ----
+function gsRatingStyle(hue) {
+  return `background:hsla(${hue},70%,45%,0.28);border-color:hsl(${hue},70%,45%)`;
+}
+function gsRatingTile(rating, raw) {
+  if (rating === null || rating === undefined) return `<span class="gs-rt">--</span>`;
+  const sign = raw > 0 ? "+" : "";
+  return `<span class="gs-rt" style="${gsRatingStyle(Math.round(rating * 1.2))}"><b>${rating}</b><small>${sign}${fmt(raw, 1)}</small></span>`;
+}
+function gsSosTile(rank) {
+  if (!rank) return `<span class="gs-rt">--</span>`;
+  return `<span class="gs-rt" style="${gsRatingStyle(Math.round(((rank - 1) / 31) * 120))}"><b>${propOrdinalSafe(rank)}</b><small>${rank <= 8 ? "tough" : rank >= 25 ? "easy" : "avg"}</small></span>`;
+}
+function propOrdinalSafe(n) {
+  const suffix = n % 100 >= 11 && n % 100 <= 13 ? "th" : { 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th";
+  return `${n}${suffix}`;
+}
+function gsRatings(away, home) {
+  const r = DATA.espn_ratings;
+  if (!r || !r[away] || !r[home]) return "";
+  const row = (team) => {
+    const t = r[team];
+    return `<div class="gs-rt-row"><span class="gs-res-team">${teamLogoMini(team, 18)} ${team}</span>${gsRatingTile(t.off_rating, t.off)}${gsRatingTile(t.def_rating, t.def)}${gsRatingTile(t.fpi_rating, t.fpi)}${gsSosTile(t.sos_rank)}</div>`;
+  };
+  return `<section class="sc-section gs-compact"><div class="sc-section-title">Ratings</div>
+    <div class="gs-rt-row gs-rt-head"><span></span><span>Offensive Rating</span><span>Defensive Rating</span><span>FPI Rating</span><span>SOS</span></div>
+    ${row(away)}${row(home)}
+  </section>`;
+}
+
 // ---- wins & losses vs the spread ----
 function gsResumeRow(team, week) {
   const games = resumeGamesFor(team, week).sort((a, b) => a.week - b.week);
@@ -254,6 +287,7 @@ function renderGameSummaryCard(game) {
           <section class="sc-section gs-compact"><div class="sc-section-title">Lines</div>${gsLines(game)}</section>
           <section class="sc-section gs-compact"><div class="sc-section-title">Wins &amp; Losses vs the Spread</div>${gsResumeRow(away, game.week)}${gsResumeRow(home, game.week)}</section>
         </div>
+        ${gsRatings(away, home)}
         <section class="sc-section gs-matchups"><div class="sc-section-title">Matchups</div>
           <div class="sc-cols">${gsMatchupColumn(away, home)}${gsMatchupColumn(home, away)}</div>
         </section>
@@ -262,7 +296,7 @@ function renderGameSummaryCard(game) {
     </div>
     <div class="sc-footer">
       <span><span class="gs-res gs-res-q gs-res-w"><b>W</b></span> quality <span class="gs-res gs-res-n gs-res-w"><b>W</b></span> neutral <span class="gs-res gs-res-b gs-res-w"><b>W</b></span> bad (vs the spread) &middot; grades A-F vs the league</span>
-      <span><span class="gs-val gs-good">green</span> good for that side &middot; <span class="gs-val gs-bad">red</span> bad &middot; vs Blitz / Box % = how often the defense shows it</span>
+      <span>Ratings 1-100 vs the league (ESPN FPI) &middot; SOS 1st = toughest schedule so far &middot; <span class="gs-val gs-good">green</span> good for that side &middot; <span class="gs-val gs-bad">red</span> bad &middot; vs Blitz / Box % = how often the defense shows it</span>
     </div>
   </div>`;
   fitSummaryCard();

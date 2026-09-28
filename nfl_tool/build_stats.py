@@ -27,6 +27,7 @@ For each player who has scored at least one TD:
 """
 import argparse
 import json
+import math
 import os
 import sys
 import urllib.error
@@ -989,6 +990,68 @@ def fetch_previous_odds_snapshot() -> dict | None:
     except Exception as e:
         print(f"WARNING: could not fetch previous odds snapshot for fallback ({e}).", file=sys.stderr)
         return None
+
+
+# ---- ESPN FPI ratings (Game Previews Summary's Ratings box) ----
+# ESPN's public powerindex feed behind espn.com/nfl/fpi, refreshed weekly:
+# FPI plus its offense/defense components (points vs an average team on a
+# neutral field -- defense positive = better) and strength-of-schedule
+# ranks. Offense/defense/FPI also become 1-100 ratings: each team's
+# z-score across the league through the normal curve (50 = league average,
+# ~84 = one standard deviation better), clamped to 1-99.
+ESPN_FPI_URL = "https://site.web.api.espn.com/apis/fitt/v3/sports/football/nfl/powerindex?region=us&lang=en&season={season}"
+ESPN_TEAM_FIXES = {"LAR": "LA", "WSH": "WAS"}
+
+
+def _normed_rating(value, values):
+    mean = sum(values) / len(values)
+    sd = math.sqrt(sum((v - mean) ** 2 for v in values) / len(values)) or 1.0
+    z = (value - mean) / sd
+    return max(1, min(99, round(100 * 0.5 * (1 + math.erf(z / math.sqrt(2))))))
+
+
+def compute_espn_ratings(season: int) -> dict | None:
+    """{team: {fpi, off, def, st, fpi_rank, sos_rank, sos_remaining_rank,
+    off_rating, def_rating, fpi_rating}, "_updated": iso time}. None if
+    ESPN can't be reached (the caller falls back to the live site's copy)."""
+    try:
+        req = urllib.request.Request(ESPN_FPI_URL.format(season=season), headers={"User-Agent": "Mozilla/5.0 (compatible; nfl-tool/1.0)"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            payload = json.load(resp)
+    except Exception as e:
+        print(f"WARNING: ESPN FPI fetch failed ({e}).", file=sys.stderr)
+        return None
+    cat = next((c for c in payload.get("categories", []) if c.get("name") == "fpi"), None)
+    if not cat:
+        return None
+    names = cat["names"]
+    rows = {}
+    for t in payload.get("teams", []):
+        abbr = t["team"]["abbreviation"]
+        abbr = normalize_team(ESPN_TEAM_FIXES.get(abbr, abbr))
+        fpi_cat = next((c for c in t.get("categories", []) if c.get("name") == "fpi"), None)
+        if not fpi_cat:
+            continue
+        v = dict(zip(names, fpi_cat.get("values") or []))
+        if v.get("fpi") is None:
+            continue
+        rows[abbr] = {
+            "fpi": round(v["fpi"], 2),
+            "off": round(v.get("epaoffense") or 0.0, 2),
+            "def": round(v.get("epadefense") or 0.0, 2),
+            "st": round(v.get("epaspecialteams") or 0.0, 2),
+            "fpi_rank": int(v["fpirank"]) if v.get("fpirank") else None,
+            "sos_rank": int(v["avgsosrank"]) if v.get("avgsosrank") else None,
+            "sos_remaining_rank": int(v["sosremainingrank"]) if v.get("sosremainingrank") else None,
+        }
+    if len(rows) < 10:
+        return None
+    for key in ("fpi", "off", "def"):
+        values = [r[key] for r in rows.values()]
+        for r in rows.values():
+            r[f"{key}_rating"] = _normed_rating(r[key], values)
+    rows["_updated"] = payload.get("lastUpdated")
+    return rows
 
 
 def sgo_debug_summary(events: list, teams) -> dict:
@@ -4115,6 +4178,11 @@ def main():
             player_td_odds = merge_td_odds(n_any, player_td_odds)
             player_first_td_odds = merge_td_odds(n_first, player_first_td_odds)
 
+    espn_ratings = compute_espn_ratings(args.season)
+    if espn_ratings is None:
+        prev_site = fetch_previous_odds_snapshot()
+        espn_ratings = (prev_site or {}).get("espn_ratings")
+
     blob = {
         "season": season,
         "requested_season": args.season,
@@ -4151,6 +4219,7 @@ def main():
         "sgo_debug": sgo_debug,
         "sgo_props_debug": sgo_props_debug,
         "novig_debug": novig_debug,
+        "espn_ratings": espn_ratings,
         "player_prop_market_labels": PLAYER_OU_MARKETS,
     }
 

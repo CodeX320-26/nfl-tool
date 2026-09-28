@@ -2572,3 +2572,15 @@ footer { border-top-color: var(--border); }
 .gs-head b { font-family: var(--font-display); font-size: 1rem; color: var(--text); letter-spacing: 0.02em; }
 .gs-sub { margin-top: 8px; font-size: 0.66rem; }
 .gs-row { grid-template-columns: minmax(0, 1fr) 62px 16px 62px 104px; gap: 5px; }
+
+/* centered lines tiles */
+.gs-lines { justify-content: center; }
+.gs-tile { align-items: center; text-align: center; }
+.gs-tile-big { justify-content: center; }
+.gs-ml span { margin-left: 6px; }
+/* ratings box */
+.gs-rt-row { display: grid; grid-template-columns: 58px repeat(4, 1fr); gap: 8px; align-items: center; padding: 2px 0; }
+.gs-rt-head span { text-align: center; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.gs-rt { display: flex; align-items: baseline; justify-content: center; gap: 6px; height: 32px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--table-head); }
+.gs-rt b { font-family: var(--font-display); font-size: 1.3rem; font-weight: 800; line-height: 32px; }
+.gs-rt small { font-size: 0.66rem; font-weight: 700; color: var(--muted); }
