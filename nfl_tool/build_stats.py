@@ -2038,6 +2038,29 @@ def compute_td_matchup_model(pbp: pd.DataFrame, scoring_df: pd.DataFrame, pos_lo
         targets=("is_tgt", "sum"), carries=("is_car", "sum"), rz_targets=("rz_tgt", "sum"),
         rz_carries=("rz_car", "sum"), ez_targets=("ez_tgt", "sum"), deep_targets=("deep_tgt", "sum"),
     )
+    # Same numbers per game, so the TD page can drop a game a player left
+    # early or discount one a regular teammate missed (see the page's
+    # lineupWeights) instead of trusting raw season totals.
+    weekly = opp.groupby(["posteam", "pid", "week"]).agg(
+        xtd=("xtd", "sum"), early_xtd=("early_xtd", "sum"),
+        targets=("is_tgt", "sum"), carries=("is_car", "sum"), rz_targets=("rz_tgt", "sum"),
+        rz_carries=("rz_car", "sum"), ez_targets=("ez_tgt", "sum"), deep_targets=("deep_tgt", "sum"),
+    )
+    tds["week"] = tds["game_id"].map(pbp.groupby("game_id")["week"].first())
+    td_weekly = tds.groupby(["scorer_id", "week"]).agg(tds=("game_id", "size"), first_tds=("first", "sum"))
+    WEEK_FIELDS = ["xtd", "early_xtd", "targets", "carries", "rz_targets", "rz_carries", "ez_targets", "deep_targets", "tds", "first_tds"]
+
+    def by_week(team, pid):
+        out = {}
+        if (team, pid) in weekly.index.droplevel(2):
+            for wk, r in weekly.loc[(team, pid)].iterrows():
+                out[int(wk)] = [round(float(r["xtd"]), 3), round(float(r["early_xtd"]), 3)] + [int(r[k]) for k in ("targets", "carries", "rz_targets", "rz_carries", "ez_targets", "deep_targets")] + [0, 0]
+        if pid in td_weekly.index.get_level_values(0):
+            for wk, r in td_weekly.loc[pid].iterrows():
+                row = out.setdefault(int(wk), [0.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0])
+                row[8], row[9] = int(r["tds"]), int(r["first_tds"])
+        return out
+
     for (team, pid), row in grouped.iterrows():
         pos, _, name = pos_lookup(pid, row["week"])
         pos = bucket_position(pos) if pos else None
@@ -2055,6 +2078,9 @@ def compute_td_matchup_model(pbp: pd.DataFrame, scoring_df: pd.DataFrame, pos_lo
                 "tds": int(actual["tds"]) if actual is not None else 0,
                 "first_tds": int(actual["first_tds"]) if actual is not None else 0,
                 **{k: int(row[k]) for k in ("targets", "carries", "rz_targets", "rz_carries", "ez_targets", "deep_targets")},
+                # {week: [xtd, early_xtd, targets, carries, rz_targets,
+                #  rz_carries, ez_targets, deep_targets, tds, first_tds]}
+                "by_week": by_week(team, pid),
             }
         )
     for team in players:

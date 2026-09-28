@@ -849,14 +849,13 @@ function firstTdInjuryStatus(team, week) {
 
 function firstTdPlayerTargets(offTeam, defTeam, teamChance, week) {
   const injured = firstTdInjuryStatus(offTeam, week);
-  const players = ((DATA.player_xtd || {})[offTeam] || []).filter((p) => injured[normName(p.name)] !== "out");
+  // Lineup-weighted (see common.js lineupAdjustedXtd): a starter's game
+  // cut short and a backup's fill-in game don't set anyone's role.
+  const players = lineupAdjustedXtd(offTeam, week).filter((p) => injured[normName(p.name)] !== "out");
   if (!players.length) return [];
-  // Overall involvement: share of the team's targets + carries (Player
-  // Props data) -- a starter who hasn't drawn goal-line looks yet still
-  // plays every snap and can score first on any drive.
-  const props = {};
-  ((DATA.player_props || {})[offTeam] || []).forEach((pp) => (props[normName(pp.name)] = (pp.targets || 0) + (pp.carries || 0)));
-  players.forEach((p) => (p.touches = props[normName(p.name)] || 0));
+  // Overall involvement: share of the team's targets + carries -- a starter
+  // who hasn't drawn goal-line looks yet still plays every snap and can
+  // score first on any drive. (touches comes from lineupAdjustedXtd.)
   const sum = (k) => players.reduce((s, p) => s + (p[k] || 0), 0) || 1;
   const totals = { early: sum("early_xtd_pg"), xtd: sum("xtd_pg"), tds: sum("tds"), touches: sum("touches") };
   const defPosZ = {};
@@ -1045,7 +1044,7 @@ function keyPlayerPool(team, week) {
   const injured = firstTdInjuryStatus(team, week);
   const props = {};
   ((DATA.player_props || {})[team] || []).forEach((p) => (props[normName(p.name)] = p));
-  return ((DATA.player_xtd || {})[team] || [])
+  return lineupAdjustedXtd(team, week)
     .filter((p) => injured[normName(p.name)] !== "out")
     .map((p) => {
       const pp = props[normName(p.name)] || {};

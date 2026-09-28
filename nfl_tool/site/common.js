@@ -1105,3 +1105,97 @@ async function saveSummaryImage() {
 document.addEventListener("click", (e) => {
   if (e.target.closest("#summary-save-btn")) saveSummaryImage();
 });
+
+
+// ---- Lineup-aware game weights (TD Data) ----
+// Raw season totals over-reward a backup's one big game and punish a
+// starter for a game he left early. Per team game, for one player:
+//   - a game he left early (snaps under 60% of his usual) doesn't count;
+//   - a game he missed while listed Out doesn't count against him;
+//   - a game a regular at his position who's healthy THIS week missed or
+//     left early counts LINEUP_DISCOUNT as much (that was a different role).
+// "Regular" = played 60%+ of snaps in at least one game; only regulars are
+// checked for leaving early (a backup's small normal role isn't "partial").
+// Snap shares: build_stats.py player_snaps; injuries: DATA.injuries.
+const LINEUP_PARTIAL_RATIO = 0.6;
+const LINEUP_REGULAR_SNAP = 0.6; // a regular has played 60%+ of snaps in some game
+const LINEUP_DISCOUNT = 0.15;
+const LINEUP_GROUPS = { RB: ["RB"], WR: ["WR", "TE"], TE: ["WR", "TE"], QB: ["QB"] };
+
+function lineupSnapIndex(team) {
+  if (!lineupSnapIndex.cache) lineupSnapIndex.cache = {};
+  if (!lineupSnapIndex.cache[team]) {
+    const map = {};
+    Object.entries((DATA.player_snaps || {})[team] || {}).forEach(([n, v]) => (map[normName(n)] = { ...v, name: n }));
+    lineupSnapIndex.cache[team] = map;
+  }
+  return lineupSnapIndex.cache[team];
+}
+function lineupOutOn(team, name, week) {
+  const list = ((DATA.injuries || {})[team] || {})[String(week)] || [];
+  const hit = list.find((i) => normName(i.full_name) === normName(name));
+  return !!hit && /out|doubtful|reserve|injured|suspend/i.test(hit.report_status || "");
+}
+function lineupMedian(xs) {
+  const v = xs.slice().sort((a, b) => a - b);
+  return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+}
+// Did this snap-count entry play a normal game in `wk`? (false = absent or left early)
+function lineupPlayedNormal(entry, wk) {
+  const s = entry.w[wk];
+  if (s === undefined || s < 0.15) return false;
+  const others = Object.entries(entry.w).filter(([w, v]) => Number(w) !== Number(wk) && v >= 0.15).map(([, v]) => v);
+  if (!others.length) return true;
+  const usual = lineupMedian(others);
+  return !(usual >= 0.4 && s < LINEUP_PARTIAL_RATIO * usual);
+}
+function teamPlayedWeeks(team, beforeWeek) {
+  return (DATA.schedule || [])
+    .filter((g) => g.status === "final" && g.week < beforeWeek && (g.away === team || g.home === team))
+    .map((g) => g.week);
+}
+function lineupWeights(team, name, position, week) {
+  const idx = lineupSnapIndex(team);
+  const mine = idx[normName(name)];
+  const weeks = teamPlayedWeeks(team, week);
+  const group = LINEUP_GROUPS[position] || [];
+  const isRegular = (t) => Math.max(0, ...Object.values(t.w)) >= LINEUP_REGULAR_SNAP;
+  const regulars = Object.entries(idx).filter(
+    ([key, t]) => key !== normName(name) && group.includes(t.pos) && isRegular(t) && !lineupOutOn(team, t.name, week)
+  );
+  const out = {};
+  weeks.forEach((wk) => {
+    let w = 1;
+    if (mine) {
+      const s = mine.w[wk];
+      if (s === undefined && lineupOutOn(team, name, wk)) w = 0;
+      else if (s !== undefined && isRegular(mine) && !lineupPlayedNormal(mine, wk)) w = 0;
+    }
+    if (w && regulars.some(([, t]) => !lineupPlayedNormal(t, wk))) w *= LINEUP_DISCOUNT;
+    out[wk] = w;
+  });
+  if (!Object.values(out).some((w) => w > 0)) weeks.forEach((wk) => (out[wk] = 1));
+  return out;
+}
+
+// player_xtd rows re-derived from their per-game numbers with the weights
+// above: per-game rates (xtd_pg, early_xtd_pg) are weighted averages, and
+// counts are that weighted per-game average times the team's games, so
+// they stay on the season scale every threshold on the page expects.
+// Adds `touches` (targets + carries) on the same basis.
+const LINEUP_FIELDS = ["xtd", "early_xtd", "targets", "carries", "rz_targets", "rz_carries", "ez_targets", "deep_targets", "tds", "first_tds"];
+function lineupAdjustedXtd(team, week) {
+  const rows = (DATA.player_xtd || {})[team] || [];
+  return rows.map((p) => {
+    if (!p.by_week) return { ...p, touches: (p.targets || 0) + (p.carries || 0) };
+    const weights = lineupWeights(team, p.name, p.position, week);
+    const weeks = Object.keys(weights);
+    const wSum = weeks.reduce((s, wk) => s + weights[wk], 0) || 1;
+    const avg = LINEUP_FIELDS.map((_, i) => weeks.reduce((s, wk) => s + weights[wk] * ((p.by_week[wk] || [])[i] || 0), 0) / wSum);
+    const n = weeks.length || 1;
+    const adj = { ...p, xtd_pg: avg[0], early_xtd_pg: avg[1], lineup_weights: weights };
+    LINEUP_FIELDS.slice(2).forEach((f, i) => (adj[f] = avg[i + 2] * n));
+    adj.touches = adj.targets + adj.carries;
+    return adj;
+  });
+}
