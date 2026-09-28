@@ -520,7 +520,10 @@ function renderGameHeader(game) {
 
 // One combined box: team logos as row headers, Spread/Total/Moneyline as
 // columns -- a single glance instead of three separate boxes.
-function renderOddsBar(game) {
+// Novig's main line and price first (pv), best-of-books when Novig has
+// none -- the All Odds button still lists every book.
+function renderOddsBar(baseGame) {
+  const game = { ...baseGame, ...(baseGame.novig || {}) };
   const hasSpread = game.away_team_spread !== null && game.away_spread_odds !== null;
   const hasTotal = game.total_line !== null;
   const hasMl = game.away_moneyline !== null && game.home_moneyline !== null;
@@ -1373,10 +1376,10 @@ const MARKET_LABELS = { spread: "Spread", total: "Total", moneyline: "Moneyline"
 const COLOR_LABELS = { green: "Good Play", yellow: "Lean", red: "No Confidence" };
 const COLOR_HEADER_CLASS = { green: "tier-good", yellow: "tier-mid", red: "tier-bad" };
 
-// Units assume a flat 1u stake on every pick, spread/total priced at a
-// standardized -105 and moneyline at its real frozen price -- see picks.js'
-// unitsForPick for why. Win% dropped from display entirely -- see
-// unitsStyle() below for why it's also no longer what colors the cell.
+// Units assume a flat 1u stake on every pick at its real frozen price
+// (Novig's when it had one) -- see picks.js' unitsForPick. Win% dropped
+// from display entirely -- see unitsStyle() below for why it's also no
+// longer what colors the cell.
 function matrixCellText(t) {
   const unitsStr = `${t.units >= 0 ? "+" : ""}${t.units.toFixed(2)}u`;
   return `${t.win}-${t.loss}-${t.push}<br>(${unitsStr})`;
@@ -1429,7 +1432,7 @@ function renderPickSummary() {
     .join("");
   document.getElementById("picks-record").innerHTML = `
     <h3>Your Record</h3>
-    ${picks.length ? `<p class="no-data-note">Units assume 1u per pick -- spread/total priced at a flat -105, moneyline at its real price.</p>` : ""}
+    ${picks.length ? `<p class="no-data-note">Units assume 1u per pick at the price saved when you made it (Novig's price when it had one).</p>` : ""}
     ${renderPickMatrix(picks) || `<p class="no-data-note">No picks saved yet.</p>`}
   `;
   document.getElementById("picks-recent").innerHTML = `

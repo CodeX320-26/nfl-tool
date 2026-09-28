@@ -147,16 +147,19 @@ function gsSigned(n) {
   if (n === 0) return "PK";
   return n > 0 ? `+${fmt(n, 1).replace(/\.0$/, "")}` : fmt(n, 1).replace(/\.0$/, "");
 }
+// Novig's main line and price first (pv), best-of-books when Novig has none.
 function gsLines(game) {
   const { away, home } = game;
-  const hasSpread = game.home_team_spread !== null && game.home_team_spread !== undefined;
-  const fav = hasSpread ? (game.home_team_spread <= 0 ? home : away) : null;
-  const favLine = fav === home ? game.home_team_spread : game.away_team_spread;
+  const homeSpread = pv(game, "home_team_spread");
+  const hasSpread = homeSpread !== null && homeSpread !== undefined;
+  const fav = hasSpread ? (homeSpread <= 0 ? home : away) : null;
+  const favLine = fav === home ? homeSpread : pv(game, "away_team_spread");
+  const total = pv(game, "total_line");
   const ml = (team, odds, prob) => `<div class="gs-ml">${teamLogoMini(team, 16)}<b>${fmtOddsSigned(odds)}</b><span>${prob ? `${Math.round(prob * 100)}%` : ""}</span></div>`;
   return `<div class="gs-lines">
     <div class="gs-tile"><div class="gs-tile-label">Spread</div><div class="gs-tile-big">${fav ? `${teamLogoMini(fav, 20)} ${gsSigned(favLine)}` : "--"}</div></div>
-    <div class="gs-tile"><div class="gs-tile-label">Total</div><div class="gs-tile-big">${game.total_line ? fmt(game.total_line, 1).replace(/\.0$/, "") : "--"}</div></div>
-    <div class="gs-tile"><div class="gs-tile-label">Moneyline</div>${game.away_moneyline !== null && game.away_moneyline !== undefined ? ml(away, game.away_moneyline, game.away_ml_implied_prob) + ml(home, game.home_moneyline, game.home_ml_implied_prob) : `<div class="gs-tile-big">--</div>`}</div>
+    <div class="gs-tile"><div class="gs-tile-label">Total</div><div class="gs-tile-big">${total ? fmt(total, 1).replace(/\.0$/, "") : "--"}</div></div>
+    <div class="gs-tile"><div class="gs-tile-label">Moneyline</div>${pv(game, "away_moneyline") !== null && pv(game, "away_moneyline") !== undefined ? ml(away, pv(game, "away_moneyline"), pv(game, "away_ml_implied_prob")) + ml(home, pv(game, "home_moneyline"), pv(game, "home_ml_implied_prob")) : `<div class="gs-tile-big">--</div>`}</div>
   </div>`;
 }
 

@@ -1565,6 +1565,67 @@ def extract_novig_schedule_odds(events: list, teams) -> dict:
     return result
 
 
+def extract_novig_game_lines(novig_games: dict) -> dict:
+    """Novig's main (consensus) spread, total and moneyline per game, with
+    Novig's own prices -- same field names as a schedule row, keyed
+    "AWAY_HOME" like extract_novig_schedule_odds. Straight from Novig's feed
+    (every build), so the Lines tiles and the Pick Tracker's frozen price
+    are Novig's real current number, not SGO's occasional copy of it."""
+    out = {}
+    for (away, home), markets in novig_games.items():
+        odds = {}
+        for m in markets:
+            if not m.get("is_consensus") or m.get("player"):
+                continue
+            mtype = m.get("type")
+            outs = m.get("outcomes") or []
+            if mtype == "SPREAD":
+                for o in outs:
+                    sym = normalize_team(NOVIG_TEAM_FIXES.get(((o.get("competitor") or {}).get("symbol")), ((o.get("competitor") or {}).get("symbol"))))
+                    parts = (o.get("description") or "").split()
+                    try:
+                        line = float(parts[-1])
+                    except (ValueError, IndexError):
+                        continue
+                    side = "away" if sym == away else "home" if sym == home else None
+                    if side:
+                        odds[f"{side}_team_spread"] = line
+                        odds[f"{side}_spread_odds"] = novig_price_to_american(o.get("available"))
+            elif mtype == "TOTAL" and m.get("strike") is not None:
+                odds["total_line"] = float(m["strike"])
+                for o in outs:
+                    word = (o.get("description") or "").split(" ")[0].lower()
+                    if word in ("over", "under"):
+                        odds[f"{word}_odds"] = novig_price_to_american(o.get("available"))
+            elif mtype == "MONEY":
+                prices = {}
+                for o in outs:
+                    sym = normalize_team(NOVIG_TEAM_FIXES.get(((o.get("competitor") or {}).get("symbol")), ((o.get("competitor") or {}).get("symbol"))))
+                    side = "away" if sym == away else "home" if sym == home else None
+                    if side:
+                        odds[f"{side}_moneyline"] = novig_price_to_american(o.get("available"))
+                        prices[side] = o.get("available")
+                if prices.get("away") and prices.get("home"):
+                    tot = prices["away"] + prices["home"]
+                    odds["away_ml_implied_prob"] = round(prices["away"] / tot, 3)
+                    odds["home_ml_implied_prob"] = round(prices["home"] / tot, 3)
+        # A market only counts when Novig prices BOTH sides -- otherwise the
+        # whole market falls back to best-of-books, so a line and a price
+        # from two different places never get paired.
+        groups = {
+            "spread": ["away_team_spread", "home_team_spread", "away_spread_odds", "home_spread_odds"],
+            "total": ["total_line", "over_odds", "under_odds"],
+            "moneyline": ["away_moneyline", "home_moneyline", "away_ml_implied_prob", "home_ml_implied_prob"],
+        }
+        clean = {}
+        for fields in groups.values():
+            if all(odds.get(f) is not None for f in fields):
+                clean.update({f: odds[f] for f in fields})
+        if clean:
+            out[f"{away}_{home}"] = clean
+    return out
+
+
 def apply_novig_pick_odds(schedule: list, novig_odds: dict) -> None:
     """Attaches game["novig"] = {same field names as the top-level schedule
     entry} wherever Novig has posted a price -- kept as a SEPARATE nested
@@ -4328,6 +4389,12 @@ def main():
             and row.report_status.lower() in ("out", "doubtful", "injured reserve", "ir", "suspended")
         }
         novig_games, novig_debug = fetch_novig_week(week_games, starts_after, starts_before)
+        # Novig's own main lines take over each game's "novig" object
+        # (SGO's copy, if any, only fills markets Novig's feed didn't have).
+        for g in week_games:
+            direct = extract_novig_game_lines(novig_games).get(f"{g['away']}_{g['home']}") if novig_games else None
+            if direct:
+                g["novig"] = {**(g.get("novig") or {}), **direct}
         if novig_games:
             n_ou, n_any, n_first = extract_novig_props(novig_games, teams, roster_positions, unavailable_names)
             player_prop_markets = merge_prop_markets(n_ou, player_prop_markets)
