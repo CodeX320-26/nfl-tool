@@ -5,6 +5,7 @@
 // vouches for that check for RECHECK_MS, so losing the role (cancelled
 // subscription, left the server, kicked) cuts access within that window.
 //
+// Setup finished 2026-09-28 (secrets added); ENFORCE below is the on switch.
 // Stays switched OFF (site open) until the client ID, allowed roles, and
 // both secrets (DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN -- Cloudflare Pages
 // secrets, pushed from GitHub secrets by deploy.yml) are all in place.
