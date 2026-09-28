@@ -2718,3 +2718,15 @@ footer { border-top-color: var(--border); }
 .pass-zone-identity-stat:not(.tier-good):not(.tier-mid):not(.tier-bad) { background: var(--panel); }
 .pass-zone-identity-stat span { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; opacity: 0.8; }
 .pass-zone-identity-stat strong { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; padding: 0; background: none; }
+
+/* Offense player mini grids: 3 cards per row, uniform rows */
+.pass-zone-players-inline { gap: 10px; }
+.pass-zone-player-mini-card { flex: 0 0 calc((100% - 20px) / 3); min-width: 0; max-width: none; }
+.pass-zone-player-banner-mini .pass-zone-player-photo { width: 30px; height: 30px; }
+.pass-zone-player-banner-mini .pass-zone-player-name { font-size: 0.86rem; }
+.pass-zone-grid-mini { border-spacing: 4px; font-size: 0.78rem; }
+.pass-zone-grid-mini th, .pass-zone-grid-mini td { padding: 0 2px; height: 30px; border-radius: 7px; }
+.pass-zone-grid-mini thead th { height: 22px; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.06em; color: var(--muted); }
+.pass-zone-row-label-mini { width: 38px; white-space: nowrap; font-size: 0.64rem; font-weight: 800; color: var(--muted); background: var(--panel); }
+.pass-zone-heat-cell { font-size: 0.82rem; font-weight: 800; }
+.pass-zone-heat-cell:not([style]) { background: var(--panel); color: var(--muted); }
