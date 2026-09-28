@@ -14,6 +14,7 @@ const GUILD_ID = "1295760852892385290";
 const CLIENT_ID = "1554268816521957447"; // Discord app's OAuth2 Client ID (not secret)
 const ALLOWED_ROLE_IDS = ["1471877733868109937", "1471880013824393266"]; // roles that get in
 const INVITE_URL = "https://gmgsports.buildr.bet/"; // join / get-access page (Buildr)
+const OWNER_IDS = ["613105360286253076"]; // Discord user IDs that see owner-only controls (Update Odds)
 // false = TEST MODE: the site stays open to everyone, but /auth/login works
 // and /auth/check shows whether this Discord account WOULD get in. Flip to
 // true (one-line push) once that's confirmed.
@@ -252,7 +253,7 @@ async function handleApi(request, env, session, json) {
     const { results } = await env.DB.prepare("SELECT k, v, updated FROM user_state WHERE uid = ?").bind(session.uid).all();
     const state = {};
     for (const r of results || []) state[r.k] = { v: r.v, updated: r.updated };
-    return json({ user: { name: session.name }, state });
+    return json({ user: { name: session.name, owner: OWNER_IDS.includes(session.uid) }, state });
   }
   if (request.method === "PUT") {
     let body;

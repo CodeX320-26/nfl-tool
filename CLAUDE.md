@@ -98,6 +98,9 @@ context. It is the only copy that travels with the repo.
     - Synced keys are listed in both `SYNC_KEYS` (middleware) and `KEYS` (sync.js). **Add new
       per-user data to both**, and call `window.NFLSync?.push(key, value)` in its save function.
     - Display prefs (theme, views, selected game) stay per-device.
+  - **Owner-only controls:** `OWNER_IDS` (the user's Discord ID `613105360286253076`) makes `/api/state`
+    return `user.owner`. sync.js then adds `html.is-owner`, and the **Update Odds** button (which runs
+    the GitHub build) is shown only then, plus on localhost.
   - Known bypass until fixed: the GitHub Pages copy still serves the site to anyone who hits
     GitHub's IPs directly, and the repo is public. Turn off GitHub Pages and make the repo
     private once the gate is confirmed.

@@ -94,6 +94,8 @@
     }
     enabled = true;
     showAccount(data.user);
+    // Owner-only controls (Update Odds) -- hidden for members by style.css.
+    if (data.user && data.user.owner) document.documentElement.classList.add("is-owner");
     const server = data.state || {};
     const meta = readMeta();
     let changed = false;
@@ -170,6 +172,7 @@
     },
   };
 
+  if (["localhost", "127.0.0.1"].includes(location.hostname)) document.documentElement.classList.add("local-dev");
   pull();
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") pull();

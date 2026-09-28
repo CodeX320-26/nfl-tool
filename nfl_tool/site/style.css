@@ -2965,3 +2965,9 @@ footer { border-top-color: var(--border); }
 .acct-chip .acct-name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
 .acct-chip a { padding: 2px 10px; border-radius: 999px; background: var(--panel-2); color: var(--muted); text-decoration: none; font-size: 0.74rem; }
 .acct-chip a:hover { color: var(--text); }
+
+/* Update Odds runs the GitHub build -- only the owner can use it, so only
+   the owner sees it (sync.js adds .is-owner from the Discord profile).
+   Local dev (no profile server) shows it as before. */
+html:not(.is-owner) .update-odds-link { display: none; }
+html.local-dev .update-odds-link { display: inline-flex; }
