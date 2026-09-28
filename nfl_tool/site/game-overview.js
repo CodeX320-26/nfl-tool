@@ -416,7 +416,7 @@ function renderSummaryTable(offTeam, defTeam) {
   }).join("");
   return `<table class="data-table summary-grade-table">
     <thead>${summaryTableHeader(offTeam, defTeam)}</thead>
-    <tbody>${rows}</tbody>
+    <tbody><tr><td class="section-group-label" colspan="4">Team Grades</td></tr>${rows}</tbody>
   </table>`;
 }
 
@@ -920,7 +920,7 @@ function renderGeneralStatsTable(offTeam, defTeam) {
         return `<tr><td>${labelHtml}</td>${offCell}${defCell}${edgeCell(offCls, defCls, offTeam, defTeam, offExtreme, defExtreme)}</tr>`;
       })
       .join("");
-    return `<tr><td class="section-group-label" colspan="4">${group.label}</td></tr>${rows}`;
+    return `<tr class="group-gap"><td colspan="4"></td></tr><tr><td class="section-group-label" colspan="4">${group.label}</td></tr>${rows}`;
   }).join("");
 
   return `<table class="data-table general-stat-table">
@@ -1079,7 +1079,18 @@ function renderSchemeGroup(group, offTeam, defTeam) {
     })
     .join("");
   const perfCaption = group.inlineUnit ? "" : group.perfLabel;
-  return `<tr class="group-row"><td>${group.label}</td><td class="metric-caption" colspan="2">${perfCaption}</td><td class="metric-caption"></td><td class="metric-caption"></td></tr>${rows}`;
+  return `<tr class="group-gap"><td colspan="5"></td></tr><tr class="group-row"><td colspan="5"><span class="group-row-label">${group.label}</span>${perfCaption ? `<span class="group-row-caption">${perfCaption}</span>` : ""}</td></tr>${rows}`;
+}
+
+// Header bar for one matchup box in General Stats & Scheme: this team's
+// offense against the other team's defense, in the offense's colors.
+function matchupPanelHead(offTeam, defTeam) {
+  const rgb = teamAccentRgb(offTeam).join(",");
+  return `<div class="gen-panel-head" style="background:rgba(${rgb},0.22);border-left:4px solid rgb(${rgb})">
+    ${teamLogoMini(offTeam, 26)}<span class="gen-panel-team">${TEAM_NAMES[offTeam] || offTeam}</span><span class="gen-panel-side">Offense</span>
+    <span class="gen-panel-vs">vs</span>
+    ${teamLogoMini(defTeam, 22)}<span class="gen-panel-opp">${defTeam} Defense</span>
+  </div>`;
 }
 
 function renderSchemeTable(offTeam, defTeam) {
@@ -1628,6 +1639,8 @@ function render() {
   document.getElementById("col-home-injuries").innerHTML = renderInjuryPanel(home, game.week);
   document.getElementById("odds-content").innerHTML = renderOddsBar(game);
   document.getElementById("resume-content").innerHTML = renderResumeChart(game);
+  document.getElementById("col-away-matchup-head").innerHTML = matchupPanelHead(away, home);
+  document.getElementById("col-home-matchup-head").innerHTML = matchupPanelHead(home, away);
   document.getElementById("col-away-general").innerHTML = renderGeneralStatsTable(away, home);
   document.getElementById("col-home-general").innerHTML = renderGeneralStatsTable(home, away);
   document.getElementById("scheme-notes").innerHTML = renderSchemeNotes(away, home);

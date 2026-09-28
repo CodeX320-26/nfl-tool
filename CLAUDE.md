@@ -137,6 +137,12 @@ context. It is the only copy that travels with the repo.
   - Rush lanes are big tiles like the pass zones.
   - The Passing tab is one boxed column per team.
   - Pick Tracker buttons match the summary's My Picks rail.
+  - Tier cells are **filled** (tint plus a soft edge), never outline-only, in both themes.
+  - Group headers inside tables (Production, Turnovers & Pressure, Run Defense, Team Grades...)
+    are solid bars with an accent left edge and a small gap above (`group-gap` spacer rows).
+  - Game Previews General Stats & Scheme is two boxed matchups ("ATL Offense vs GB Defense"),
+    each holding its stat table plus scheme and Team Grades. Grade letters are the same size as
+    the numbers, and Heavy/Light Box values stay on one line.
   - New UI should reuse these patterns rather than add a new look.
 - Player Props pass-zone grids (Pass D Allowed / Passing Offense) use the summary-card look: rounded zone tiles, big share numbers, header/row shares as big red→green numbers with fill bars (no small % tags), stat tiles underneath. The offense per-player mini grids sit 3 cards per row with uniform row heights.
 - Schedule strip (top of every page): finished games show each team's score under its logo (winner bold), not the date.
