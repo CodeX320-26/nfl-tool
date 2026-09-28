@@ -123,6 +123,7 @@ context. It is the only copy that travels with the repo.
     with A–F grades and Mismatch/Tough/Good vs Good/Bad vs Bad tags.
   - Right side: My Picks rail with the Novig ad.
   - "Scheme" is labeled "Blitz & Box" on the card.
+- Player Props pass-zone grids (Pass D Allowed / Passing Offense) use the summary-card look: rounded zone tiles, big share numbers, header/row shares as big red→green numbers with fill bars (no small % tags), stat tiles underneath.
 - Schedule strip (top of every page): finished games show each team's score under its logo (winner bold), not the date.
 - Player Props page extras:
   - The **Pick props** list is grouped Passing / Rushing / Receiving / Other, then by player.

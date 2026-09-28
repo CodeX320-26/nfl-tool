@@ -2688,3 +2688,33 @@ footer { border-top-color: var(--border); }
 .matchup-score-win { color: var(--text); font-weight: 800; }
 .matchup-score-loss { opacity: 0.7; }
 .matchup-card-final .at { align-self: center; margin-top: -14px; }
+
+/* ---- Pass zone grids: summary-card look ---- */
+.pass-zone-block { background: var(--panel-2); border: 1px solid var(--border); border-radius: 14px; padding: 10px 10px 12px; }
+.pass-zone-team-banner { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; margin-bottom: 6px; }
+.pass-zone-team-banner .team-logo { width: 30px; height: 30px; }
+.pass-zone-team-name { font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
+.pass-zone-team-side { margin-left: auto; padding: 2px 10px; border-radius: 999px; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; opacity: 1; background: var(--panel); border: 1px solid var(--border-strong); color: var(--text); }
+.pass-zone-grid { border-collapse: separate; border-spacing: 6px; table-layout: fixed; }
+.pass-zone-grid th, .pass-zone-grid td { border: none; border-radius: 10px; padding: 8px 6px; }
+.pass-zone-grid thead th { background: var(--panel) !important; vertical-align: bottom; }
+.pass-zone-grid thead th:first-child { background: transparent !important; }
+.pass-zone-col-label, .pass-zone-row-label-text { display: block; font-family: var(--font-display); font-size: 0.9rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.pass-zone-row-label { background: var(--panel); width: 92px; }
+.pass-zone-cell { transition: transform 0.12s ease; }
+.pass-zone-cell:not(.tier-good):not(.tier-mid):not(.tier-bad) { background: var(--panel); }
+.pass-zone-cell:hover { transform: translateY(-1px); outline: none !important; box-shadow: 0 0 0 2px var(--accent) inset; }
+.pass-zone-cell-inner { min-height: 74px; justify-content: center; }
+.pass-zone-cell-inner .pass-zone-rate { font-family: var(--font-display); font-size: 1.9rem; font-weight: 800; line-height: 1; }
+.pass-zone-cell-comp { font-size: 0.82rem; font-weight: 800; margin-top: 3px; }
+.pass-zone-cell-sample { font-size: 0.68rem; opacity: 0.75; }
+.pz-share { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-top: 4px; }
+.pz-share b { font-family: var(--font-display); font-size: 1.35rem; font-weight: 800; line-height: 1; color: hsl(var(--pz-hue), 75%, 58%); }
+.pz-bar { display: block; width: 70%; max-width: 90px; height: 5px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.pz-bar span { display: block; height: 100%; border-radius: 999px; background: hsl(var(--pz-hue), 70%, 48%); }
+:root[data-theme="light"] .pz-share b { color: hsl(var(--pz-hue), 75%, 34%); }
+.pass-zone-identity { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px; }
+.pass-zone-identity-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 4px; border-radius: 10px; text-align: center; }
+.pass-zone-identity-stat:not(.tier-good):not(.tier-mid):not(.tier-bad) { background: var(--panel); }
+.pass-zone-identity-stat span { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; opacity: 0.8; }
+.pass-zone-identity-stat strong { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; padding: 0; background: none; }

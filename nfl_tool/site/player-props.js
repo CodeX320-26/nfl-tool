@@ -999,12 +999,16 @@ function passZoneColSharePool(chart) {
 // the same thing the cells around it already do.
 // In League-rank mode the badge instead grades the whole row/column
 // (zoneKeys) against the league with the same composite as the cells.
+// Share of throws for a whole row/column: a big number shaded red ->
+// yellow -> green by how it compares (same z the cells use), with a fill
+// bar underneath showing the share itself.
 function passZoneTotalBadge(share, pool, league) {
   if (share === null) return "";
   const z = passZoneColorMode === "league" && league ? passZoneLeagueCompositeZ(league.team, league.side, league.zoneKeys) : zScore(share, pool, true);
-  const cls = tierFromZ(z);
-  const alpha = alphaAttrFromZ(z);
-  return `<span class="pass-zone-total-badge ${cls}"${alpha}>${Math.round(share * 100)}%</span>`;
+  const q = z === null || z === undefined ? 0.5 : Math.max(0, Math.min(1, 0.5 + z / 3));
+  const hue = Math.round(q * 120);
+  const pct = Math.round(share * 100);
+  return `<span class="pz-share" style="--pz-hue:${hue}"><b>${pct}%</b><span class="pz-bar"><span style="width:${Math.min(100, pct * 2)}%"></span></span></span>`;
 }
 
 // Tinted the same way every other team table on the site headers its
@@ -1351,7 +1355,7 @@ function renderPassIdentityCard(team, side) {
     const pool = passIdentityPool(side, field);
     const cls = raw === null || raw === undefined ? "" : percentileTier(raw, pool, invert);
     const alpha = raw === null || raw === undefined ? "" : tierAlphaAttr(raw, pool, invert);
-    return `<div class="pass-zone-identity-stat"><span>${label}</span><strong class="${cls}"${alpha}>${value}</strong></div>`;
+    return `<div class="pass-zone-identity-stat ${cls}"${alpha}><span>${label}</span><strong>${value}</strong></div>`;
   };
   return `<div class="pass-zone-identity">
     ${statRow("Lead Zone", zoneLabel(s.leadZoneKey), "leadZoneShare", s.leadZoneShare)}
@@ -1372,10 +1376,10 @@ function renderPassIdentityCard(team, side) {
 // team's own defenders.
 function passZoneTeamHeader(team, side) {
   const rgb = teamAccentRgb(team);
-  const sideLabel = side === "off" ? "Passing Offense" : "Pass Defense Allowed";
+  const sideLabel = side === "off" ? "Passing Offense" : "Pass D Allowed";
   const clickable = side === "off";
   const cls = `pass-zone-team-banner${clickable ? " pass-zone-team-click" : ""}`;
-  return `<div class="${cls}" style="background:rgba(${rgb.join(",")},0.16)"${clickable ? ` data-team="${team}"` : ""}>
+  return `<div class="${cls}" style="background:rgba(${rgb.join(",")},0.22);border-left:4px solid rgb(${rgb.join(",")})"${clickable ? ` data-team="${team}"` : ""}>
     <img src="${teamLogoUrl(team)}" class="team-logo" alt="${team}" loading="lazy">
     <span class="pass-zone-team-name">${TEAM_NAMES[team] || team}</span>
     <span class="pass-zone-team-side">${sideLabel}${clickable ? " &rsaquo;" : ""}</span>
