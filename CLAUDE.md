@@ -72,7 +72,7 @@ context. It is the only copy that travels with the repo.
 - The user wants access tied to live roles; someone who paid a week must not keep access after cancelling.
 - **Gate code:** `nfl_tool/functions/_middleware.js` (Pages Functions; deploy.yml deploys from `nfl_tool/`
   so the functions get bundled). It holds the config constants: GUILD_ID `1295760852892385290`,
-  CLIENT_ID, ALLOWED_ROLE_IDS (`1471877733868109937`, `1471880013824393266`) and INVITE_URL.
+  CLIENT_ID, ALLOWED_ROLE_IDS (`1471877733868109937`, `1471880013824393266`) and INVITE_URL (`https://gmgsports.buildr.bet/`).
   - The secrets `DISCORD_CLIENT_SECRET` and `DISCORD_BOT_TOKEN` live in GitHub secrets and are copied
     into the Pages project by deploy.yml before each Cloudflare deploy.
   - The gate stays **off** (site open) until CLIENT_ID (`1554268816521957447`), roles and both secrets exist.

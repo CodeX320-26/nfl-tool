@@ -13,7 +13,7 @@
 const GUILD_ID = "1295760852892385290";
 const CLIENT_ID = "1554268816521957447"; // Discord app's OAuth2 Client ID (not secret)
 const ALLOWED_ROLE_IDS = ["1471877733868109937", "1471880013824393266"]; // roles that get in
-const INVITE_URL = ""; // "Join the Discord" button
+const INVITE_URL = "https://gmgsports.buildr.bet/"; // join / get-access page (Buildr)
 // false = TEST MODE: the site stays open to everyone, but /auth/login works
 // and /auth/check shows whether this Discord account WOULD get in. Flip to
 // true (one-line push) once that's confirmed.
@@ -140,7 +140,7 @@ function deniedPage(reason) {
   return page(
     "No access -- GMG's NFL Suite",
     `<p>${msg}</p>
-     ${INVITE_URL && reason !== "api" ? `<a class="btn discord" href="${INVITE_URL}" target="_blank" rel="noopener">${DISCORD_ICON}Open the GMG Discord</a>` : ""}
+     ${INVITE_URL && reason !== "api" ? `<a class="btn discord" href="${INVITE_URL}" target="_blank" rel="noopener">${DISCORD_ICON}${reason === "no-role" ? "Get access" : "Join the GMG Discord"}</a>` : ""}
      <a class="btn ghost" href="/auth/logout">Use a different Discord account</a>`,
     403,
     // Discord outage keeps the session; a real "no" clears it.
