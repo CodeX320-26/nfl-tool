@@ -2541,3 +2541,34 @@ footer { border-top-color: var(--border); }
 .gs-card .sc-main > .gs-matchups { flex: 1 1 auto; }
 .gs-card .sc-main { justify-content: space-between; }
 .gs-card .sc-main > .sc-section, .gs-card .sc-main > .gs-matchups { flex: 0 0 auto; }
+
+/* Game Summary v2: compact top, bigger matchups */
+.gs-card .sc-main { justify-content: flex-start; gap: 8px; }
+.gs-card .sc-main > .gs-matchups { flex: 1 1 auto; display: flex; flex-direction: column; }
+.gs-card .gs-matchups > .sc-cols { flex: 1 1 auto; }
+.gs-card .gs-compact { padding: 6px 10px 8px; }
+.gs-card .gs-compact .sc-section-title { font-size: 0.9rem; margin-bottom: 5px; }
+.gs-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.gs-two .gs-inj-row { grid-template-columns: 58px 1fr; padding: 0; }
+.gs-top { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+.gs-lines { display: flex; gap: 6px; }
+.gs-tile { padding: 5px 9px 6px; gap: 2px; min-width: 76px; }
+.gs-tile-big { font-size: 1.25rem; }
+.gs-ml { display: flex; align-items: center; gap: 5px; font-size: 0.82rem; line-height: 1.25; white-space: nowrap; }
+.gs-ml b { font-weight: 800; }
+.gs-ml span { color: var(--muted); font-size: 0.72rem; font-weight: 700; margin-left: auto; padding-left: 6px; }
+.gs-res-row { grid-template-columns: 58px minmax(0, 1fr) auto; gap: 6px; padding: 2px 0; }
+.gs-res-recs { display: flex; flex-direction: column; align-items: flex-end; font-size: 0.72rem; font-weight: 800; line-height: 1.2; white-space: nowrap; }
+.gs-res-team { font-size: 0.92rem; }
+.gs-col { gap: 6px; padding: 10px 12px 12px; }
+.gs-rows { gap: 5px; }
+.gs-row { grid-template-columns: minmax(0, 1fr) 70px 20px 70px 118px; gap: 6px; font-size: 0.92rem; }
+.gs-grade, .gs-val, .gs-tag { height: 28px; }
+.gs-grade { font-size: 1.25rem; }
+.gs-val { font-size: 0.86rem; }
+.gs-tag { font-size: 0.68rem; }
+.gs-head-row { margin-bottom: 2px; }
+.gs-head { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 30px; border-radius: 6px 6px 0 0; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.05em; color: var(--muted); }
+.gs-head b { font-family: var(--font-display); font-size: 1rem; color: var(--text); letter-spacing: 0.02em; }
+.gs-sub { margin-top: 8px; font-size: 0.66rem; }
+.gs-row { grid-template-columns: minmax(0, 1fr) 62px 16px 62px 104px; gap: 5px; }

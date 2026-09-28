@@ -13,7 +13,7 @@ try {
   // localStorage unavailable -- opens on the full preview.
 }
 const GS_EDGE_Z = TIER_Z_THRESHOLD; // same line as the page's green/red tiers
-const GS_EDGES_SHOWN = 4;
+const GS_EDGES_SHOWN = 6;
 const GS_INJURIES_SHOWN = 5;
 
 // ---- matchup tags ----
@@ -47,6 +47,11 @@ function gsZClass(z) {
   return z >= GS_EDGE_Z ? "gs-good" : z <= -GS_EDGE_Z ? "gs-bad" : "";
 }
 
+// "Scheme" on the full page = how an offense does against the looks a
+// defense throws at it (blitzes, pressure, 7+ or 6- man boxes), and how a
+// defense does when it shows them. Named for what it is on the card.
+const GS_CATEGORY_LABELS = { Scheme: "Blitz & Box" };
+
 // Team grades, offense vs the other defense.
 function gsGradeRows(offTeam, defTeam) {
   return SUMMARY_CATEGORIES.map((cat) => {
@@ -57,7 +62,7 @@ function gsGradeRows(offTeam, defTeam) {
     const good = (g) => g === "A" || g === "B";
     const bad = (g) => g === "D" || g === "F";
     const tag = gsTag(good(og), bad(og), good(dg), bad(dg));
-    return `<div class="gs-row"><span class="gs-row-label">${cat.label}</span>${gsGradeBox(og)}<span class="gs-vs">vs</span>${gsGradeBox(dg)}${gsTagHtml(tag)}</div>`;
+    return `<div class="gs-row"><span class="gs-row-label">${GS_CATEGORY_LABELS[cat.label] || cat.label}</span>${gsGradeBox(og)}<span class="gs-vs">vs</span>${gsGradeBox(dg)}${gsTagHtml(tag)}</div>`;
   }).join("");
 }
 
@@ -122,10 +127,14 @@ function gsStatEdges(offTeam, defTeam) {
 function gsMatchupColumn(offTeam, defTeam) {
   const edges = gsStatEdges(offTeam, defTeam);
   const edgeRows = edges.length
-    ? edges.map((e) => `<div class="gs-row gs-edge"><span class="gs-row-label">${e.label}${e.scheme ? ` <span class="gs-scheme">Scheme</span>` : ""}</span>${e.off}<span class="gs-vs">vs</span>${e.def}${gsTagHtml(e.tag)}</div>`).join("")
+    ? edges.map((e) => `<div class="gs-row gs-edge"><span class="gs-row-label">${e.label}</span>${e.off}<span class="gs-vs">vs</span>${e.def}${gsTagHtml(e.tag)}</div>`).join("")
     : `<div class="gs-none">No big stat edges</div>`;
+  const head = (team, side) => {
+    const rgb = teamAccentRgb(team);
+    return `<span class="gs-head" style="background:rgba(${rgb.join(",")},0.35);border-bottom:3px solid rgb(${rgb.join(",")})">${teamLogoMini(team, 18)}<b>${team}</b><span>${side}</span></span>`;
+  };
   return `<div class="sc-col gs-col">
-    <div class="gs-col-head">${teamLogoMini(offTeam, 18)} <b>${offTeam}</b> OFF <span class="gs-vs">vs</span> ${teamLogoMini(defTeam, 18)} <b>${defTeam}</b> DEF</div>
+    <div class="gs-row gs-head-row"><span></span>${head(offTeam, "OFF")}<span></span>${head(defTeam, "DEF")}<span></span></div>
     <div class="gs-rows">${gsGradeRows(offTeam, defTeam)}</div>
     <div class="gs-sub">Key stat edges</div>
     <div class="gs-rows">${edgeRows}</div>
@@ -140,35 +149,14 @@ function gsSigned(n) {
 }
 function gsLines(game) {
   const { away, home } = game;
-  const fav = game.home_team_spread !== null && game.home_team_spread !== undefined ? (game.home_team_spread <= 0 ? home : away) : null;
+  const hasSpread = game.home_team_spread !== null && game.home_team_spread !== undefined;
+  const fav = hasSpread ? (game.home_team_spread <= 0 ? home : away) : null;
   const favLine = fav === home ? game.home_team_spread : game.away_team_spread;
-  const dog = fav === home ? away : home;
-  const dogLine = fav === home ? game.away_team_spread : game.home_team_spread;
-  const favOdds = fav === home ? game.home_spread_odds : game.away_spread_odds;
-  const dogOdds = fav === home ? game.away_spread_odds : game.home_spread_odds;
-  const implied = (spread) => (game.total_line && spread !== null && spread !== undefined ? (game.total_line - spread) / 2 : null);
-  const pa = game.away_ml_implied_prob;
-  const ph = game.home_ml_implied_prob;
-  const rgbA = teamAccentRgb(away);
-  const rgbH = teamAccentRgb(home);
-  const scoreA = implied(game.away_team_spread);
-  const scoreH = implied(game.home_team_spread);
+  const ml = (team, odds, prob) => `<div class="gs-ml">${teamLogoMini(team, 16)}<b>${fmtOddsSigned(odds)}</b><span>${prob ? `${Math.round(prob * 100)}%` : ""}</span></div>`;
   return `<div class="gs-lines">
-    <div class="gs-tile">
-      <div class="gs-tile-label">Spread</div>
-      ${fav ? `<div class="gs-tile-big">${teamLogoMini(fav, 26)} ${fav} ${gsSigned(favLine)} <span class="gs-price">${fmtOddsSigned(favOdds)}</span></div>
-      <div class="gs-tile-small">${teamLogoMini(dog, 16)} ${dog} ${gsSigned(dogLine)} <span class="gs-price">${fmtOddsSigned(dogOdds)}</span></div>` : `<div class="gs-tile-big">--</div>`}
-    </div>
-    <div class="gs-tile">
-      <div class="gs-tile-label">Total</div>
-      <div class="gs-tile-big">${game.total_line ? `O/U ${fmt(game.total_line, 1).replace(/\.0$/, "")}` : "--"}</div>
-      <div class="gs-tile-small">${scoreA !== null ? `${away} ${fmt(scoreA, 1).replace(/\.0$/, "")} &middot; ${home} ${fmt(scoreH, 1).replace(/\.0$/, "")}` : ""}</div>
-    </div>
-    <div class="gs-tile gs-tile-ml">
-      <div class="gs-tile-label">Moneyline</div>
-      ${pa ? `<div class="gs-ml-row"><span>${teamLogoMini(away, 18)} <b>${fmtOddsSigned(game.away_moneyline)}</b></span><span><b>${fmtOddsSigned(game.home_moneyline)}</b> ${teamLogoMini(home, 18)}</span></div>
-      <div class="gs-ml-bar"><span style="width:${pa * 100}%;background:rgb(${rgbA.join(",")})">${Math.round(pa * 100)}%</span><span style="width:${ph * 100}%;background:rgb(${rgbH.join(",")})">${Math.round(ph * 100)}%</span></div>` : `<div class="gs-tile-big">--</div>`}
-    </div>
+    <div class="gs-tile"><div class="gs-tile-label">Spread</div><div class="gs-tile-big">${fav ? `${teamLogoMini(fav, 20)} ${gsSigned(favLine)}` : "--"}</div></div>
+    <div class="gs-tile"><div class="gs-tile-label">Total</div><div class="gs-tile-big">${game.total_line ? fmt(game.total_line, 1).replace(/\.0$/, "") : "--"}</div></div>
+    <div class="gs-tile"><div class="gs-tile-label">Moneyline</div>${game.away_moneyline !== null && game.away_moneyline !== undefined ? ml(away, game.away_moneyline, game.away_ml_implied_prob) + ml(home, game.home_moneyline, game.home_ml_implied_prob) : `<div class="gs-tile-big">--</div>`}</div>
   </div>`;
 }
 
@@ -188,8 +176,7 @@ function gsResumeRow(team, week) {
   return `<div class="gs-res-row">
     <span class="gs-res-team">${teamLogoMini(team, 20)} ${team}</span>
     <span class="gs-res-chips">${chips}</span>
-    <span class="gs-res-rec"><span class="gs-res-lbl">SU</span> ${s.su}</span>
-    <span class="gs-res-rec"><span class="gs-res-lbl">ATS</span> ${s.ats}</span>
+    <span class="gs-res-recs"><span><span class="gs-res-lbl">SU</span> ${s.su}</span><span><span class="gs-res-lbl">ATS</span> ${s.ats}</span></span>
   </div>`;
 }
 
@@ -206,7 +193,7 @@ function gsInjuries(team, week) {
     .map((p) => `<span class="gs-inj">${summaryHeadshot(team, p.full_name, 22)}<span class="gs-inj-name">${shortName(p.full_name)} <span class="muted">${p.position}</span></span><span class="gs-inj-status ${statusClass(p.status)}">${p.abbr === "Questionable" ? "Q" : p.abbr}</span></span>`)
     .join("");
   const more = starters.length > shown.length ? `<span class="gs-inj-more">+${starters.length - shown.length}</span>` : "";
-  return `<div class="gs-inj-row"><span class="gs-res-team">${teamLogoMini(team, 20)} ${team}</span><span class="gs-inj-list">${chips || `<span class="gs-none">No starters listed</span>`}${more}</span></div>`;
+  return `<div class="gs-inj-row"><span class="gs-res-team">${teamLogoMini(team, 18)} ${team}</span><span class="gs-inj-list">${chips || `<span class="gs-none">No starters listed</span>`}${more}</span></div>`;
 }
 
 // ---- Pick Tracker rail (same saved picks as the full page) ----
@@ -235,13 +222,10 @@ function gsPickMarket(game, m) {
   </div>`;
 }
 function gsPickRail(game) {
-  const picks = regradeAllPicks(DATA.schedule);
-  const t = pickMatrix(picks).grandTotal;
-  const record = picks.length ? `<div class="gs-record"><span>Season</span> <b>${t.win}-${t.loss}${t.push ? `-${t.push}` : ""}</b> <b class="${t.units >= 0 ? "gs-good" : "gs-bad"}">${t.units >= 0 ? "+" : ""}${t.units.toFixed(1)}u</b></div>` : "";
+  regradeAllPicks(DATA.schedule);
   return `<section class="sc-section sc-section-odds gs-picks">
     <div class="sc-section-title">My Picks</div>
     ${MARKETS.map((m) => gsPickMarket(game, m)).join("")}
-    ${record}
   </section>`;
 }
 
@@ -265,18 +249,20 @@ function renderGameSummaryCard(game) {
     </div>
     <div class="sc-body">
       <div class="sc-main">
-        <section class="sc-section"><div class="sc-section-title">Lines</div>${gsLines(game)}</section>
-        <section class="sc-section"><div class="sc-section-title">Wins &amp; Losses vs the Spread</div>${gsResumeRow(away, game.week)}${gsResumeRow(home, game.week)}</section>
+        <section class="sc-section gs-compact"><div class="sc-section-title">Key Injuries</div><div class="gs-two">${gsInjuries(away, game.week)}${gsInjuries(home, game.week)}</div></section>
+        <div class="gs-top">
+          <section class="sc-section gs-compact"><div class="sc-section-title">Lines</div>${gsLines(game)}</section>
+          <section class="sc-section gs-compact"><div class="sc-section-title">Wins &amp; Losses vs the Spread</div>${gsResumeRow(away, game.week)}${gsResumeRow(home, game.week)}</section>
+        </div>
         <section class="sc-section gs-matchups"><div class="sc-section-title">Matchups</div>
           <div class="sc-cols">${gsMatchupColumn(away, home)}${gsMatchupColumn(home, away)}</div>
         </section>
-        <section class="sc-section"><div class="sc-section-title">Key Injuries</div>${gsInjuries(away, game.week)}${gsInjuries(home, game.week)}</section>
       </div>
       ${gsPickRail(game)}
     </div>
     <div class="sc-footer">
       <span><span class="gs-res gs-res-q gs-res-w"><b>W</b></span> quality <span class="gs-res gs-res-n gs-res-w"><b>W</b></span> neutral <span class="gs-res gs-res-b gs-res-w"><b>W</b></span> bad (vs the spread) &middot; grades A-F vs the league</span>
-      <span><span class="gs-val gs-good">green</span> good for that side &middot; <span class="gs-val gs-bad">red</span> bad &middot; Scheme % = how often the defense shows it</span>
+      <span><span class="gs-val gs-good">green</span> good for that side &middot; <span class="gs-val gs-bad">red</span> bad &middot; vs Blitz / Box % = how often the defense shows it</span>
     </div>
   </div>`;
   fitSummaryCard();
