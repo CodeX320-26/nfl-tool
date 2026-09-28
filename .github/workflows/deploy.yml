@@ -93,3 +93,25 @@ jobs:
 
       - id: deployment
         uses: actions/deploy-pages@v4
+
+      # Second copy on Cloudflare Pages (the base for the Discord login gate
+      # -- see CLAUDE.md "Hosting"). Same built folder, same data.json.
+      # continue-on-error: a Cloudflare hiccup must never block the GitHub
+      # Pages deploy above, which still serves nfl.gmgsports.org until the
+      # switch. The project is created on the first run; later runs just
+      # report it already exists.
+      - name: Create Cloudflare Pages project (first run only)
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages project create gmg-nfl --production-branch=main
+
+      - name: Deploy to Cloudflare Pages
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy nfl_tool/site --project-name=gmg-nfl --branch=main --commit-dirty=true

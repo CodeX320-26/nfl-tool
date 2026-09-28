@@ -50,6 +50,24 @@ context. It is the only copy that travels with the repo.
   - `teams.js`: team names, colors and logo URLs.
   - `style.css`: dark/light theme tokens and all page styles.
 
+### Hosting (moving to Cloudflare, started 2026-09-28)
+
+- **Today:** `nfl.gmgsports.org` is a CNAME to GitHub Pages (`greenmeansgobetting.github.io`).
+  The domain is at **Namecheap**, which also runs email forwarding (MX `eforward*.registrar-servers.com`).
+  **Don't move the whole domain's nameservers**; only the `nfl` record changes.
+- **deploy.yml** also publishes the same built folder to **Cloudflare Pages** project `gmg-nfl`
+  (test address `*.pages.dev`), using the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+  Those steps are `continue-on-error`, so they never block the GitHub Pages deploy.
+- **Plan, one step at a time:**
+  1. Cloudflare copy verified, then switch the `nfl` CNAME at Namecheap to the pages.dev address.
+  2. Discord login gate (Pages Functions). A bot checks the member's **current** roles
+     server-side on every visit (short session, re-checked every ~15–30 min), so cancelling
+     or losing a role cuts access. data.json is gated too.
+  3. Free vs Supporter roles.
+  4. Sell the role (Discord Server Subscriptions / Patreon / Whop).
+  5. Optional Patreon/Whop login for people without Discord.
+- The user wants access tied to live roles; someone who paid a week must not keep access after cancelling.
+
 ### Local verification
 
 - Build: `SKIP_SGO_FETCH=1 python nfl_tool/build_stats.py --season 2026 --out nfl_tool/site/data.json`.
