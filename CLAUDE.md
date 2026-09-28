@@ -58,6 +58,9 @@ context. It is the only copy that travels with the repo.
 - **deploy.yml** also publishes the same built folder to **Cloudflare Pages** project `gmg-nfl`
   (test address `*.pages.dev`), using the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
   Those steps are `continue-on-error`, so they never block the GitHub Pages deploy.
+- `.github/workflows/cloudflare-domain.yml` attached `nfl.gmgsports.org` to the Pages project
+  through the API. It can be re-run from the Actions tab and prints the verification status.
+  (The Cloudflare connector for Claude can't manage Pages domains; the GitHub secret token can.)
 - **Plan, one step at a time:**
   1. Cloudflare copy verified, then switch the `nfl` CNAME at Namecheap to the pages.dev address.
   2. Discord login gate (Pages Functions). A bot checks the member's **current** roles
