@@ -788,8 +788,16 @@ function propPackages(offTeam, defTeam, game, lines) {
       { text: `${offTeam} ${propRankTag(oPart.o.rk)} ${PROP_STAT_WORDS[oPart.m]}`, q: (32 - oPart.o.rk) / 31 },
       { text: `${defTeam} D ${propRankTag(dPart.d.rk)} ${PROP_STAT_WORDS[dPart.m]}`, q: (dPart.d.rk - 1) / 31 },
     ];
-    // Players in this package with a posted line, biggest line first.
+    // Players in this package with a posted line: zone-flagged players
+    // (Zone Targets says this market fits them) first with a star, then
+    // the biggest line.
     const mainMk = shown[0].mk;
+    const zoneFlags = {};
+    if (["WR", "TE", "RB"].includes(pkg.pos) && pkg.name !== "RBs") {
+      zoneTargets(offTeam, defTeam, game ? game.week : DATA.current_week).forEach((z) => {
+        if (z.markets.some((mk) => shown.some((m) => m.mk === mk))) zoneFlags[normName(z.name)] = true;
+      });
+    }
     const players = {};
     lines
       .filter((r) => r.position === pkg.pos && r.injury !== "out" && shown.some((m) => m.mk === r.marketKey))
@@ -802,7 +810,8 @@ function propPackages(offTeam, defTeam, game, lines) {
     // One QB (the starter has the biggest line), up to three others.
     const plist = Object.values(players)
       .map((x) => x.r)
-      .sort((a, b) => (b.marketKey === mainMk) - (a.marketKey === mainMk) || b.line - a.line)
+      .map((r) => ({ ...r, zoneFlag: !!zoneFlags[normName(r.name)] }))
+      .sort((a, b) => b.zoneFlag - a.zoneFlag || (b.marketKey === mainMk) - (a.marketKey === mainMk) || b.line - a.line)
       .slice(0, pkg.pos === "QB" ? 1 : 3);
     out.push({
       team: offTeam,
@@ -827,7 +836,7 @@ function propRankShade(q) {
 }
 function propPackageHtml(p, lines) {
   const players = p.players.length
-    ? p.players.map((r) => `<span class="ps-pk-player player-click" data-entry="${propClickEntry(r)}">${summaryHeadshot(r.team, r.name, 22)}${propDisplayName(lines, r)} <b>${fmt(r.line, 1)}</b></span>`).join("")
+    ? p.players.map((r) => `<span class="ps-pk-player player-click" data-entry="${propClickEntry(r)}">${summaryHeadshot(r.team, r.name, 22)}${r.zoneFlag ? `<span class="ps-zone-star" title="Zone Targets: his looks land where this defense is soft">&#9733;</span>` : ""}${propDisplayName(lines, r)} <b>${fmt(r.line, 1)}</b></span>`).join("")
     : `<span class="ps-pk-noline">No lines posted yet</span>`;
   return `<div class="ps-pk">
     <div class="ps-pk-head">${teamLogoMini(p.team, 22)}<span class="ps-pk-name">${p.team} ${p.name}</span><span class="ps-pk-mkts">${p.markets.map((m) => `<span>${m}</span>`).join("")}</span></div>
@@ -1087,3 +1096,194 @@ document.addEventListener("change", (e) => {
   savePropsSummaryPicks(gameKey, picks);
   refreshPropsAfterPick();
 });
+
+// ---- Zone Targets: pass catchers whose looks land where this defense is soft ----
+// Building block shared by the pass-zone grids (Player Props page) and the
+// Props Summary card.
+//
+// Defense side, per zone (depth x left/middle/right), a "softness" z:
+//   half from the zone itself -- EPA/att and completion % allowed there
+//   (both pulled toward that zone's league average with ZT_ZONE_PRIOR
+//   attempts, so 2 throws can't make a zone "soft") and how often offenses
+//   attack it vs the league;
+//   half from the depth band in the opponent-adjusted model (short / 10-19 /
+//   deep yards allowed -- where backup-QB and bad-weather games already
+//   count less).
+// Player side: where his targets go (share per zone, needs ZT_MIN_TARGETS),
+// how many he gets (lineup-aware targets/game, league percentile at his
+// position) and how much he plays (latest snap share).
+// Match = his targets' average zone softness. A player shows when both the
+// match and his opportunity clear a bar, with the markets that fit:
+//   Receptions -- steady volume into soft SHORT/screen zones;
+//   Long Rec   -- real 10+ yard share into soft intermediate/deep zones and a
+//                 defense that gives up 20+ yard plays;
+//   Rec Yds    -- good overall match + volume (YAC skill as a bonus tag).
+const ZT_ZONE_PRIOR = 8;
+const ZT_MIN_TARGETS = 5;
+const ZT_MATCH_MIN = 0.3;
+const ZT_OPP_MIN = 0.35;
+const ZT_SHOWN = 4;
+const ZT_DEPTH_METRIC = { screen: "yds_short", short: "yds_short", intermediate: "yds_int", deep: "yds_deep" };
+const ZT_ZONE_WORDS = { screen: "Screen", short: "Short", intermediate: "10-19", deep: "Deep" };
+const ZT_LOC_WORDS = { left: "L", middle: "M", right: "R" };
+
+function ztZoneKeys() {
+  return PASS_ZONE_ROWS.flatMap((r) => PASS_ZONE_COLS.map((c) => `${r.key}_${c}`));
+}
+function ztMean(xs) {
+  return xs.reduce((a, b) => a + b, 0) / (xs.length || 1);
+}
+function ztZ(v, xs) {
+  const m = ztMean(xs);
+  const sd = Math.sqrt(ztMean(xs.map((x) => (x - m) ** 2))) || 1;
+  return (v - m) / sd;
+}
+
+// Softness z per zone for every defense, cached for the page.
+function ztDefenseSoftness() {
+  if (ztDefenseSoftness.cache) return ztDefenseSoftness.cache;
+  const charts = DATA.pass_shot_charts || {};
+  const teams = Object.keys(charts).filter((t) => charts[t]?.def?.pass_attempts > 0);
+  const keys = ztZoneKeys();
+  const out = {};
+  teams.forEach((t) => (out[t] = {}));
+  keys.forEach((zk) => {
+    let la = 0, lc = 0, le = 0;
+    teams.forEach((t) => {
+      const z = charts[t].def.zones[zk] || {};
+      la += z.attempts || 0;
+      lc += z.completions || 0;
+      le += z.epa_sum || 0;
+    });
+    const lRate = la ? lc / la : 0.6;
+    const lEpa = la ? le / la : 0;
+    const rows = teams.map((t) => {
+      const c = charts[t].def;
+      const z = c.zones[zk] || {};
+      const att = z.attempts || 0;
+      return {
+        t,
+        comp: ((z.completions || 0) + ZT_ZONE_PRIOR * lRate) / (att + ZT_ZONE_PRIOR),
+        epa: ((z.epa_sum || 0) + ZT_ZONE_PRIOR * lEpa) / (att + ZT_ZONE_PRIOR),
+        vol: c.pass_attempts ? att / c.pass_attempts : 0,
+      };
+    });
+    const comps = rows.map((r) => r.comp), epas = rows.map((r) => r.epa), vols = rows.map((r) => r.vol);
+    const depth = zk.split("_")[0];
+    rows.forEach((r) => {
+      const zoneZ = 0.45 * ztZ(r.epa, epas) + 0.35 * ztZ(r.comp, comps) + 0.2 * ztZ(r.vol, vols);
+      const band = propSide(r.t, "def", ZT_DEPTH_METRIC[depth]);
+      const bandZ = band ? band.lean * 1.7 : 0; // rank lean (-1..1) onto a z-like scale
+      out[r.t][zk] = 0.5 * zoneZ + 0.5 * bandZ;
+    });
+  });
+  ztDefenseSoftness.cache = out;
+  return out;
+}
+
+// League pool of targets/game by position (for the opportunity percentile).
+function ztTargetPool(pos) {
+  if (!ztTargetPool.cache) ztTargetPool.cache = {};
+  if (!ztTargetPool.cache[pos]) {
+    ztTargetPool.cache[pos] = Object.values(DATA.player_props || {})
+      .flat()
+      .filter((p) => p.position === pos && (p.targets || 0) >= 3 && p.targets_per_g)
+      .map((p) => p.targets_per_g)
+      .sort((a, b) => a - b);
+  }
+  return ztTargetPool.cache[pos];
+}
+function ztPercentile(v, pool) {
+  if (!pool.length) return 0.5;
+  return pool.filter((x) => x <= v).length / pool.length;
+}
+
+function zoneTargets(offTeam, defTeam, week) {
+  const soft = ztDefenseSoftness()[defTeam];
+  if (!soft) return [];
+  const zones = (DATA.player_pass_zones || {})[offTeam] || {};
+  const injuries = propInjuries(offTeam, week);
+  const snaps = propSnapIndex(offTeam);
+  const explDef = propSide(defTeam, "def", "expl_pass");
+  const out = [];
+  Object.entries(zones).forEach(([name, pz]) => {
+    const pos = pz.position;
+    if (!["WR", "TE", "RB"].includes(pos)) return;
+    if (injuries[normName(name)]?.tag === "out") return;
+    const total = Object.values(pz.zones).reduce((a, z) => a + (z.targets || 0), 0);
+    if (total < ZT_MIN_TARGETS) return;
+    // Where his targets go, and how soft those spots are.
+    let match = 0, deepShare = 0, deepSoft = 0, shortShare = 0, shortSoft = 0;
+    const softZones = [];
+    Object.entries(pz.zones).forEach(([zk, z]) => {
+      const t = z.targets || 0;
+      if (!t) return;
+      const share = t / total;
+      const v = soft[zk] ?? 0;
+      match += share * v;
+      if (zk.startsWith("deep") || zk.startsWith("intermediate")) { deepShare += share; deepSoft += share * v; }
+      else { shortShare += share; shortSoft += share * v; }
+      if (share >= 0.15 && v >= 0.5) softZones.push({ zk, share, v });
+    });
+    const mDeep = deepShare ? deepSoft / deepShare : 0;
+    const mShort = shortShare ? shortSoft / shortShare : 0;
+    // Opportunity: lineup-aware targets/game vs his position league-wide,
+    // plus how much he's on the field lately.
+    const games = propBaselineGames(offTeam, name, pos, false, week);
+    const tpg = games.length ? propWeightedMean(games, (g) => g.targets) : 0;
+    const snapEntry = snaps[normName(name)];
+    const snapVals = snapEntry ? Object.entries(snapEntry.w).sort((a, b) => b[0] - a[0]).map(([, v]) => v) : [];
+    const snap = snapVals.length ? (snapVals[0] + (snapVals[1] ?? snapVals[0])) / 2 : 0.5;
+    const opp = 0.7 * ztPercentile(tpg, ztTargetPool(pos)) + 0.3 * Math.min(1, snap);
+    if (match < ZT_MATCH_MIN || opp < ZT_OPP_MIN) return;
+    const markets = [];
+    if (tpg >= 4 && shortShare >= 0.4 && mShort >= ZT_MATCH_MIN) markets.push("receiving_receptions");
+    if (deepShare >= 0.3 && mDeep >= ZT_MATCH_MIN + 0.1 && (explDef?.rk || 32) <= 16) markets.push("receiving_longestReception");
+    if (match >= ZT_MATCH_MIN + 0.05 && opp >= 0.5) markets.push("receiving_yards");
+    if (!markets.length) return;
+    const props = ((DATA.player_props || {})[offTeam] || []).find((p) => normName(p.name) === normName(name));
+    out.push({
+      team: offTeam,
+      name,
+      position: pos,
+      tpg,
+      snap,
+      match,
+      opp,
+      markets,
+      yac: props && props.yac_per_rec !== null && props.yac_per_rec >= (pos === "WR" ? 5 : pos === "TE" ? 5.5 : 8),
+      softZones: softZones.sort((a, b) => b.share * b.v - a.share * a.v).slice(0, 2),
+      score: 0.5 * opp + 0.5 * Math.min(1, match / 1.2),
+    });
+  });
+  return out.sort((a, b) => b.score - a.score).slice(0, ZT_SHOWN);
+}
+
+function renderZoneTargets(offTeam, defTeam) {
+  const game = (DATA.schedule || []).find((g) => g.week === scheduleWeek && ((g.away === offTeam && g.home === defTeam) || (g.home === offTeam && g.away === defTeam)));
+  const week = game ? game.week : DATA.current_week;
+  const list = zoneTargets(offTeam, defTeam, week);
+  const lines = propTeamLines(offTeam, defTeam, week, game);
+  const lineFor = (name, mk) => lines.find((r) => r.marketKey === mk && normName(r.name) === normName(name));
+  const rows = list.length
+    ? list
+        .map((p) => {
+          const chips = p.markets
+            .map((mk) => {
+              const l = lineFor(p.name, mk);
+              return `<span class="zt-mkt">${PROP_MARKETS[mk].label}${l ? ` <b>${fmt(l.line, 1)}</b>` : ""}</span>`;
+            })
+            .join("");
+          const zonesHtml = p.softZones.map((z) => { const [d, loc] = z.zk.split("_"); return `<span class="zt-zone">${ZT_ZONE_WORDS[d]} ${ZT_LOC_WORDS[loc]}</span>`; }).join("");
+          return `<div class="zt-row">
+            <span class="zt-who player-click" data-entry="${encodeDataAttr({ team: offTeam, name: p.name, oppTeam: defTeam })}">${summaryHeadshot(offTeam, p.name, 34)}<span><b>${p.name}</b><small>${p.position} &middot; ${fmt(p.tpg, 1)} tgt/g &middot; ${Math.round(p.snap * 100)}% snaps</small></span></span>
+            <span class="zt-tags">${chips}${p.yac ? `<span class="zt-yac">YAC</span>` : ""}${zonesHtml}</span>
+          </div>`;
+        })
+        .join("")
+    : `<p class="zt-none">No clear zone mismatches for ${offTeam} pass catchers</p>`;
+  return `<div class="zt-panel">
+    <div class="zt-title">${teamLogoMini(offTeam, 18)} ${offTeam} Zone Targets</div>
+    ${rows}
+  </div>`;
+}

@@ -2730,3 +2730,19 @@ footer { border-top-color: var(--border); }
 .pass-zone-row-label-mini { width: 38px; white-space: nowrap; font-size: 0.64rem; font-weight: 800; color: var(--muted); background: var(--panel); }
 .pass-zone-heat-cell { font-size: 0.82rem; font-weight: 800; }
 .pass-zone-heat-cell:not([style]) { background: var(--panel); color: var(--muted); }
+
+/* ---- Zone Targets panel (under Pass D Allowed grids) ---- */
+.zt-panel { margin-top: 10px; padding: 10px; border-radius: 12px; background: rgba(var(--good-rgb), 0.05); border: 1px solid rgba(var(--good-rgb), 0.35); display: flex; flex-direction: column; gap: 8px; }
+.zt-title { display: flex; align-items: center; gap: 6px; font-family: var(--font-display); font-size: 1rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--good-text); }
+.zt-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--panel); }
+.zt-who { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
+.zt-who > span { display: flex; flex-direction: column; min-width: 0; }
+.zt-who b { font-size: 0.95rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zt-who small { font-size: 0.68rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.zt-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 250px; }
+.zt-mkt { padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 800; white-space: nowrap; color: var(--good-text); background: rgba(var(--good-rgb), 0.16); border: 1px solid rgba(var(--good-rgb), 0.5); }
+.zt-mkt b { color: var(--text); }
+.zt-yac { padding: 2px 7px; border-radius: 6px; font-size: 0.66rem; font-weight: 800; color: var(--mid-text); background: rgba(var(--mid-rgb), 0.16); border: 1px solid rgba(var(--mid-rgb), 0.5); }
+.zt-zone { padding: 2px 7px; border-radius: 6px; font-size: 0.64rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; color: var(--bad-text); background: rgba(var(--bad-rgb), 0.1); border: 1px solid rgba(var(--bad-rgb), 0.4); }
+.zt-none { margin: 0; font-size: 0.78rem; color: var(--muted); font-style: italic; }
+.ps-zone-star { color: rgb(var(--mid-rgb)); font-size: 0.8rem; margin-right: 1px; }

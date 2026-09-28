@@ -1387,10 +1387,14 @@ function passZoneTeamHeader(team, side) {
 }
 
 function renderPassZoneBlock(team, side, opponent) {
+  // Under a defense grid: the facing offense's pass catchers whose targets
+  // land in this defense's soft zones (props-summary.js zoneTargets).
+  const targets = side === "def" && opponent && typeof renderZoneTargets === "function" ? renderZoneTargets(opponent, team) : "";
   return `<div class="pass-zone-block">
     ${passZoneTeamHeader(team, side)}
     ${renderPassZoneGrid(team, side, opponent)}
     ${renderPassIdentityCard(team, side)}
+    ${targets}
   </div>`;
 }
 

@@ -95,6 +95,11 @@ context. It is the only copy that travels with the repo.
   - TD Data uses `lineupWeights` / `lineupAdjustedXtd` in common.js; Props uses
     `propBaselineGames`.
   - **Never surface a backup off one fill-in game.**
+- **Zone Targets** (`zoneTargets` / `renderZoneTargets` in props-summary.js): pass catchers whose targets land where the defense is soft.
+  - **Zone softness** is 50% the zone's own completion % and EPA allowed (shrunk with 8 prior attempts) plus how often it's attacked, and 50% the opponent-adjusted depth band from `prop_matchup_model`.
+  - **Player opportunity:** lineup-aware targets per game as a percentile at his position (70%) plus recent snap share (30%).
+  - **Markets:** Receptions (volume into soft short zones), Long Rec (10+ yd share into soft zones, defense gives up 20+ plays), Rec Yds (overall match plus volume); YAC is a bonus tag.
+  - **Where it shows:** a panel under each Pass D Allowed grid; on the Props Summary card, flagged players list first with a ★ in receiving packages.
 - **Pick Tracker** grades each pick on the price saved at pick time, which is Novig's when
   available.
 
