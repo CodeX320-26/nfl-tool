@@ -2597,3 +2597,31 @@ footer { border-top-color: var(--border); }
 .gs-novig-qr { width: 140px; height: 140px; border-radius: 6px; background: #fff; padding: 4px; }
 .gs-novig-offer { margin: 0; font-size: 0.78rem; font-weight: 600; line-height: 1.35; }
 .gs-novig-code { display: inline-block; padding: 0 6px; border-radius: 5px; font-weight: 800; letter-spacing: 0.06em; color: var(--on-accent); background: var(--accent); }
+
+/* ---- Props Summary v3: unit strengths/weaknesses + leans ---- */
+.ps-col { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px; }
+.ps-unit { display: grid; grid-template-columns: 62px minmax(0, 1fr); align-items: center; gap: 6px; }
+.ps-unit-label { display: inline-flex; align-items: center; gap: 5px; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.07em; color: var(--muted); }
+.ps-unit-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.ps-unit-chip { display: inline-flex; align-items: baseline; gap: 4px; padding: 3px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 800; white-space: nowrap; border: 1px solid transparent; }
+.ps-unit-chip small { font-size: 0.64rem; font-weight: 700; opacity: 0.85; }
+.ps-unit-strong { color: var(--good-text); background: rgba(var(--good-rgb), 0.16); border-color: rgba(var(--good-rgb), 0.5); }
+.ps-unit-weak { color: var(--bad-text); background: rgba(var(--bad-rgb), 0.13); border-color: rgba(var(--bad-rgb), 0.45); }
+.ps-unit-none { font-size: 0.74rem; color: var(--muted); font-style: italic; }
+.ps-leans { padding-top: 6px; border-top: 1px dashed var(--border); }
+.ps-leans .ps-angle-call { font-size: 0.68rem; }
+.ps-card .ps-section .sc-grid2 { grid-template-rows: auto; }
+/* picker grouped by section / player */
+.ps-pick-table td { padding-top: 3px; padding-bottom: 3px; }
+.ps-pick-section td { padding-top: 10px !important; font-family: var(--font-display); font-size: 1rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accent); border-bottom: 2px solid rgba(var(--accent-rgb), 0.4); }
+.ps-pick-player td { padding-top: 7px !important; background: var(--table-head); }
+.ps-pick-player .sc-headshot { vertical-align: middle; }
+.ps-pick-out td { opacity: 0.55; }
+.ps-pick-mkt { padding-left: 22px !important; }
+.ps-src { font-size: 0.66rem; color: var(--muted); white-space: nowrap; }
+.ps-out-btn { float: right; padding: 1px 7px; border-radius: 5px; border: 1px solid var(--border-strong); background: transparent; color: var(--muted); font: inherit; font-size: 0.68rem; font-weight: 700; cursor: pointer; }
+.ps-out-btn:hover { border-color: rgb(var(--bad-rgb)); color: var(--bad-text); }
+.ps-out-on { color: var(--bad-text); border-color: rgb(var(--bad-rgb)); background: rgba(var(--bad-rgb), 0.12); }
+.ps-thin { padding: 0 4px; border-radius: 4px; font-size: 0.6rem; font-weight: 800; color: var(--mid-text); background: rgba(var(--mid-rgb), 0.18); }
+.ps-card .ps-section .sc-cols { flex: 1 1 auto; }
+.ps-col { justify-content: space-around; }

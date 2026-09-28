@@ -823,6 +823,9 @@ NOVIG_OU_TYPES = {
     "LONGEST_COMPLETION": "passing_longestCompletion",
     "RUSHING_AND_RECEIVING_YARDS": "rushing+receiving_yards",
     "PASSING_AND_RUSHING_YARDS": "passing+rushing_yards",
+    "KICKING_POINTS": "kicking_points",
+    "FIELD_GOALS_MADE": "field_goals_made",
+    "TACKLES_ASSISTS": "defense_tackles_assists",
 }
 # Novig team symbols that differ from ours.
 NOVIG_TEAM_FIXES = {"LAR": "LA", "WSH": "WAS", "JAC": "JAX", "LVR": "LV"}
@@ -911,7 +914,11 @@ def extract_novig_props(novig_games: dict, teams, roster_positions: dict, unavai
                 over, under = novig_price_to_american(outcomes.get("over")), novig_price_to_american(outcomes.get("under"))
                 if over is None and under is None:
                     continue
-                ou[NOVIG_OU_TYPES[mtype]][team].append({"name": name, "position": position, "line": float(m["strike"]), "over_odds": over, "under_odds": under, "source": "novig"})
+                # Barely traded: both asks far apart (implied chances adding
+                # well past 100%) -- still Novig's price, just flagged.
+                po, pu = outcomes.get("over"), outcomes.get("under")
+                thin = bool(po and pu and po + pu > 1.15) or po is None or pu is None
+                ou[NOVIG_OU_TYPES[mtype]][team].append({"name": name, "position": position, "line": float(m["strike"]), "over_odds": over, "under_odds": under, "source": "novig", "thin": thin})
             elif mtype in ("TOUCHDOWNS", "FIRST_TOUCHDOWN_SCORER") and name not in (unavailable or ()):
                 yes_p = outcomes.get("over") if mtype == "TOUCHDOWNS" else outcomes.get("yes")
                 no_p = outcomes.get("under") if mtype == "TOUCHDOWNS" else outcomes.get("no")
@@ -1244,6 +1251,10 @@ PLAYER_OU_MARKETS = {
     "rushing+receiving_yards": "Rush + Rec Yards",
     "passing+rushing_yards": "Pass + Rush Yards",
     "fantasyScore": "Fantasy Score",
+    # Novig-only (no SGO statID): kickers and defenders.
+    "kicking_points": "Kicking Points",
+    "field_goals_made": "FGs Made",
+    "defense_tackles_assists": "Tackles + Ast",
 }
 
 

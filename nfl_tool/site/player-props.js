@@ -2018,9 +2018,6 @@ function renderPlayerMarketsModalContent(team, name, oppTeam) {
     .map((r) => {
       const { over, under } = propOuEntries(r.marketKey, r.market, team, r.name, r.line, r.over_odds, r.under_odds, matchup);
       const m = model[r.marketKey];
-      const hasEdge = m && m.edge !== null && m.edge !== undefined;
-      const proj = m && m.proj !== null ? fmt(m.proj, 1) : "--";
-      const lean = hasEdge ? `${m.edge >= PROP_EDGE_MIN ? `<b>${propLineText(m)}</b>` : propLineText(m)} ${m.edge >= 0 ? "+" : ""}${Math.round(m.edge * 100)}%` : "--";
       let add = `<span class="muted">--</span>`;
       if (m) {
         const key = propPickKey(m);
@@ -2028,15 +2025,15 @@ function renderPlayerMarketsModalContent(team, name, oppTeam) {
         const disabled = !on && full ? ` disabled title="${PROPS_SUMMARY_MAX_PICKS} per team max"` : "";
         add = `<button type="button" class="ps-add-btn${on ? " ps-add-on" : ""}" data-team="${team}" data-key="${encodeDataAttr(key)}"${disabled}>${on ? "&#10003; On summary" : "+ Summary"}</button>`;
       }
-      return `<tr class="${hasEdge && m.edge >= PROP_EDGE_MIN ? "ps-picker-lean" : ""}"><td>${r.market}</td><td class="num props-line">${fmt(r.line, 1)}</td><td class="num">${proj}</td><td class="num">${lean}</td><td class="num">${ouCheckboxCell(fmtOddsSigned(r.over_odds), over)}</td><td class="num">${ouCheckboxCell(fmtOddsSigned(r.under_odds), under)}</td><td class="num">${add}</td></tr>`;
+      return `<tr><td>${r.market}</td><td class="num props-line">${fmt(r.line, 1)}</td><td class="num">${ouCheckboxCell(fmtOddsSigned(r.over_odds), over)}</td><td class="num">${ouCheckboxCell(fmtOddsSigned(r.under_odds), under)}</td><td class="num">${add}</td></tr>`;
     })
     .join("");
   const note = inGame
-    ? `<p class="no-data-note">Proj / Model = the Summary tab's projection and the side it leans (bold = strong lean, 10%+). + Summary adds the line to the card's Prop Picks (${chosen.size}/${PROPS_SUMMARY_MAX_PICKS} for ${team}).</p>`
+    ? `<p class="no-data-note">+ Summary adds the line to the card's Prop Picks (${chosen.size}/${PROPS_SUMMARY_MAX_PICKS} for ${team}).</p>`
     : "";
   return `${heading}${note}
     <table class="data-table player-odds-table props-market-table">
-      <thead><tr><th>Market</th><th class="num">Line</th><th class="num">Proj</th><th class="num">Model</th><th class="num">Over</th><th class="num">Under</th><th class="num">Summary</th></tr></thead>
+      <thead><tr><th>Market</th><th class="num">Line</th><th class="num">Over</th><th class="num">Under</th><th class="num">Summary</th></tr></thead>
       <tbody>${body}</tbody>
     </table>`;
 }

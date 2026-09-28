@@ -1,4 +1,11 @@
 // ---- Player Props Summary: one screenshot-ready card ----
+// The card is directional, not a pick sheet: per section (Passing /
+// Rushing / Receiving), each offense's and defense's strengths and
+// weaknesses vs the league (opponent-adjusted ranks) and the market leans
+// where they meet. Players only appear on the right, the lines YOU pick.
+// (The projection engine below is kept for later but no longer drives
+// anything on the card -- a few games is too little to trust it.)
+//
 // Same 1160x980 card as TD Data's Summary. Every posted prop line in the
 // game gets a projection built from:
 //   1. the player's own recent games (most recent weighted most),
@@ -23,7 +30,6 @@ const PROP_EDGE_MIN = 0.1;
 // line-anchored player baseline (the books price some of it already).
 const PROP_CONTEXT_TRUST = 0.8; // model minus no-vig odds, to list a play
 const PROP_EDGE_STRONG = 0.18;
-const PROP_ROWS = { pass: 2, rush: 3, rec: 3 };
 // Games of data it takes before the data counts as much as the line
 // itself: volume settles fast, yards slower, long plays/TDs/INTs slowest.
 const PROP_STABILITY = {
@@ -53,6 +59,9 @@ const PROP_MARKETS = {
   receiving_receptions: { section: "rec", label: "Receptions", stat: (g) => g.receptions, kind: "rec", unit: "rec" },
   receiving_yards: { section: "rec", label: "Rec Yds", stat: (g) => g.rec_yards, kind: "recyds", unit: "yds" },
   receiving_longestReception: { section: "rec", label: "Long Rec", stat: (g) => g.longest_rec, kind: "long", unit: "long" },
+  kicking_points: { section: "other", label: "Kicking Pts", stat: () => 0, kind: "none", unit: "pts" },
+  field_goals_made: { section: "other", label: "FGs Made", stat: () => 0, kind: "none", unit: "FG" },
+  defense_tackles_assists: { section: "other", label: "Tackles + Ast", stat: () => 0, kind: "none", unit: "tkl" },
 };
 
 // ---- small math helpers ----
@@ -158,7 +167,36 @@ function propInjuries(team, week) {
     const tag = /out|doubtful|reserve|injured|suspend/.test(r) ? "out" : r === "questionable" ? "Q" : null;
     if (tag) out[normName(i.full_name)] = { tag, name: i.full_name };
   });
+  // Players you marked Out yourself (late news the injury report doesn't
+  // have yet -- e.g. a QB benched the day of the game).
+  loadManualOuts(week).forEach((k) => {
+    const [t, n] = k.split("|");
+    if (t === team) out[n] = { tag: "out", name: n, manual: true };
+  });
   return out;
+}
+
+// ---- Manual Out: per week, "TEAM|normname" ----
+const MANUAL_OUTS_KEY = "nfl-tool.manual-outs.v1";
+function loadManualOuts(week) {
+  try {
+    return (JSON.parse(localStorage.getItem(MANUAL_OUTS_KEY)) || {})[week] || [];
+  } catch (e) {
+    return [];
+  }
+}
+function toggleManualOut(week, team, name) {
+  try {
+    const all = JSON.parse(localStorage.getItem(MANUAL_OUTS_KEY)) || {};
+    const list = new Set(all[week] || []);
+    const key = `${team}|${normName(name)}`;
+    if (list.has(key)) list.delete(key);
+    else list.add(key);
+    all[week] = [...list];
+    localStorage.setItem(MANUAL_OUTS_KEY, JSON.stringify(all));
+  } catch (e) {
+    // localStorage unavailable -- the switch just won't stick.
+  }
 }
 function propGame(away, home) {
   return (DATA.schedule || []).find((g) => g.away === away && g.home === home && g.status !== "final")
@@ -537,7 +575,7 @@ function propMarketProjection(proj, marketKey) {
 }
 
 // Every posted line for one team, each with the model's view of it.
-function propTeamLines(team, defTeam, week, game) {
+function propTeamLines(team, defTeam, week, game, withModel = false) {
   const markets = DATA.player_prop_markets || {};
   const labels = DATA.player_prop_market_labels || {};
   const injuries = propInjuries(team, week);
@@ -548,7 +586,7 @@ function propTeamLines(team, defTeam, week, game) {
     ((markets[marketKey] || {})[team] || []).forEach((line) => {
       const key = normName(line.name);
       const position = line.position || propPositions(team)[key] || null;
-      if (!(key in cache)) {
+      if (withModel && !(key in cache)) {
         cache[key] = propProjectPlayer(team, line.name, position, defTeam, week, game);
         cache[key + "|n"] = propProjectPlayer(team, line.name, position, defTeam, week, game, true);
       }
@@ -556,8 +594,9 @@ function propTeamLines(team, defTeam, week, game) {
       const base = cache[key + "|n"];
       const def = PROP_MARKETS[marketKey];
       const section = def.section || (position === "RB" ? "rush" : "rec");
-      const row = { team, name: line.name, position, marketKey, market: def.label, section, line: line.line, over: line.over_odds, under: line.under_odds, injury: injuries[key]?.tag || null, proj: null };
+      const row = { team, name: line.name, position, marketKey, market: def.label, section, line: line.line, over: line.over_odds, under: line.under_odds, injury: injuries[key]?.tag || null, proj: null, source: line.source || "sgo", thin: !!line.thin };
       rows.push(row);
+      if (!withModel) return;
       if (!proj || row.injury === "out") return;
       const mp = propMarketProjection(proj, marketKey);
       const mn = propMarketProjection(base, marketKey);
@@ -622,31 +661,6 @@ function propDisplayName(rows, r) {
   const short = shortName(r.name);
   const clash = rows.some((o) => o.team === r.team && normName(o.name) !== normName(r.name) && shortName(o.name) === short);
   return clash ? r.name : short;
-}
-
-// Plays under a column are the lines that BACK one of its market calls:
-// right market, right position (and, for depth calls, a receiver who's
-// actually targeted at that depth), same side as the call, and the
-// player's own projection agrees by at least PROP_CALL_EDGE_MIN. One row
-// per player, his best-backed line; each row names the call it backs.
-const PROP_CALL_EDGE_MIN = 0.04;
-function propFitsCall(r, a) {
-  if (!a.markets.includes(r.marketKey) || !a.pos.includes(r.position) || r.side !== a.side) return false;
-  if (!a.depth) return true;
-  const sh = propDepthShares(r.team, r.name);
-  return !!sh && sh[a.depth] >= a.share;
-}
-function propSectionPlays(rows, section, angles) {
-  const byPlayer = {};
-  rows
-    .filter((r) => r.section === section && r.edge !== null && r.edge >= PROP_CALL_EDGE_MIN)
-    .forEach((r) => {
-      const call = (angles || []).find((a) => propFitsCall(r, a));
-      if (!call) return;
-      const k = normName(r.name);
-      if (!byPlayer[k] || r.edge > byPlayer[k].edge) byPlayer[k] = { ...r, display: propDisplayName(rows, r), call };
-    });
-  return Object.values(byPlayer).sort((a, b) => b.edge - a.edge);
 }
 
 // Share of a receiver's targets at each depth (short <10 air yds, 10-19, 20+).
@@ -755,45 +769,70 @@ function propClickEntry(r) {
   const { away, home } = propsSummaryContext();
   return encodeDataAttr({ team: r.team, name: r.name, oppTeam: r.team === away ? home : away });
 }
-function propLineText(r, side = r.side) {
-  return `${side === "over" ? "o" : "u"}${fmt(r.line, 1)}`;
+// ---- Strengths & weaknesses per unit ----
+// [metric, label, value formatter, more-is-better for the OFFENSE?]
+// Offense reads its own production; defense reads what it allows (so for
+// a defense, allowing a lot is a weakness) -- except INTs and sacks, where
+// more is good for the defense and bad for the offense.
+const PROP_UNIT_METRICS = {
+  pass: [
+    ["pass_att", "Pass volume", (v) => `${f1(v)} att/g`, true],
+    ["pass_yards", "Pass yards", (v) => `${f0(v)}/g`, true],
+    ["ypa", "Yds per att", (v) => f1(v), true],
+    ["comp", "Comp %", (v) => `${Math.round(v * 100)}%`, true],
+    ["pass_td", "Pass TDs", (v) => `${f1(v)}/g`, true],
+    ["expl_pass", "Big plays", (v) => `${f1(v)} 20+/g`, true],
+    ["ints", "INTs", (v) => `${f1(v)}/g`, false],
+    ["sacks", "Sacks", (v) => `${f1(v)}/g`, false],
+  ],
+  rush: [
+    ["car_RB", "RB volume", (v) => `${f1(v)} car/g`, true],
+    ["rushyds_RB", "RB rush yds", (v) => `${f0(v)}/g`, true],
+    ["ypc_RB", "RB YPC", (v) => f1(v), true],
+    ["rushyds_QB", "QB runs", (v) => `${f0(v)} yds/g`, true],
+    ["expl_rush", "Big runs", (v) => `${f1(v)} 10+/g`, true],
+  ],
+  rec: [
+    ["recyds_WR", "WR yards", (v) => `${f0(v)}/g`, true],
+    ["recyds_TE", "TE yards", (v) => `${f0(v)}/g`, true],
+    ["recyds_RB", "RB receiving", (v) => `${f0(v)}/g`, true],
+    ["yds_short", "Short area", (v) => `${f0(v)} yds/g`, true],
+    ["yds_int", "10-19 yd", (v) => `${f0(v)} yds/g`, true],
+    ["yds_deep", "Deep ball", (v) => `${f0(v)} yds/g`, true],
+  ],
+};
+const PROP_UNIT_EDGE_RANK = 8; // top/bottom 8 of 32
+const PROP_UNIT_CHIPS = 4;
+function propUnitProfile(team, side, section) {
+  const chips = [];
+  PROP_UNIT_METRICS[section].forEach(([metric, label, fmtV, moreGoodOff]) => {
+    const cell = propSide(team, side, metric);
+    if (!cell || !cell.rk || cell.raw === null || cell.raw === undefined) return;
+    const most = cell.rk <= PROP_UNIT_EDGE_RANK;
+    const fewest = cell.rk > 32 - PROP_UNIT_EDGE_RANK;
+    if (!most && !fewest) return;
+    const moreGood = side === "off" ? moreGoodOff : !moreGoodOff;
+    const strong = moreGood ? most : fewest;
+    chips.push({ strong, label, value: fmtV(cell.raw), words: propRankWords(cell.rk), extremity: Math.abs(16.5 - cell.rk) });
+  });
+  return chips.sort((a, b) => b.strong - a.strong || b.extremity - a.extremity).slice(0, PROP_UNIT_CHIPS);
 }
-function propValuesCell(r) {
-  return r.games
-    .slice(0, 4)
-    .map((g) => {
-      if (g.partial) return `<span class="ps-val ps-val-partial" title="Wk ${g.week}: ${Math.round((g.snap || 0) * 100)}% of snaps -- left early / limited, not counted">${Math.round(g.v)}*</span>`;
-      const cls = (r.side === "over" ? g.v > r.line : g.v < r.line) ? "ps-val-hit" : "ps-val-miss";
-      const tip = g.missing ? ` title="Wk ${g.week}: ${g.missing.join(", ")} out -- scaled back in the projection"` : "";
-      return `<span class="ps-val ${cls}${g.missing ? " ps-val-lineup" : ""}"${tip}>${Math.round(g.v)}</span>`;
-    })
-    .join("");
+function propUnitRow(team, side, section) {
+  const chips = propUnitProfile(team, side, section);
+  const html = chips.length
+    ? chips.map((c) => `<span class="ps-unit-chip ${c.strong ? "ps-unit-strong" : "ps-unit-weak"}" title="${c.words} of 32 (${side === "off" ? "produced" : "allowed"}, opponent-adjusted)">${c.strong ? "&#9650;" : "&#9660;"} ${c.label} <small>${c.value}</small></span>`).join("")
+    : `<span class="ps-unit-none">Middle of the pack</span>`;
+  return `<div class="ps-unit"><span class="ps-unit-label">${teamLogoMini(team, 18)}<span>${side === "off" ? "OFF" : "DEF"}</span></span><span class="ps-unit-chips">${html}</span></div>`;
 }
-// Reads like a pick: "Over 57.5 Rec Yds -114". The defense story is in the
-// summary line above; the only note kept here is a lineup change (a
-// teammate Out, or back), since nothing else on the card says that.
-function propPlayRow(r) {
-  const strong = r.edge >= PROP_EDGE_STRONG;
-  const inj = r.injury === "Q" ? ` <span class="ftd-inj">Q</span>` : "";
-  const lineup = r.reasons.filter((x) => / OUT \+| back \(/.test(x.text)).map((x) => x.text).join(" &middot; ");
-  return `<tr class="ps-play${strong ? " ps-play-strong" : ""}">
-      <td><span class="sc-player player-click" data-entry="${propClickEntry(r)}" title="Game log, odds, add to summary">${summaryHeadshot(r.team, r.name, 26)}<span class="ps-name">${r.display} <span class="muted ps-pos">${r.position || ""}</span>${inj}${lineup ? `<span class="ps-lineup">${lineup}</span>` : ""}</span></span></td>
-      <td><span class="ps-bet"><b class="ps-side-${r.side}">${r.side === "over" ? "Over" : "Under"} ${fmt(r.line, 1)}</b> ${r.market}</span> <span class="muted">${fmtOddsSigned(r.odds)}</span></td>
-      <td class="num">${fmt(r.proj, r.proj < 10 ? 1 : 0)}</td>
-      <td class="ps-vals">${propValuesCell(r)}</td>
-      <td class="num">${r.hits}/${r.values.length}</td>
-    </tr>`;
-}
-function propSectionColumn(section, offTeam, defTeam, rows) {
+function propSectionColumn(section, offTeam, defTeam) {
   const angles = propMarketAngles(section, offTeam, defTeam);
-  const tagHtml = propAnglesHtml(angles);
-  const plays = propSectionPlays(rows, section, angles).slice(0, PROP_ROWS[section]);
-  const body = plays.length
-    ? `<table class="sc-table ps-plays"><thead><tr><th>Player</th><th>Play</th><th class="num">Proj</th><th>Games</th><th class="num">Hit</th></tr></thead><tbody>${plays.map(propPlayRow).join("")}</tbody></table>`
-    : `<p class="target-none ps-none">${angles.length ? "No posted lines the model agrees with for these calls" : ""}</p>`;
-  return `<div class="sc-col">
-    <div class="sc-block"><div class="sc-label">${teamLogoMini(offTeam, 14)} ${offTeam} offense vs ${defTeam} defense</div><div class="ps-angles">${tagHtml}</div></div>
-    <div class="sc-block">${body}</div>
+  const leans = angles.length
+    ? angles.map((a) => `<span class="ps-angle-call ps-angle-${a.side}" title="${a.detail.replace(/&middot;/g, "·")} (${a.tip})">${a.side === "over" ? "&#9650; Target" : "&#9660; Fade"} ${a.name}</span>`).join("")
+    : `<span class="ps-unit-none">No clear lean</span>`;
+  return `<div class="sc-col ps-col">
+    ${propUnitRow(offTeam, "off", section)}
+    ${propUnitRow(defTeam, "def", section)}
+    <div class="ps-unit ps-leans"><span class="ps-unit-label"><span>Leans</span></span><span class="ps-unit-chips">${leans}</span></div>
   </div>`;
 }
 
@@ -840,13 +879,12 @@ function propsRail(away, home, linesByTeam, gameKey) {
   const block = (team) => {
     const chosen = new Set(picks[team] || []);
     const rows = linesByTeam[team]
-      .filter((r) => chosen.has(propPickKey(r)))
+      .filter((r) => chosen.has(propPickKey(r)) && r.injury !== "out")
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((r) => {
-        // Arrow where the model sides with this line strongly enough to list it.
-        const lean = r.edge !== null && r.edge !== undefined && r.edge >= PROP_EDGE_MIN ? ` <span class="ps-lean" title="Model leans ${r.side}">${r.side === "over" ? "&#9650;" : "&#9660;"}</span>` : "";
-        return `<tr><td><span class="sc-player player-click" data-entry="${propClickEntry(r)}" title="Game log, odds, add to summary">${summaryHeadshot(team, r.name, 26)}<span class="ps-rail-name">${propDisplayName(linesByTeam[team], r)}<span class="ps-rail-mkt">${r.market} ${fmt(r.line, 1)}${r.proj !== null ? ` <span class="muted">proj ${fmt(r.proj, r.proj < 10 ? 1 : 0)}</span>` : ""}${lean}</span></span></span></td><td class="num"><div class="ps-rail-btns">${propSideButton(r, "over")}${propSideButton(r, "under")}</div></td></tr>`;
-      })
+      .map(
+        (r) =>
+          `<tr><td><span class="sc-player player-click" data-entry="${propClickEntry(r)}" title="Game log, odds, add to summary">${summaryHeadshot(team, r.name, 26)}<span class="ps-rail-name">${propDisplayName(linesByTeam[team], r)}<span class="ps-rail-mkt">${r.market} ${fmt(r.line, 1)}</span></span></span></td><td class="num"><div class="ps-rail-btns">${propSideButton(r, "over")}${propSideButton(r, "under")}</div></td></tr>`
+      )
       .join("");
     const rgb = teamAccentRgb(team);
     return `<div class="sc-odds-team" style="border-left:4px solid rgb(${rgb.join(",")})">
@@ -876,12 +914,11 @@ function renderPropsSummaryCard(away, home) {
     game && game.home_team_spread !== null && game.home_team_spread !== undefined ? `${home} ${signed(game.home_team_spread)}` : null,
     game && game.total_line ? `O/U ${game.total_line}` : null,
   ].filter(Boolean).join(" &middot; ");
-  const noLines = !linesByTeam[away].length && !linesByTeam[home].length;
   const section = (key, title) => `<section class="sc-section ps-section">
       <div class="sc-section-title">${title}</div>
-      <div class="sc-cols sc-grid2">
-        ${propSectionColumn(key, away, home, linesByTeam[away])}
-        ${propSectionColumn(key, home, away, linesByTeam[home])}
+      <div class="sc-cols">
+        ${propSectionColumn(key, away, home)}
+        ${propSectionColumn(key, home, away)}
       </div>
     </section>`;
   card.dataset.kind = "props";
@@ -899,7 +936,6 @@ function renderPropsSummaryCard(away, home) {
     <div class="sc-body">
       <div class="sc-main">
         <div class="sc-cols">${summaryTeamBanner(away)}${summaryTeamBanner(home)}</div>
-        ${noLines ? `<p class="no-data-note">No player prop lines posted for this game yet -- defense tags still show below.</p>` : ""}
         ${section("pass", "Passing")}
         ${section("rush", "Rushing")}
         ${section("rec", "Receiving")}
@@ -908,49 +944,77 @@ function renderPropsSummaryCard(away, home) {
     </div>
 
     <div class="sc-footer">
-      <span><span class="ps-angle-call ps-angle-over">&#9650; Target</span> / <span class="ps-angle-call ps-angle-under">&#9660; Fade</span> = defense and offense both lean that way (opponent-adjusted, hover for ranks)</span>
-      <span>Games newest first, green = hit &middot; <span class="ps-val ps-val-partial">7*</span> left early, skipped &middot; <span class="ps-val ps-val-hit ps-val-lineup">9</span> teammate out, scaled</span>
+      <span><span class="ps-unit-chip ps-unit-strong">&#9650; strength</span> <span class="ps-unit-chip ps-unit-weak">&#9660; weakness</span> = top / bottom 8 of 32, opponent-adjusted (hover for rank)</span>
+      <span><span class="ps-angle-call ps-angle-over">&#9650; Target</span> / <span class="ps-angle-call ps-angle-under">&#9660; Fade</span> = offense and defense point the same way</span>
     </div>
   </div>`;
   fitSummaryCard();
   card.querySelectorAll("img").forEach((img) => img.addEventListener("load", fitSummaryCard, { once: true }));
 }
 
-// ---- Picker: every line in the game, "add to summary" per line ----
+// ---- Picker: every line in the game, by section, then by player ----
+// Passing / Rushing / Receiving / Other; inside each, one block per player
+// with his lines (Novig's line and price when Novig has it, SGO's
+// otherwise). No projections -- you draw the conclusions. Each player has
+// an Out switch for late news the injury report doesn't have yet.
+const PROP_SECTIONS = [
+  ["pass", "Passing"],
+  ["rush", "Rushing"],
+  ["rec", "Receiving"],
+  ["other", "Other"],
+];
+const PROP_POS_ORDER = { QB: 0, RB: 1, WR: 2, TE: 3 };
+function propUsage(team, name) {
+  const p = ((DATA.player_props || {})[team] || []).find((x) => normName(x.name) === normName(name));
+  return p ? (p.pass_att || 0) + (p.carries || 0) + (p.targets || 0) : 0;
+}
 function renderPropsPicker() {
   const { away, home, week, game, gameKey } = propsSummaryContext();
   const picks = loadPropsSummaryPicks(gameKey);
-  const filter = propsPickerFilter;
-  const markets = [...new Set([away, home].flatMap((t) => propTeamLines(t, t === away ? home : away, week, game).map((r) => r.marketKey)))];
-  const options = [`<option value="">All markets</option>`]
-    .concat(markets.map((m) => `<option value="${m}"${m === filter ? " selected" : ""}>${PROP_MARKETS[m].label}</option>`))
-    .join("");
+  const marketOrder = Object.keys(PROP_MARKETS);
   const col = (team, defTeam) => {
     const chosen = new Set(picks[team] || []);
     const full = chosen.size >= PROPS_SUMMARY_MAX_PICKS;
-    const rows = propTeamLines(team, defTeam, week, game)
-      .filter((r) => !filter || r.marketKey === filter)
-      .sort((a, b) => (b.edge ?? -1) - (a.edge ?? -1));
-    const body = rows.length
-      ? rows
-          .map((r) => {
-            const on = chosen.has(propPickKey(r));
-            const edge = r.edge === null || r.edge === undefined ? "--" : `${r.edge >= PROP_EDGE_MIN ? `<b>${propLineText(r)}</b>` : propLineText(r)} ${r.edge >= 0 ? "+" : ""}${Math.round(r.edge * 100)}%`;
-            return `<tr class="${on ? "sc-picker-on" : ""}${r.edge >= PROP_EDGE_MIN ? " ps-picker-lean" : ""}"><td><label class="pp-row-label"><input type="checkbox" class="ps-pick-toggle" data-team="${team}" data-key="${encodeDataAttr(propPickKey(r))}"${on ? " checked" : ""}${!on && full ? " disabled" : ""}> ${summaryHeadshot(team, r.name, 22)} ${r.name}</label></td><td>${r.market}</td><td class="num">${fmt(r.line, 1)}</td><td class="num">${r.proj === null ? "--" : fmt(r.proj, 1)}</td><td class="num">${edge}</td><td class="num">${fmtOddsSigned(r.over)}</td><td class="num">${fmtOddsSigned(r.under)}</td></tr>`;
-          })
-          .join("")
-      : `<tr><td colspan="7" class="no-data-note">No lines posted yet.</td></tr>`;
+    const rows = propTeamLines(team, defTeam, week, game);
+    const sections = PROP_SECTIONS.map(([key, title]) => {
+      const inSection = rows.filter((r) => r.section === key);
+      if (!inSection.length) return "";
+      const byPlayer = {};
+      inSection.forEach((r) => (byPlayer[normName(r.name)] = byPlayer[normName(r.name)] || []).push(r));
+      const players = Object.values(byPlayer).sort((a, b) => {
+        const pa = PROP_POS_ORDER[a[0].position] ?? 9;
+        const pb = PROP_POS_ORDER[b[0].position] ?? 9;
+        return pa - pb || propUsage(team, b[0].name) - propUsage(team, a[0].name) || a[0].name.localeCompare(b[0].name);
+      });
+      const blocks = players
+        .map((lines) => {
+          const p = lines[0];
+          const out = p.injury === "out";
+          const outBtn = `<button type="button" class="ps-out-btn${out ? " ps-out-on" : ""}" data-team="${team}" data-name="${encodeDataAttr(p.name)}" title="Mark him out for this week (late news)">${out ? "Out &#10003;" : "Out?"}</button>`;
+          const head = `<tr class="ps-pick-player${out ? " ps-pick-out" : ""}"><td colspan="5">${summaryHeadshot(team, p.name, 22)} <b>${p.name}</b> <span class="muted-label">${p.position || ""}</span>${p.injury === "Q" ? ` <span class="ftd-inj">Q</span>` : ""}${outBtn}</td></tr>`;
+          if (out) return head;
+          const body = lines
+            .sort((a, b) => marketOrder.indexOf(a.marketKey) - marketOrder.indexOf(b.marketKey))
+            .map((r) => {
+              const on = chosen.has(propPickKey(r));
+              return `<tr class="${on ? "sc-picker-on" : ""}"><td class="ps-pick-mkt"><label class="pp-row-label"><input type="checkbox" class="ps-pick-toggle" data-team="${team}" data-key="${encodeDataAttr(propPickKey(r))}"${on ? " checked" : ""}${!on && full ? " disabled" : ""}> ${r.market}</label></td><td class="num">${fmt(r.line, 1)}</td><td class="num">${fmtOddsSigned(r.over)}</td><td class="num">${fmtOddsSigned(r.under)}</td><td class="ps-src">${r.source === "novig" ? `Novig${r.thin ? ` <span class="ps-thin" title="Barely traded on Novig right now -- prices are wide">thin</span>` : ""}` : "Books"}</td></tr>`;
+            })
+            .join("");
+          return head + body;
+        })
+        .join("");
+      return `<tr class="ps-pick-section"><td colspan="5">${title}</td></tr>${blocks}`;
+    }).join("");
     return `<div class="sc-picker-col ps-picker-col">
       <h4 class="sc-picker-team">${teamLogoMini(team, 20)} ${TEAM_NAMES[team] || team} <span class="muted">${chosen.size}/${PROPS_SUMMARY_MAX_PICKS}</span></h4>
-      <table class="data-table player-odds-table"><thead><tr><th>Add to summary</th><th>Market</th><th class="num">Line</th><th class="num">Proj</th><th class="num">Model</th><th class="num">Over</th><th class="num">Under</th></tr></thead><tbody>${body}</tbody></table>
+      <table class="data-table player-odds-table ps-pick-table"><thead><tr><th>Add to summary</th><th class="num">Line</th><th class="num">Over</th><th class="num">Under</th><th></th></tr></thead><tbody>${sections || `<tr><td colspan="5" class="no-data-note">No lines posted yet.</td></tr>`}</tbody></table>
     </div>`;
   };
   return `<h3>${away} @ ${home} &mdash; Pick lines for the summary</h3>
-    <p class="no-data-note">Up to ${PROPS_SUMMARY_MAX_PICKS} per team. Model = the side the projection favors and how far it is from the odds' no-vig chance (bold = strong lean, 10%+).</p>
-    <div class="sc-picker-actions"><select id="ps-picker-market" class="props-market-select">${options}</select> <button type="button" class="view-toggle-btn ps-picker-clear">Clear all</button></div>
+    <p class="no-data-note">Up to ${PROPS_SUMMARY_MAX_PICKS} per team. Novig's line and price when Novig has one; "Books" = best price from other sportsbooks. "Out?" hides a player for this week (late news).</p>
+    <div class="sc-picker-actions"><button type="button" class="view-toggle-btn ps-picker-clear">Clear all</button></div>
     <div class="sc-picker-cols">${col(away, home)}${col(home, away)}</div>`;
 }
-let propsPickerFilter = "";
 function ensurePropsPicker() {
   if (document.getElementById("ps-picker-modal")) return;
   const overlay = document.createElement("div");
@@ -984,6 +1048,12 @@ function refreshPropsAfterPick() {
 
 document.addEventListener("click", (e) => {
   if (e.target.closest(".ps-open, #props-pick-btn")) openPropsPicker();
+  const outBtn = e.target.closest(".ps-out-btn");
+  if (outBtn) {
+    toggleManualOut(propsSummaryContext().week, outBtn.dataset.team, decodeDataAttr(outBtn.dataset.name));
+    refreshPropsAfterPick();
+    return;
+  }
   if (e.target.closest(".ps-picker-clear")) {
     savePropsSummaryPicks(propsSummaryContext().gameKey, {});
     refreshPropsAfterPick();
@@ -998,11 +1068,6 @@ document.addEventListener("click", (e) => {
   }
 });
 document.addEventListener("change", (e) => {
-  if (e.target.id === "ps-picker-market") {
-    propsPickerFilter = e.target.value;
-    document.getElementById("ps-picker-content").innerHTML = renderPropsPicker();
-    return;
-  }
   const cb = e.target.closest(".ps-pick-toggle");
   if (!cb) return;
   const { gameKey } = propsSummaryContext();
