@@ -2588,3 +2588,12 @@ footer { border-top-color: var(--border); }
 .view-toggle-sep { width: 1px; align-self: stretch; margin: 2px 6px; background: var(--border-strong); }
 .gs-adj-badge { padding: 0 6px; border-radius: 999px; font-size: 0.72rem; font-weight: 800; color: var(--accent); border: 1px solid rgba(var(--accent-rgb), 0.55); background: rgba(var(--accent-rgb), 0.1); }
 .gs-head { gap: 6px; font-size: 0.78rem; color: var(--text); letter-spacing: 0.08em; }
+
+/* Novig ad at the bottom of the Game Summary's My Picks rail */
+.gs-novig { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 10px 12px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--border-strong); text-align: center; }
+.gs-novig-head { display: flex; align-items: center; gap: 8px; font-size: 0.86rem; font-weight: 700; }
+.gs-novig-head b { color: var(--accent); }
+.gs-novig-logo { width: 32px; height: 32px; border-radius: 8px; }
+.gs-novig-qr { width: 140px; height: 140px; border-radius: 6px; background: #fff; padding: 4px; }
+.gs-novig-offer { margin: 0; font-size: 0.78rem; font-weight: 600; line-height: 1.35; }
+.gs-novig-code { display: inline-block; padding: 0 6px; border-radius: 5px; font-weight: 800; letter-spacing: 0.06em; color: var(--on-accent); background: var(--accent); }
