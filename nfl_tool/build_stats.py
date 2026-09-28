@@ -991,7 +991,16 @@ def fetch_previous_odds_snapshot() -> dict | None:
     ANY failure -- reading the live site is a nice-to-have, never allowed
     to break the build itself."""
     try:
-        req = urllib.request.Request(LIVE_SITE_DATA_URL, headers={"User-Agent": "Mozilla/5.0 (compatible; nfl-tool/1.0)"})
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; nfl-tool/1.0)"}
+        # The live site sits behind the Discord login (nfl_tool/functions/
+        # _middleware.js); the build proves itself with a key derived from
+        # the bot token, which only CI and Cloudflare hold.
+        bot_token = os.environ.get("DISCORD_BOT_TOKEN")
+        if bot_token:
+            import hashlib
+            import hmac
+            headers["X-GMG-Build"] = hmac.new(bot_token.encode(), b"gmg-build-v1", hashlib.sha256).hexdigest()
+        req = urllib.request.Request(LIVE_SITE_DATA_URL, headers=headers)
         with urllib.request.urlopen(req, timeout=15) as resp:
             return json.load(resp)
     except Exception as e:

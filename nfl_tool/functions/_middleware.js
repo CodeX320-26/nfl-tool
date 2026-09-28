@@ -17,7 +17,7 @@ const INVITE_URL = ""; // "Join the Discord" button
 // false = TEST MODE: the site stays open to everyone, but /auth/login works
 // and /auth/check shows whether this Discord account WOULD get in. Flip to
 // true (one-line push) once that's confirmed.
-const ENFORCE = false;
+const ENFORCE = true;
 
 const COOKIE = "gmg_session";
 const STATE_COOKIE = "gmg_oauth_state";
@@ -80,6 +80,17 @@ async function memberRoles(env, userId) {
   return { ok: true, roles: m.roles || [] };
 }
 const hasAllowedRole = (roles) => roles.some((r) => ALLOWED_ROLE_IDS.includes(r));
+
+// The data build (build_stats.py fetch_previous_odds_snapshot) reads the
+// live data.json; it sends HMAC(bot token, "gmg-build-v1") as X-GMG-Build.
+async function isBuildRequest(request, env) {
+  const sent = request.headers.get("X-GMG-Build");
+  if (!sent) return false;
+  const key = await crypto.subtle.importKey("raw", enc.encode(env.DISCORD_BOT_TOKEN), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode("gmg-build-v1")));
+  const hex = [...mac].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return sent === hex;
+}
 
 function gateReady(env) {
   return !!(CLIENT_ID && ALLOWED_ROLE_IDS.length && env.DISCORD_CLIENT_SECRET && env.DISCORD_BOT_TOKEN);
@@ -239,6 +250,7 @@ export async function onRequest(context) {
     if (url.pathname === "/auth/check") return handleCheck(request, env);
   }
   if (!gateEnabled(env)) return next(); // not configured / test mode: site stays open
+  if (await isBuildRequest(request, env)) return next();
 
   let session = null;
   try {

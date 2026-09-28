@@ -76,8 +76,11 @@ context. It is the only copy that travels with the repo.
   - The secrets `DISCORD_CLIENT_SECRET` and `DISCORD_BOT_TOKEN` live in GitHub secrets and are copied
     into the Pages project by deploy.yml before each Cloudflare deploy.
   - The gate stays **off** (site open) until CLIENT_ID (`1554268816521957447`), roles and both secrets exist.
-  - `ENFORCE = false` is **test mode**: the site stays open, `/auth/login` works and `/auth/check`
-    shows whether that Discord account would get in. Flipping ENFORCE to true turns the gate on.
+  - **ENFORCE = true since 2026-09-28: the gate is ON.** `false` is test mode (site open;
+    `/auth/login` plus `/auth/check` show whether an account would get in).
+  - **The build gets through the gate:** `fetch_previous_odds_snapshot` sends
+    `X-GMG-Build: HMAC-SHA256(bot token, "gmg-build-v1")`, and deploy.yml passes `DISCORD_BOT_TOKEN`
+    to the build step. Push builds rely on this to reuse SGO odds.
   - Bot invite: `https://discord.com/oauth2/authorize?client_id=1554268816521957447&scope=bot&permissions=0&guild_id=1295760852892385290`.
   - `https://nfl.gmgsports.org/auth/status` shows which pieces are in place, never the values.
   - Roles are re-checked with the bot every 15 min. Sessions last 30 days. If Discord's API is down,
