@@ -783,6 +783,191 @@ def fetch_sgo_events(api_keys: list, starts_after: str, starts_before: str) -> l
     return None
 
 
+# ---- Novig: primary source for player prop lines ----
+# Novig's public site reads every market for a game (main lines,
+# alternates, prices) from one GraphQL request per game, no login. SGO's
+# free tier leaves many player props without a book price (starters
+# included), so Novig goes first and SGO fills in any player Novig doesn't
+# list. Novig only accepts the exact query its own site sends, saved
+# verbatim in novig_event_markets.graphql -- if Novig changes its site the
+# request starts erroring, this returns nothing, and SGO carries the props
+# alone until the file is refreshed (copy the EventMarkets_Query request
+# body from the browser's network tab on any novig.com game page).
+NOVIG_EVENTS_URL = "https://api.novig.us/v3/public/catalog/events?league=NFL"
+NOVIG_GRAPHQL_URL = "https://api.novig.us/v1/graphql"
+NOVIG_QUERY_PATH = Path(__file__).parent / "novig_event_markets.graphql"
+NOVIG_MARKET_FILTER = {
+    "_and": [
+        {"status": {"_eq": "OPEN"}},
+        {"_or": [{"is_consensus": {"_eq": True}}, {"outcomes": {"available": {"_is_null": False}}}]},
+        {"_and": [
+            {"_not": {"market_locks": {"_and": [{"deleted_at": {"_is_null": True}}]}}},
+            {"event": {"_not": {"event_locks": {"_and": [{"deleted_at": {"_is_null": True}}]}}}},
+        ]},
+    ]
+}
+# Novig market type -> our PLAYER_OU_MARKETS stat id.
+NOVIG_OU_TYPES = {
+    "RECEIVING_YARDS": "receiving_yards",
+    "RECEPTIONS": "receiving_receptions",
+    "LONGEST_RECEPTION": "receiving_longestReception",
+    "RUSHING_YARDS": "rushing_yards",
+    "RUSHING_ATTEMPTS": "rushing_attempts",
+    "LONGEST_RUSH": "rushing_longestRush",
+    "PASSING_YARDS": "passing_yards",
+    "PASSING_ATTEMPTS": "passing_attempts",
+    "PASSING_COMPLETIONS": "passing_completions",
+    "PASSING_TOUCHDOWNS": "passing_touchdowns",
+    "INTERCEPTIONS_THROWN": "passing_interceptions",
+    "LONGEST_COMPLETION": "passing_longestCompletion",
+    "RUSHING_AND_RECEIVING_YARDS": "rushing+receiving_yards",
+    "PASSING_AND_RUSHING_YARDS": "passing+rushing_yards",
+}
+# Novig team symbols that differ from ours.
+NOVIG_TEAM_FIXES = {"LAR": "LA", "WSH": "WAS", "JAC": "JAX", "LVR": "LV"}
+
+
+def _novig_request(url: str, body: dict | None = None):
+    data = json.dumps(body).encode() if body is not None else None
+    headers = {"accept": "*/*", "User-Agent": "Mozilla/5.0 (compatible; nfl-tool/1.0)"}
+    if data is not None:
+        headers["content-type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=headers)
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.load(resp)
+
+
+def novig_price_to_american(p):
+    """Novig prices an outcome as the cost of a $1 contract (0.535 = 53.5%)."""
+    if p is None or p <= 0 or p >= 1:
+        return None
+    return int(round(-100 * p / (1 - p))) if p >= 0.5 else int(round(100 * (1 - p) / p))
+
+
+def fetch_novig_week(week_games: list, starts_after: str, starts_before: str) -> tuple:
+    """Every market for this week's games, keyed by our (away, home).
+    Returns (games, debug). Never raises -- a Novig problem just means SGO
+    carries the props this run."""
+    debug = {"events": 0, "games": [], "error": None}
+    out = {}
+    try:
+        query = NOVIG_QUERY_PATH.read_text(encoding="utf-8").rstrip("\n")
+        lo = datetime.fromisoformat(starts_after).timestamp() * 1000
+        hi = datetime.fromisoformat(starts_before).timestamp() * 1000
+        wanted = {(g["away"], g["home"]) for g in week_games}
+        events = [e for e in _novig_request(NOVIG_EVENTS_URL).get("items", []) if lo <= (e.get("startsTs") or 0) <= hi]
+        debug["events"] = len(events)
+        for e in events:
+            resp = _novig_request(NOVIG_GRAPHQL_URL, {
+                "operationName": "EventMarkets_Query",
+                "variables": {"eventId": e["eventId"], "marketVisibleWhere": NOVIG_MARKET_FILTER},
+                "query": query,
+            })
+            if resp.get("errors"):
+                debug["error"] = str(resp["errors"][0].get("message"))
+                continue
+            rows = (resp.get("data") or {}).get("event") or []
+            if not rows or not rows[0].get("game"):
+                continue
+            ev = rows[0]
+            fix = lambda sym: normalize_team(NOVIG_TEAM_FIXES.get(sym, sym))
+            key = (fix(ev["game"]["awayTeam"]["symbol"]), fix(ev["game"]["homeTeam"]["symbol"]))
+            if key not in wanted:
+                continue
+            out[key] = ev.get("markets") or []
+            debug["games"].append(f"{key[0]}@{key[1]}:{len(out[key])}")
+    except Exception as ex:  # network, JSON, or a changed query -- SGO covers it
+        debug["error"] = str(ex)
+        print(f"WARNING: Novig fetch failed ({ex}) -- player props fall back to SGO only.", file=sys.stderr)
+    return out, debug
+
+
+def _novig_player_team(market):
+    comps = ((market.get("player") or {}).get("player_competitors") or [])
+    sym = comps[0]["competitor"]["symbol"] if comps else None
+    return normalize_team(NOVIG_TEAM_FIXES.get(sym, sym)) if sym else None
+
+
+def extract_novig_props(novig_games: dict, teams, roster_positions: dict, unavailable: set) -> tuple:
+    """(ou, anytime, first): ou is {stat_id: {team: [rows]}} shaped like
+    extract_player_ou_props; anytime/first are {team: [rows]} shaped like
+    extract_player_prop_odds. Main (consensus) lines only."""
+    ou = {stat: {t: [] for t in teams} for stat in PLAYER_OU_MARKETS}
+    anytime = {t: [] for t in teams}
+    first = {t: [] for t in teams}
+    for markets in novig_games.values():
+        for m in markets:
+            if not m.get("is_consensus") or not m.get("player"):
+                continue
+            name = m["player"].get("full_name")
+            team = _novig_player_team(m)
+            if not name or team not in teams:
+                continue
+            outcomes = {(o.get("description") or "").split(" ")[0].lower(): o.get("available") for o in m.get("outcomes") or []}
+            mtype = m.get("type")
+            position = (roster_positions or {}).get(name)
+            if mtype in NOVIG_OU_TYPES and m.get("strike") is not None:
+                over, under = novig_price_to_american(outcomes.get("over")), novig_price_to_american(outcomes.get("under"))
+                if over is None and under is None:
+                    continue
+                ou[NOVIG_OU_TYPES[mtype]][team].append({"name": name, "position": position, "line": float(m["strike"]), "over_odds": over, "under_odds": under, "source": "novig"})
+            elif mtype in ("TOUCHDOWNS", "FIRST_TOUCHDOWN_SCORER") and name not in (unavailable or ()):
+                yes_p = outcomes.get("over") if mtype == "TOUCHDOWNS" else outcomes.get("yes")
+                no_p = outcomes.get("under") if mtype == "TOUCHDOWNS" else outcomes.get("no")
+                if mtype == "TOUCHDOWNS" and float(m.get("strike") or 0) != 0.5:
+                    continue
+                odds = novig_price_to_american(yes_p)
+                # One-sided (no one selling "No") = too thin to read a chance from.
+                if odds is None or not no_p:
+                    continue
+                fair = yes_p / (yes_p + no_p)
+                row = {"name": name, "position": position, "best_odds": odds, "best_book": "Novig", "fair_odds": novig_price_to_american(fair), "implied_prob": round(fair, 3)}
+                (anytime if mtype == "TOUCHDOWNS" else first)[team].append(row)
+    for stat in ou:
+        for t in ou[stat]:
+            ou[stat][t].sort(key=lambda r: -(r["line"] or 0))
+    return ou, anytime, first
+
+
+def _norm_player(name: str) -> str:
+    return "".join(ch for ch in (name or "").lower().replace(" jr.", "").replace(" sr.", "").replace(" iii", "").replace(" ii", "") if ch.isalpha())
+
+
+def merge_prop_markets(novig: dict, sgo: dict | None) -> dict:
+    """Novig's line for every player it lists; SGO's for anyone it doesn't."""
+    merged = {}
+    for stat in PLAYER_OU_MARKETS:
+        n_by_team = (novig or {}).get(stat) or {}
+        s_by_team = (sgo or {}).get(stat) or {}
+        merged[stat] = {}
+        for team in set(n_by_team) | set(s_by_team):
+            rows = list(n_by_team.get(team) or [])
+            have = {_norm_player(r["name"]) for r in rows}
+            rows += [r for r in (s_by_team.get(team) or []) if _norm_player(r["name"]) not in have and r.get("source") != "novig"]
+            merged[stat][team] = sorted(rows, key=lambda r: -(r.get("line") or 0))
+    return merged
+
+
+def merge_td_odds(novig: dict, sgo: dict | None) -> dict:
+    """Per player, whichever of SGO's best book or Novig pays more; players
+    only one source lists are kept as-is."""
+    merged = {}
+    for team in set(novig or {}) | set(sgo or {}):
+        by_name = {}
+        for r in (sgo or {}).get(team) or []:
+            if r.get("best_book") != "Novig":
+                by_name[_norm_player(r["name"])] = dict(r)
+        for r in (novig or {}).get(team) or []:
+            k = _norm_player(r["name"])
+            cur = by_name.get(k)
+            if cur is None:
+                by_name[k] = dict(r)
+            elif cur.get("best_odds") is None or (r["best_odds"] is not None and r["best_odds"] > cur["best_odds"]):
+                cur["best_odds"], cur["best_book"] = r["best_odds"], "Novig"
+        merged[team] = sorted(by_name.values(), key=lambda r: -(r.get("implied_prob") or 0))
+    return merged
+
+
 LIVE_SITE_DATA_URL = "https://nfl.gmgsports.org/data.json"
 
 
@@ -3827,6 +4012,7 @@ def main():
     player_prop_markets = None
     sgo_debug = None
     sgo_props_debug = None
+    novig_debug = None
     if week_dates:
         starts_after = week_dates[0]
         # A plain date+1 cutoff is midnight UTC on the day after the last
@@ -3914,6 +4100,21 @@ def main():
             # place untouched, so no odds bar / spread-total value goes
             # missing either way.
 
+        # Novig first for player props (free, no quota -- so every build,
+        # routine pushes included, gets fresh lines), SGO filling gaps.
+        unavailable_names = {
+            row.full_name
+            for row in injuries_df.itertuples(index=False)
+            if isinstance(row.report_status, str)
+            and row.report_status.lower() in ("out", "doubtful", "injured reserve", "ir", "suspended")
+        }
+        novig_games, novig_debug = fetch_novig_week(week_games, starts_after, starts_before)
+        if novig_games:
+            n_ou, n_any, n_first = extract_novig_props(novig_games, teams, roster_positions, unavailable_names)
+            player_prop_markets = merge_prop_markets(n_ou, player_prop_markets)
+            player_td_odds = merge_td_odds(n_any, player_td_odds)
+            player_first_td_odds = merge_td_odds(n_first, player_first_td_odds)
+
     blob = {
         "season": season,
         "requested_season": args.season,
@@ -3949,6 +4150,7 @@ def main():
         "player_prop_markets": player_prop_markets,
         "sgo_debug": sgo_debug,
         "sgo_props_debug": sgo_props_debug,
+        "novig_debug": novig_debug,
         "player_prop_market_labels": PLAYER_OU_MARKETS,
     }
 

@@ -1,0 +1,415 @@
+query EventMarkets_Query($eventId: uuid, $marketVisibleWhere: market_bool_exp) @cached(ttl: 5) {
+  event(where: {id: {_eq: $eventId}}) {
+    ...MarketSelector_Frag
+    ...EventData_Frag
+    ...EventScoreboard_Frag
+    ...CustomEvent_Frag
+    id
+    description
+    type
+    league
+    scheduled_start
+    status
+    tournament_markets: markets {
+      type
+      __typename
+    }
+    game {
+      id
+      awayTeam {
+        id
+        name
+        symbol
+        primary_color
+        secondary_color
+        swish_id
+        optic_odds_id
+        __typename
+      }
+      homeTeam {
+        id
+        name
+        symbol
+        primary_color
+        secondary_color
+        swish_id
+        optic_odds_id
+        __typename
+      }
+      end_date
+      away_score
+      home_score
+      time_remaining
+      sport
+      __typename
+    }
+    __typename
+  }
+}
+
+fragment MarketData_Frag on market {
+  id
+  type
+  strike
+  status
+  re_settled_at
+  competitor {
+    id
+    name
+    country
+    __typename
+  }
+  market_locks(
+    order_by: {created_at: desc}
+    where: {deleted_at: {_is_null: true}}
+  ) {
+    id
+    market_id
+    created_at
+    minute_duration
+    __typename
+  }
+  player {
+    id
+    full_name
+    __typename
+  }
+  __typename
+}
+
+fragment Outcome_Frag on outcome {
+  id
+  available
+  altAvailable
+  index
+  description
+  competitor {
+    id
+    symbol
+    __typename
+  }
+  __typename
+}
+
+fragment StrikePriceSelector_Frag on market {
+  id
+  description
+  eventId
+  strike
+  ...MarketData_Frag
+  outcomes {
+    id
+    index
+    description
+    ...Outcome_Frag
+    __typename
+  }
+  __typename
+}
+
+fragment TennisScoreboard_Frag on game {
+  events {
+    id
+    status
+    __typename
+  }
+  home_set_1
+  home_set_2
+  home_set_3
+  home_set_4
+  home_set_5
+  away_set_1
+  away_set_2
+  away_set_3
+  away_set_4
+  away_set_5
+  possession
+  home_game_score
+  away_game_score
+  homeTeam {
+    id
+    name
+    __typename
+  }
+  awayTeam {
+    id
+    name
+    __typename
+  }
+  __typename
+}
+
+fragment BaseEvent_Frag on event {
+  id
+  status
+  type
+  description
+  league
+  scheduled_start
+  event_locks(order_by: {created_at: desc}, where: {deleted_at: {_is_null: true}}) {
+    id
+    event_id
+    minute_duration
+    created_at
+    __typename
+  }
+  __typename
+}
+
+fragment MarketSelector_Frag on event {
+  id
+  type
+  league
+  markets(where: $marketVisibleWhere) {
+    is_consensus
+    id
+    strike
+    type
+    description
+    status
+    volume
+    market_detail {
+      question
+      __typename
+    }
+    ...MarketData_Frag
+    ...StrikePriceSelector_Frag
+    outcomes {
+      id
+      index
+      description
+      available
+      ...Outcome_Frag
+      __typename
+    }
+    market_locks(
+      order_by: {created_at: desc}
+      where: {deleted_at: {_is_null: true}}
+    ) {
+      id
+      market_id
+      minute_duration
+      created_at
+      __typename
+    }
+    player {
+      id
+      full_name
+      logo
+      jersey_number
+      player_competitors {
+        competitor {
+          id
+          name
+          short_name
+          symbol
+          swish_id
+          optic_odds_id
+          primary_color
+          secondary_color
+          country
+          __typename
+        }
+        __typename
+      }
+      __typename
+    }
+    competitor {
+      id
+      name
+      short_name
+      symbol
+      swish_id
+      optic_odds_id
+      primary_color
+      secondary_color
+      country
+      __typename
+    }
+    __typename
+  }
+  event_locks(order_by: {created_at: desc}, where: {deleted_at: {_is_null: true}}) {
+    id
+    event_id
+    minute_duration
+    created_at
+    __typename
+  }
+  __typename
+}
+
+fragment EventData_Frag on event {
+  id
+  type
+  status
+  scheduled_start
+  league
+  game {
+    id
+    league
+    sport
+    scheduled_start
+    period
+    time_remaining
+    home_score
+    away_score
+    awayTeam {
+      id
+      name
+      symbol
+      short_name
+      mascot
+      primary_color
+      secondary_color
+      swish_id
+      optic_odds_id
+      wins
+      losses
+      draws
+      country
+      __typename
+    }
+    homeTeam {
+      id
+      name
+      symbol
+      short_name
+      mascot
+      primary_color
+      secondary_color
+      swish_id
+      optic_odds_id
+      wins
+      losses
+      draws
+      country
+      __typename
+    }
+    __typename
+  }
+  __typename
+}
+
+fragment EventScoreboard_Frag on event {
+  id
+  type
+  status
+  description
+  league
+  scheduled_start
+  game {
+    id
+    ...TennisScoreboard_Frag
+    status
+    home_score
+    away_score
+    period
+    time_remaining
+    down
+    distance
+    yardLine
+    yardline_territory
+    league
+    sport
+    homeTeam {
+      id
+      name
+      short_name
+      mascot
+      symbol
+      primary_color
+      secondary_color
+      wins
+      losses
+      draws
+      swish_id
+      optic_odds_id
+      ranking
+      country
+      __typename
+    }
+    awayTeam {
+      id
+      name
+      short_name
+      mascot
+      symbol
+      primary_color
+      secondary_color
+      wins
+      losses
+      draws
+      swish_id
+      optic_odds_id
+      ranking
+      country
+      __typename
+    }
+    __typename
+  }
+  parent_event {
+    id
+    description
+    __typename
+  }
+  scoreboard_markets: markets(where: {type: {_eq: "MONEY"}}, limit: 1) {
+    id
+    type
+    outcomes {
+      id
+      index
+      status
+      __typename
+    }
+    __typename
+  }
+  custom_markets: markets(where: {type: {_eq: "CUSTOM"}}, limit: 1) {
+    id
+    type
+    __typename
+  }
+  __typename
+}
+
+fragment CustomEvent_Frag on event {
+  ...BaseEvent_Frag
+  custom_event_markets_aggregate: markets_aggregate(
+    where: {type: {_eq: "CUSTOM"}, status: {_eq: "OPEN"}}
+  ) {
+    aggregate {
+      count
+      __typename
+    }
+    __typename
+  }
+  custom_event_volume_aggregate: markets_aggregate(
+    where: {type: {_eq: "CUSTOM"}, status: {_eq: "OPEN"}}
+  ) {
+    aggregate {
+      sum {
+        volume
+        __typename
+      }
+      __typename
+    }
+    __typename
+  }
+  custom_event_markets: markets(
+    where: {type: {_eq: "CUSTOM"}, status: {_eq: "OPEN"}}
+    order_by: {volume: desc}
+  ) {
+    ...MarketData_Frag
+    description
+    volume
+    market_detail {
+      question
+      __typename
+    }
+    outcomes {
+      ...Outcome_Frag
+      __typename
+    }
+    __typename
+  }
+  __typename
+}
