@@ -678,40 +678,53 @@ function propDepthShares(team, name) {
   return total >= 3 ? { short: n.short / total, int: n.int / total, deep: n.deep / total } : null;
 }
 
-// ---- Market calls: this offense vs this defense ----
-// Each angle pairs what the defense allows with what the offense actually
-// does, and ends in a market: "Target Receptions" when a defense gives up
-// underneath catches to an offense that lives underneath, "Fade Deep
-// catches" when a defense takes away the deep ball from an offense that
-// doesn't throw it much. Defense counts 60%, offense 40%; both have to
-// lean the same way (or the offense be neutral) for a call. Ranks are
-// opponent-adjusted (build_stats.py prop_matchup_model).
-const PROP_ANGLE_MIN = 0.45; // combined lean (-1..1) needed for a call
-const PROP_ANGLES_SHOWN = 3;
+// ---- Card rendering ----
+// Clicking a player opens the shared player popup (player-props.js).
+function propClickEntry(r) {
+  const { away, home } = propsSummaryContext();
+  return encodeDataAttr({ team: r.team, name: r.name, oppTeam: r.team === away ? home : away });
+}
+// ---- Target / Fade spots: this offense vs this defense ----
+// Every spot pairs what the offense produces with what the defense allows
+// (both opponent-adjusted in build_stats.py prop_matchup_model, so schedule
+// strength is already in the ranks). Lean = average of the two, each from
+// rank 1 (+1, most) to rank 32 (-1, fewest), flipped where "more" is bad
+// for the offense (INTs thrown, sacks). A strong positive lean lands under
+// Target, a strong negative one under Fade.
 const f1 = (v) => fmt(v, 1);
 const f0 = (v) => fmt(v, 0);
-const PROP_ANGLES = {
+const PROP_SPOT_MIN = 0.4; // |lean| needed to list a spot
+const PROP_SPOTS_SHOWN = 3; // per half
+// { label | {target, fade}, off, def (metric keys), fmt, bad: true when more
+// of it is bad for the offense }
+const PROP_SPOTS = {
   pass: [
-    { name: "Pass attempts", def: ["pass_att"], off: "pass_att", d: (v) => `faces ${f1(v)} att/g`, o: (v) => `throws ${f1(v)}/g`, markets: ["passing_attempts", "passing_completions"], pos: ["QB"] },
-    { name: "Pass yards", def: ["pass_yards", "ypa"], off: "pass_yards", d: (v) => `allows ${f0(v)} pass yds/g`, o: (v) => `${f0(v)}/g`, markets: ["passing_yards", "passing+rushing_yards"], pos: ["QB"] },
-    { name: "Pass TDs", def: ["pass_td"], off: "pass_td", d: (v) => `allows ${f1(v)} pass TD/g`, o: (v) => `${f1(v)}/g`, markets: ["passing_touchdowns"], pos: ["QB"] },
-    { name: "Long completions", def: ["expl_pass"], off: "expl_pass", d: (v) => `allows ${f1(v)} 20+ yd comp/g`, o: (v) => `${f1(v)}/g`, markets: ["passing_longestCompletion"], pos: ["QB"] },
-    { name: "INTs", def: ["ints"], off: "ints", d: (v) => `picks off ${f1(v)}/g`, o: (v) => `throws ${f1(v)}/g`, markets: ["passing_interceptions"], pos: ["QB"] },
+    { label: "Pass yards", off: "pass_yards", def: "pass_yards", fmt: (v) => `${f0(v)}/g` },
+    { label: "Pass attempts", off: "pass_att", def: "pass_att", fmt: (v) => `${f1(v)}/g` },
+    { label: "Completions", off: "completions", def: "completions", fmt: (v) => `${f1(v)}/g` },
+    { label: "Yards per attempt", off: "ypa", def: "ypa", fmt: (v) => f1(v) },
+    { label: "Pass TDs", off: "pass_td", def: "pass_td", fmt: (v) => `${f1(v)}/g` },
+    { label: "Long completions", off: "expl_pass", def: "expl_pass", fmt: (v) => `${f1(v)} 20+/g` },
+    { label: { target: "Ball security", fade: "Interception risk" }, off: "ints", def: "ints", fmt: (v) => `${f1(v)} INT/g`, bad: true, offVerb: "throws", defVerb: "picks off" },
+    { label: { target: "Clean pocket", fade: "Pressure / sacks" }, off: "sacks", def: "sacks", fmt: (v) => `${f1(v)} sacks/g`, bad: true, offVerb: "gives up", defVerb: "gets" },
   ],
   rush: [
-    { name: "RB carries", def: ["car_RB", "ypc_RB"], off: "car_RB", d: (v) => `allows ${f1(v)} RB car/g`, o: (v) => `${f1(v)}/g`, markets: ["rushing_attempts"], pos: ["RB"] },
-    { name: "RB rush yards", def: ["rushyds_RB", "ypc_RB"], off: "rushyds_RB", d: (v) => `allows ${f0(v)} RB rush yds/g`, o: (v) => `${f0(v)}/g`, markets: ["rushing_yards", "rushing+receiving_yards"], pos: ["RB"] },
-    { name: "Long runs", def: ["expl_rush"], off: "expl_rush", d: (v) => `allows ${f1(v)} 10+ yd runs/g`, o: (v) => `${f1(v)}/g`, markets: ["rushing_longestRush"], pos: ["RB", "QB"] },
-    { name: "QB rushing", def: ["rushyds_QB"], off: "rushyds_QB", d: (v) => `allows ${f0(v)} QB rush yds/g`, o: (v) => `${f0(v)}/g`, markets: ["rushing_yards", "rushing_attempts"], pos: ["QB"] },
+    { label: "RB carries", off: "car_RB", def: "car_RB", fmt: (v) => `${f1(v)}/g` },
+    { label: "RB rush yards", off: "rushyds_RB", def: "rushyds_RB", fmt: (v) => `${f0(v)}/g` },
+    { label: "Yards per carry", off: "ypc_RB", def: "ypc_RB", fmt: (v) => f1(v) },
+    { label: "QB rushing", off: "rushyds_QB", def: "rushyds_QB", fmt: (v) => `${f0(v)} yds/g` },
+    { label: "Long runs", off: "expl_rush", def: "expl_rush", fmt: (v) => `${f1(v)} 10+/g` },
   ],
   rec: [
-    { name: "Receptions", def: ["yds_short"], off: "att_short", d: (v) => `allows ${f0(v)} yds/g on short throws`, o: (v) => `throws ${f1(v)} short/g`, markets: ["receiving_receptions"], pos: ["WR", "TE", "RB"], depth: "short", share: 0.5 },
-    { name: "10-19 yd yards", def: ["yds_int"], off: "att_int", d: (v) => `allows ${f0(v)} yds/g on 10-19 yd throws`, o: (v) => `throws ${f1(v)} there/g`, markets: ["receiving_yards"], pos: ["WR", "TE"], depth: "int", share: 0.25 },
-    { name: "Deep yards", def: ["yds_deep"], off: "att_deep", d: (v) => `allows ${f0(v)} yds/g on 20+ yd throws`, o: (v) => `throws ${f1(v)} deep/g`, markets: ["receiving_yards", "receiving_longestReception"], pos: ["WR", "TE"], depth: "deep", share: 0.2 },
-    { name: "Long catches", def: ["expl_pass"], off: "expl_pass", d: (v) => `allows ${f1(v)} 20+ yd catches/g`, o: (v) => `makes ${f1(v)}/g`, markets: ["receiving_longestReception"], pos: ["WR", "TE", "RB"] },
-    { name: "WR yards", def: ["recyds_WR"], off: "recyds_WR", d: (v) => `allows ${f0(v)} WR yds/g`, o: (v) => `WRs ${f0(v)}/g`, markets: ["receiving_yards", "receiving_receptions"], pos: ["WR"] },
-    { name: "TE yards", def: ["recyds_TE"], off: "recyds_TE", d: (v) => `allows ${f0(v)} TE yds/g`, o: (v) => `TEs ${f0(v)}/g`, markets: ["receiving_yards", "receiving_receptions"], pos: ["TE"] },
-    { name: "RB catches", def: ["recyds_RB"], off: "recyds_RB", d: (v) => `allows ${f0(v)} RB rec yds/g`, o: (v) => `RBs ${f0(v)}/g`, markets: ["receiving_yards", "receiving_receptions"], pos: ["RB"] },
+    { label: "WR yards", off: "recyds_WR", def: "recyds_WR", fmt: (v) => `${f0(v)}/g` },
+    { label: "WR receptions", off: "rec_WR", def: "rec_WR", fmt: (v) => `${f1(v)}/g` },
+    { label: "TE yards", off: "recyds_TE", def: "recyds_TE", fmt: (v) => `${f0(v)}/g` },
+    { label: "TE receptions", off: "rec_TE", def: "rec_TE", fmt: (v) => `${f1(v)}/g` },
+    { label: "RB receiving", off: "recyds_RB", def: "recyds_RB", fmt: (v) => `${f0(v)} yds/g` },
+    { label: "Short throws", off: "yds_short", def: "yds_short", fmt: (v) => `${f0(v)} yds/g` },
+    { label: "10-19 yd throws", off: "yds_int", def: "yds_int", fmt: (v) => `${f0(v)} yds/g` },
+    { label: "Deep throws", off: "yds_deep", def: "yds_deep", fmt: (v) => `${f0(v)} yds/g` },
+    { label: "Long catches", off: "expl_pass", def: "expl_pass", fmt: (v) => `${f1(v)} 20+/g` },
   ],
 };
 
@@ -723,116 +736,36 @@ function propSide(team, side, metric) {
   const cell = ((propModel().teams[team] || {})[side] || {})[metric];
   return cell ? { raw: cell.raw, rk: cell.rk, lean: propRankLean(cell.rk) } : null;
 }
-
-function propMarketAngles(section, offTeam, defTeam) {
-  const out = [];
-  PROP_ANGLES[section].forEach((a) => {
-    const defs = a.def.map((m) => propSide(defTeam, "def", m)).filter(Boolean);
-    const off = propSide(offTeam, "off", a.off);
-    if (!defs.length || !off) return;
-    const dLean = defs.reduce((x, d) => x + d.lean, 0) / defs.length;
-    const score = 0.6 * dLean + 0.4 * off.lean;
-    const dir = Math.sign(score);
-    if (Math.abs(score) < PROP_ANGLE_MIN || dLean * dir < 0.3 || off.lean * dir < -0.2) return;
-    const d = defs[0];
-    out.push({
-      ...a,
-      side: dir > 0 ? "over" : "under",
-      score,
-      detail: `${defTeam} ${a.d(d.raw)} &middot; ${offTeam} ${a.o(off.raw)}`,
-      tip: `${defTeam}: ${propRankWords(d.rk)} of 32 defenses; ${offTeam}: ${propRankWords(off.rk)} of 32 offenses (opponent-adjusted)`,
-    });
+function propOrd(rk) {
+  return propOrdinal(rk);
+}
+function propSpots(section, offTeam, defTeam) {
+  const target = [];
+  const fade = [];
+  PROP_SPOTS[section].forEach((sp) => {
+    const o = propSide(offTeam, "off", sp.off);
+    const d = propSide(defTeam, "def", sp.def);
+    if (!o || !d) return;
+    const sign = sp.bad ? -1 : 1;
+    const lean = (sign * o.lean + sign * d.lean) / 2;
+    if (Math.abs(lean) < PROP_SPOT_MIN) return;
+    const isTarget = lean > 0;
+    const label = typeof sp.label === "string" ? sp.label : isTarget ? sp.label.target : sp.label.fade;
+    const blurb = `${offTeam} ${sp.offVerb ? `${sp.offVerb} ` : ""}${sp.fmt(o.raw)} <span class="ps-rk">${propOrd(o.rk)}</span> &middot; ${defTeam} ${sp.defVerb || "allows"} ${sp.fmt(d.raw)} <span class="ps-rk">${propOrd(d.rk)}</span>`;
+    (isTarget ? target : fade).push({ label, blurb, lean: Math.abs(lean) });
   });
-  // Strongest first; one call per market group so two angles never say
-  // the same thing twice (or the opposite thing) about the same market.
-  const taken = new Set();
-  return out
-    .sort((x, y) => Math.abs(y.score) - Math.abs(x.score))
-    .filter((a) => {
-      const key = a.markets[0] + "|" + a.pos.join("");
-      if (taken.has(key)) return false;
-      taken.add(key);
-      return true;
-    })
-    .slice(0, PROP_ANGLES_SHOWN);
+  const top = (list) => list.sort((a, b) => b.lean - a.lean).slice(0, PROP_SPOTS_SHOWN);
+  return { target: top(target), fade: top(fade) };
 }
-function propAnglesHtml(angles) {
-  if (!angles.length) return `<span class="target-none">No clear market edge from this matchup</span>`;
-  return angles
-    .map((a) => `<div class="ps-angle" title="${a.tip}"><span class="ps-angle-call ps-angle-${a.side}">${a.side === "over" ? "&#9650; Target" : "&#9660; Fade"} ${a.name}</span><span class="ps-angle-why">${a.detail}</span></div>`)
-    .join("");
-}
-
-// ---- Card rendering ----
-// Clicking a player opens the shared player popup (player-props.js).
-function propClickEntry(r) {
-  const { away, home } = propsSummaryContext();
-  return encodeDataAttr({ team: r.team, name: r.name, oppTeam: r.team === away ? home : away });
-}
-// ---- Strengths & weaknesses per unit ----
-// [metric, label, value formatter, more-is-better for the OFFENSE?]
-// Offense reads its own production; defense reads what it allows (so for
-// a defense, allowing a lot is a weakness) -- except INTs and sacks, where
-// more is good for the defense and bad for the offense.
-const PROP_UNIT_METRICS = {
-  pass: [
-    ["pass_att", "Pass volume", (v) => `${f1(v)} att/g`, true],
-    ["pass_yards", "Pass yards", (v) => `${f0(v)}/g`, true],
-    ["ypa", "Yds per att", (v) => f1(v), true],
-    ["comp", "Comp %", (v) => `${Math.round(v * 100)}%`, true],
-    ["pass_td", "Pass TDs", (v) => `${f1(v)}/g`, true],
-    ["expl_pass", "Big plays", (v) => `${f1(v)} 20+/g`, true],
-    ["ints", "INTs", (v) => `${f1(v)}/g`, false],
-    ["sacks", "Sacks", (v) => `${f1(v)}/g`, false],
-  ],
-  rush: [
-    ["car_RB", "RB volume", (v) => `${f1(v)} car/g`, true],
-    ["rushyds_RB", "RB rush yds", (v) => `${f0(v)}/g`, true],
-    ["ypc_RB", "RB YPC", (v) => f1(v), true],
-    ["rushyds_QB", "QB runs", (v) => `${f0(v)} yds/g`, true],
-    ["expl_rush", "Big runs", (v) => `${f1(v)} 10+/g`, true],
-  ],
-  rec: [
-    ["recyds_WR", "WR yards", (v) => `${f0(v)}/g`, true],
-    ["recyds_TE", "TE yards", (v) => `${f0(v)}/g`, true],
-    ["recyds_RB", "RB receiving", (v) => `${f0(v)}/g`, true],
-    ["yds_short", "Short area", (v) => `${f0(v)} yds/g`, true],
-    ["yds_int", "10-19 yd", (v) => `${f0(v)} yds/g`, true],
-    ["yds_deep", "Deep ball", (v) => `${f0(v)} yds/g`, true],
-  ],
-};
-const PROP_UNIT_EDGE_RANK = 8; // top/bottom 8 of 32
-const PROP_UNIT_CHIPS = 4;
-function propUnitProfile(team, side, section) {
-  const chips = [];
-  PROP_UNIT_METRICS[section].forEach(([metric, label, fmtV, moreGoodOff]) => {
-    const cell = propSide(team, side, metric);
-    if (!cell || !cell.rk || cell.raw === null || cell.raw === undefined) return;
-    const most = cell.rk <= PROP_UNIT_EDGE_RANK;
-    const fewest = cell.rk > 32 - PROP_UNIT_EDGE_RANK;
-    if (!most && !fewest) return;
-    const moreGood = side === "off" ? moreGoodOff : !moreGoodOff;
-    const strong = moreGood ? most : fewest;
-    chips.push({ strong, label, value: fmtV(cell.raw), words: propRankWords(cell.rk), extremity: Math.abs(16.5 - cell.rk) });
-  });
-  return chips.sort((a, b) => b.strong - a.strong || b.extremity - a.extremity).slice(0, PROP_UNIT_CHIPS);
-}
-function propUnitRow(team, side, section) {
-  const chips = propUnitProfile(team, side, section);
-  const html = chips.length
-    ? chips.map((c) => `<span class="ps-unit-chip ${c.strong ? "ps-unit-strong" : "ps-unit-weak"}" title="${c.words} of 32 (${side === "off" ? "produced" : "allowed"}, opponent-adjusted)">${c.strong ? "&#9650;" : "&#9660;"} ${c.label} <small>${c.value}</small></span>`).join("")
-    : `<span class="ps-unit-none">Middle of the pack</span>`;
-  return `<div class="ps-unit"><span class="ps-unit-label">${teamLogoMini(team, 18)}<span>${side === "off" ? "OFF" : "DEF"}</span></span><span class="ps-unit-chips">${html}</span></div>`;
+function propSpotList(items, kind) {
+  if (!items.length) return `<div class="ps-spot-none">Nothing stands out</div>`;
+  return items.map((i) => `<div class="ps-spot"><b>${i.label}</b><span>${i.blurb}</span></div>`).join("");
 }
 function propSectionColumn(section, offTeam, defTeam) {
-  const angles = propMarketAngles(section, offTeam, defTeam);
-  const leans = angles.length
-    ? angles.map((a) => `<span class="ps-angle-call ps-angle-${a.side}" title="${a.detail.replace(/&middot;/g, "·")} (${a.tip})">${a.side === "over" ? "&#9650; Target" : "&#9660; Fade"} ${a.name}</span>`).join("")
-    : `<span class="ps-unit-none">No clear lean</span>`;
+  const { target, fade } = propSpots(section, offTeam, defTeam);
   return `<div class="sc-col ps-col">
-    ${propUnitRow(offTeam, "off", section)}
-    ${propUnitRow(defTeam, "def", section)}
-    <div class="ps-unit ps-leans"><span class="ps-unit-label"><span>Leans</span></span><span class="ps-unit-chips">${leans}</span></div>
+    <div class="ps-half ps-half-target"><div class="ps-half-title">Target</div>${propSpotList(target, "target")}</div>
+    <div class="ps-half ps-half-fade"><div class="ps-half-title">Fade</div>${propSpotList(fade, "fade")}</div>
   </div>`;
 }
 
@@ -899,6 +832,10 @@ function propsRail(away, home, linesByTeam, gameKey) {
   </section>`;
 }
 
+function statsNote() {
+  return `data through Week ${DATA.through_week}`;
+}
+
 function renderPropsSummaryCard(away, home) {
   const card = document.getElementById("summary-card");
   if (!card) return;
@@ -944,8 +881,8 @@ function renderPropsSummaryCard(away, home) {
     </div>
 
     <div class="sc-footer">
-      <span><span class="ps-unit-chip ps-unit-strong">&#9650; strength</span> <span class="ps-unit-chip ps-unit-weak">&#9660; weakness</span> = top / bottom 8 of 32, opponent-adjusted (hover for rank)</span>
-      <span><span class="ps-angle-call ps-angle-over">&#9650; Target</span> / <span class="ps-angle-call ps-angle-under">&#9660; Fade</span> = offense and defense point the same way</span>
+      <span>Each spot = this offense's rank for producing it + the other defense's rank for allowing it, both adjusted for the opponents they've faced</span>
+      <span>Ranks out of 32 (1st = most) &middot; ${statsNote()}</span>
     </div>
   </div>`;
   fitSummaryCard();

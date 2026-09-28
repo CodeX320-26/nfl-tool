@@ -2625,3 +2625,18 @@ footer { border-top-color: var(--border); }
 .ps-thin { padding: 0 4px; border-radius: 4px; font-size: 0.6rem; font-weight: 800; color: var(--mid-text); background: rgba(var(--mid-rgb), 0.18); }
 .ps-card .ps-section .sc-cols { flex: 1 1 auto; }
 .ps-col { justify-content: space-around; }
+
+/* ---- Props Summary v4: Target / Fade halves ---- */
+.ps-col { display: grid; grid-template-rows: 1fr 1fr; gap: 6px; padding: 8px; }
+.ps-half { border-radius: 8px; padding: 5px 8px 6px; display: flex; flex-direction: column; gap: 4px; }
+.ps-half-target { background: rgba(var(--good-rgb), 0.08); border: 1px solid rgba(var(--good-rgb), 0.35); }
+.ps-half-fade { background: rgba(var(--bad-rgb), 0.07); border: 1px solid rgba(var(--bad-rgb), 0.3); }
+.ps-half-title { font-family: var(--font-display); font-size: 0.82rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; }
+.ps-half-target .ps-half-title { color: var(--good-text); }
+.ps-half-fade .ps-half-title { color: var(--bad-text); }
+.ps-spot { display: flex; flex-direction: column; line-height: 1.2; }
+.ps-spot b { font-size: 0.86rem; font-weight: 800; }
+.ps-spot span { font-size: 0.7rem; color: var(--muted); font-weight: 600; }
+.ps-rk { font-size: 0.62rem; opacity: 0.85; }
+.ps-spot-none { font-size: 0.74rem; color: var(--muted); font-style: italic; text-align: center; margin: auto 0; }
+.ps-col { grid-template-columns: minmax(0, 1fr); justify-content: stretch; }
