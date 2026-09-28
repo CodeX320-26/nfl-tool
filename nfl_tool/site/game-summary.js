@@ -277,7 +277,7 @@ function renderGameSummaryCard(game) {
         <div class="sc-matchup">${TEAM_NAMES[away] || away} <span class="sc-at">@</span> ${TEAM_NAMES[home] || home}</div>
         <img src="${teamLogoUrl(home)}" crossorigin="anonymous" class="sc-logo" alt="">
       </div>
-      <div class="sc-meta">Week ${game.week}${when ? ` &middot; ${when}` : ""}${game.time ? ` &middot; ${fmtGameTime(game.time)}` : ""} &middot; ${away} ${teamCurrentRecord(away)} &middot; ${home} ${teamCurrentRecord(home)}</div>
+      <div class="sc-meta">Week ${game.week}${when ? ` &middot; ${when}` : ""}${game.time ? ` &middot; ${fmtGameTime(game.time)}` : ""} &middot; ${away} ${teamCurrentRecord(away)} &middot; ${home} ${teamCurrentRecord(home)}${statsMode === "adj" ? ` &middot; <span class="gs-adj-badge">Stats vs opponents</span>` : ""}</div>
       <div class="sc-brand"><span class="brand-mark">GMG</span><span class="sc-brand-name">Game Summary</span></div>
     </div>
     <div class="sc-body">
@@ -341,6 +341,45 @@ document.addEventListener("click", (e) => {
   }
   renderGameSummaryCard(game);
 });
+
+// ---- Raw / vs Opponents stats toggle ----
+// Swaps DATA.team_stats for a copy with the opponent-adjusted numbers
+// (build_stats.py compute_opponent_adjusted_stats) laid over the raw ones,
+// so every table, color, grade, tag and the Summary card follow along.
+const STATS_MODE_KEY = "nfl-tool.stats-mode.v1";
+let statsMode = "raw";
+function initStatsMode() {
+  DATA.team_stats_raw = DATA.team_stats;
+  const adj = DATA.team_stats_adj || {};
+  DATA.team_stats_opp = {};
+  Object.entries(DATA.team_stats_raw).forEach(([t, s]) => (DATA.team_stats_opp[t] = { ...s, ...(adj[t] || {}) }));
+  try {
+    statsMode = localStorage.getItem(STATS_MODE_KEY) || "raw";
+  } catch (e) {
+    // localStorage unavailable -- raw stats.
+  }
+  if (!DATA.team_stats_adj) statsMode = "raw";
+  applyStatsMode();
+}
+function applyStatsMode() {
+  DATA.team_stats = statsMode === "adj" ? DATA.team_stats_opp : DATA.team_stats_raw;
+  document.querySelectorAll(".stats-mode-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.mode === statsMode);
+    b.disabled = !DATA.team_stats_adj;
+  });
+}
+document.querySelectorAll(".stats-mode-btn").forEach((btn) =>
+  btn.addEventListener("click", () => {
+    statsMode = btn.dataset.mode;
+    try {
+      localStorage.setItem(STATS_MODE_KEY, statsMode);
+    } catch (e) {
+      // localStorage unavailable -- toggle just won't stick.
+    }
+    applyStatsMode();
+    render();
+  })
+);
 
 // ---- view toggle: Full Preview / Summary ----
 function applyPreviewView(game) {

@@ -1706,6 +1706,7 @@ fetch("data.json")
   .then((r) => r.json())
   .then((data) => {
     DATA = data;
+    initStatsMode();
     resetDraftPicks();
     initFlipper();
     render();

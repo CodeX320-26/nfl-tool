@@ -2212,6 +2212,162 @@ def compute_prop_matchup_model(pbp: pd.DataFrame, pos_lookup) -> dict:
     return {"league": league, "teams": out}
 
 
+# ---- Game Previews: opponent-adjusted team stats (the Raw / vs Opponents
+# toggle) ----
+# Every offense stat gets corrected for the defenses it faced, every defense
+# stat for the offenses it faced. Correction = league average minus what
+# those opponents normally allow/produce in their OTHER games (their "normal",
+# shrunk toward the league by OPP_ADJ_SHRINK_GAMES games so a 1-2 game
+# opponent can't swing it), averaged over the schedule and weighted by volume
+# for rates. The corrected value is the site's own raw number plus that
+# correction, so every stat keeps its existing definition. Penalty yards and
+# scoring by quarter stay raw (not opponent-driven / too noisy); defensive
+# tendencies (blitz rate, box rate) are the defense's own choice, not adjusted.
+# (metric, numerator column, denominator column or None for per-game counts,
+#  offense key, defense key)
+OPP_ADJ_METRICS = [
+    ("points", "pts", None, "points_for_per_g", "points_against_per_g"),
+    ("epa", "epa_sum", "epa_n", "epa_per_play", "epa_per_play_allowed"),
+    ("epa_pass", "epa_pass_sum", "epa_pass_n", "epa_per_play_pass", "epa_per_play_pass_allowed"),
+    ("epa_rush", "epa_rush_sum", "epa_rush_n", "epa_per_play_rush", "epa_per_play_rush_allowed"),
+    ("pass_yards", "pass_yds", None, "pass_yards_per_g", "pass_yards_allowed_per_g"),
+    ("rush_yards", "rush_yds", None, "rush_yards_per_g", "rush_yards_allowed_per_g"),
+    ("ypc", "rush_yds", "rush_att", "yards_per_carry", "yards_per_carry_allowed"),
+    ("ypa", "pass_yds", "pass_att", "yards_per_att", "yards_per_att_allowed"),
+    ("third", "third_conv", "third_att", "third_down_rate", "third_down_rate_allowed"),
+    ("explosive", "expl", "plays", "explosive_rate", "explosive_rate_allowed"),
+    ("explosive_pass", "expl_pass", "pass_plays", "explosive_pass_rate", "explosive_pass_rate_allowed"),
+    ("explosive_rush", "expl_rush", "rush_att", "explosive_rush_rate", "explosive_rush_rate_allowed"),
+    ("rz_trips", "rz_trips", None, "rz_trips_per_g", "rz_trips_allowed_per_g"),
+    ("rz_points", "rz_pts", "rz_trips", "rz_avg_points", "rz_avg_points_allowed"),
+    ("plays", "plays", None, "off_plays_per_g", "def_plays_faced_per_g"),
+    ("sacks", "sacks", None, "sacks_allowed_per_g", "sacks_made_per_g"),
+    ("turnovers", "tos", None, "turnovers_per_g", "takeaways_per_g"),
+    ("heavy_box", "hb_yds", "hb_n", "ypc_vs_heavy_box", "def_ypc_allowed_heavy_box"),
+    ("light_box", "lb_yds", "lb_n", "ypc_vs_light_box", "def_ypc_allowed_light_box"),
+    ("blitz", "bl_succ", "bl_n", "success_vs_blitz", "def_success_allowed_blitz"),
+    ("standard", "st_succ", "st_n", "success_vs_standard_rush", "def_success_allowed_standard_rush"),
+    ("pressure", "pr_succ", "pr_n", "success_vs_pressure", "def_success_allowed_pressure"),
+    ("clean", "cl_succ", "cl_n", "success_vs_clean_pocket", "def_success_allowed_clean_pocket"),
+]
+
+
+def compute_opponent_adjusted_stats(pbp: pd.DataFrame, ftn: pd.DataFrame, team_stats: dict) -> dict:
+    """{team: {team_stats key: opponent-adjusted value}} for every key in
+    OPP_ADJ_METRICS the team has a raw value for."""
+    p = pbp[(pbp["two_point_attempt"] != 1) & pbp["posteam"].notna() & pbp["defteam"].notna()].copy()
+    p = p.merge(
+        ftn[["nflverse_game_id", "nflverse_play_id", "n_defense_box", "n_pass_rushers"]],
+        left_on=["game_id", "play_id"], right_on=["nflverse_game_id", "nflverse_play_id"], how="left",
+    ) if ftn is not None and len(ftn) else p.assign(n_defense_box=float("nan"), n_pass_rushers=float("nan"))
+    keys = ["game_id", "posteam"]
+    is_pass = p["pass"] == 1
+    is_rush = p["rush"] == 1
+    play = is_pass | is_rush
+    has_epa = p["epa"].notna()
+    att = (p["pass_attempt"] == 1) & (p["sack"] != 1)
+    rush_att = p["rush_attempt"] == 1
+    pass_yds = p["passing_yards"].fillna(0)
+    rush_yds = p["rushing_yards"].fillna(0)
+    comp = p["complete_pass"] == 1
+    third = (p["down"] == 3) & play
+    succ = p["success"].fillna(0)
+    pressure = (p["sack"] == 1) | (p["qb_hit"] == 1)
+    blitz = p["n_pass_rushers"] >= 5
+    box_known = p["n_defense_box"].notna()
+    heavy = p["n_defense_box"] >= 7
+
+    def agg(mask, col=None):
+        grp = p[mask].groupby(keys)
+        return grp.size() if col is None else grp[col].sum()
+
+    p["_pass_yds"], p["_rush_yds"], p["_succ"] = pass_yds, rush_yds, succ
+    p["_conv"] = ((p["first_down"] == 1) | (p["touchdown"] == 1)).astype(int)
+    p["_to"] = p["interception"].fillna(0) + p["fumble_lost"].fillna(0)
+    cols = {
+        "plays": agg(play),
+        "epa_sum": agg(play & has_epa, "epa"), "epa_n": agg(play & has_epa),
+        "epa_pass_sum": agg(is_pass & has_epa, "epa"), "epa_pass_n": agg(is_pass & has_epa),
+        "epa_rush_sum": agg(is_rush & has_epa, "epa"), "epa_rush_n": agg(is_rush & has_epa),
+        "pass_yds": agg(p.index == p.index, "_pass_yds"), "rush_yds": agg(rush_att, "_rush_yds"),
+        "pass_att": agg(att), "rush_att": agg(rush_att), "pass_plays": agg(is_pass),
+        "third_att": agg(third), "third_conv": agg(third, "_conv"),
+        "expl": agg((rush_att & (rush_yds >= EXPLOSIVE_RUSH_YARDS)) | (comp & (p["yards_gained"] >= EXPLOSIVE_PASS_YARDS))),
+        "expl_pass": agg(comp & (p["yards_gained"] >= EXPLOSIVE_PASS_YARDS)),
+        "expl_rush": agg(rush_att & (rush_yds >= EXPLOSIVE_RUSH_YARDS)),
+        "sacks": agg(p["sack"] == 1), "tos": agg(p.index == p.index, "_to"),
+        "hb_yds": agg(rush_att & box_known & heavy, "yards_gained"), "hb_n": agg(rush_att & box_known & heavy),
+        "lb_yds": agg(rush_att & box_known & ~heavy, "yards_gained"), "lb_n": agg(rush_att & box_known & ~heavy),
+        "bl_succ": agg(att & blitz, "_succ"), "bl_n": agg(att & blitz),
+        "st_succ": agg(att & ~blitz & p["n_pass_rushers"].notna(), "_succ"), "st_n": agg(att & ~blitz & p["n_pass_rushers"].notna()),
+        "pr_succ": agg(att & pressure, "_succ"), "pr_n": agg(att & pressure),
+        "cl_succ": agg(att & ~pressure, "_succ"), "cl_n": agg(att & ~pressure),
+    }
+    # Red zone trips (drives reaching the 20) and points on them (TD 6, FG 3).
+    drives = p[p["drive"].notna()].groupby(["game_id", "posteam", "drive"]).agg(
+        best=("yardline_100", "min"), result=("fixed_drive_result", "first")
+    ).reset_index()
+    rz = drives[drives["best"] <= RED_ZONE_YARDLINE].copy()
+    rz["pts"] = rz["result"].map({"Touchdown": 6, "Field goal": 3}).fillna(0)
+    cols["rz_trips"] = rz.groupby(keys).size()
+    cols["rz_pts"] = rz.groupby(keys)["pts"].sum()
+
+    games = pbp.groupby("game_id").agg(home=("home_team", "first"), away=("away_team", "first"), hs=("home_score", "max"), as_=("away_score", "max")).reset_index()
+    sides = pd.concat(
+        [
+            games.rename(columns={"home": "off", "away": "def", "hs": "pts"})[["game_id", "off", "def", "pts"]],
+            games.rename(columns={"away": "off", "home": "def", "as_": "pts"})[["game_id", "off", "def", "pts"]],
+        ],
+        ignore_index=True,
+    )
+    idx = pd.MultiIndex.from_frame(sides[["game_id", "off"]])
+    for col, series in cols.items():
+        sides[col] = series.reindex(idx).fillna(0).astype(float).to_numpy()
+    sides = sides[sides["plays"] > 0].reset_index(drop=True)
+    if sides.empty:
+        return {}
+
+    k = OPP_ADJ_SHRINK_GAMES
+    deltas: dict = {}
+
+    def opp_delta(num, den):
+        """(offense deltas, defense deltas) by team."""
+        out = ({}, {})
+        if den is None:
+            L = sides[num].mean()
+            tables = {s: sides.groupby(s)[num].agg(["sum", "count"]) for s in ("off", "def")}
+            for i, (side, other) in enumerate((("off", "def"), ("def", "off"))):
+                t = tables[other]
+                normal = sides.apply(lambda r: (t.loc[r[other], "sum"] - r[num] + k * L) / (t.loc[r[other], "count"] - 1 + k), axis=1)
+                out[i].update((L - normal.groupby(sides[side]).mean()).to_dict())
+            return out
+        total = sides[den].sum()
+        if total <= 0:
+            return out
+        L = sides[num].sum() / total
+        kw = k * sides[den].mean()
+        tables = {s: sides.groupby(s)[[num, den]].sum() for s in ("off", "def")}
+        valid = sides[sides[den] > 0]
+        for i, (side, other) in enumerate((("off", "def"), ("def", "off"))):
+            t = tables[other]
+            normal = valid.apply(lambda r: (t.loc[r[other], num] - r[num] + kw * L) / (t.loc[r[other], den] - r[den] + kw), axis=1)
+            frame = pd.DataFrame({"team": valid[side], "n": normal, "w": valid[den]})
+            for team, grp in frame.groupby("team"):
+                out[i][team] = L - (grp["n"] * grp["w"]).sum() / grp["w"].sum()
+        return out
+
+    result: dict = {}
+    for _name, num, den, off_key, def_key in OPP_ADJ_METRICS:
+        off_d, def_d = opp_delta(num, den)
+        for team, stats in team_stats.items():
+            for key, dmap in ((off_key, off_d), (def_key, def_d)):
+                raw = stats.get(key)
+                if raw is None or team not in dmap:
+                    continue
+                result.setdefault(team, {})[key] = round(float(raw + dmap[team]), 4)
+    return result
+
+
 def compute_red_zone(pbp: pd.DataFrame) -> dict:
     """Red zone = own offense's snap inside the opponent's 20. Excludes
     two-point attempts (not a normal drive play). Returns per-team dict of
@@ -4207,6 +4363,7 @@ def main():
         **(lambda m: {"td_matchup_model": m["teams"], "player_xtd": m["players"]})(compute_td_matchup_model(pbp, scoring_df, pos_lookup)),
         "pre_first_td_usage": pre_first_td_usage,
         "prop_matchup_model": compute_prop_matchup_model(pbp, pos_lookup),
+        "team_stats_adj": compute_opponent_adjusted_stats(pbp, ftn, team_stats),
         "schedule": schedule,
         "current_week": current_week,
         "recent_games": recent_games,
