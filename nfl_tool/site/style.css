@@ -2677,3 +2677,6 @@ footer { border-top-color: var(--border); }
 .ps-rail-btns { gap: 4px; }
 .ps-rail .sc-pp { font-size: 0.72rem; padding: 2px 6px; }
 .ps-pk-for { align-self: center; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+
+.ps-pk-tags span { padding: 1px 7px; border-radius: 5px; font-size: 0.68rem; font-weight: 800; }
+:root[data-theme="light"] .ps-pk-tags span { color: var(--text) !important; }

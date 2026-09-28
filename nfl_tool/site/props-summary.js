@@ -781,9 +781,12 @@ function propPackages(offTeam, defTeam, game, lines) {
     const parts = shown.flatMap((m) => m.parts);
     const dPart = parts.slice().sort((a, b) => dir * (b.d.lean - a.d.lean))[0];
     const oPart = parts.slice().sort((a, b) => dir * (b.o.lean - a.o.lean))[0];
+    // Offense first. q = how good the rank is for THAT unit (0 worst, 1
+    // best): producing a lot is good for an offense, allowing a lot is bad
+    // for a defense.
     const tags = [
-      `${defTeam} D ${propRankTag(dPart.d.rk)} ${PROP_STAT_WORDS[dPart.m]}`,
-      `${offTeam} ${propRankTag(oPart.o.rk)} ${PROP_STAT_WORDS[oPart.m]}`,
+      { text: `${offTeam} ${propRankTag(oPart.o.rk)} ${PROP_STAT_WORDS[oPart.m]}`, q: (32 - oPart.o.rk) / 31 },
+      { text: `${defTeam} D ${propRankTag(dPart.d.rk)} ${PROP_STAT_WORDS[dPart.m]}`, q: (dPart.d.rk - 1) / 31 },
     ];
     // Players in this package with a posted line, biggest line first.
     const mainMk = shown[0].mk;
@@ -816,6 +819,12 @@ function propPackages(offTeam, defTeam, game, lines) {
   return out;
 }
 
+// Red (worst) -> yellow (middle) -> green (best), stronger toward the ends.
+function propRankShade(q) {
+  const hue = Math.round(q * 120);
+  const strength = Math.abs(q - 0.5) * 2; // 0 middle, 1 extreme
+  return `background:hsla(${hue},75%,45%,${(0.14 + 0.26 * strength).toFixed(2)});border:1px solid hsla(${hue},75%,45%,${(0.35 + 0.5 * strength).toFixed(2)});color:hsl(${hue},80%,${Math.round(72 - 10 * strength)}%)`;
+}
 function propPackageHtml(p, lines) {
   const players = p.players.length
     ? p.players.map((r) => `<span class="ps-pk-player player-click" data-entry="${propClickEntry(r)}">${summaryHeadshot(r.team, r.name, 22)}${propDisplayName(lines, r)} <b>${fmt(r.line, 1)}</b></span>`).join("")
@@ -823,7 +832,7 @@ function propPackageHtml(p, lines) {
   return `<div class="ps-pk">
     <div class="ps-pk-head">${teamLogoMini(p.team, 22)}<span class="ps-pk-name">${p.team} ${p.name}</span><span class="ps-pk-mkts">${p.markets.map((m) => `<span>${m}</span>`).join("")}</span></div>
     <div class="ps-pk-players">${p.players.length ? `<span class="ps-pk-for">${p.lineMarket}</span>` : ""}${players}</div>
-    <div class="ps-pk-tags">${p.tags.map((t) => `<span>${t}</span>`).join("")}</div>
+    <div class="ps-pk-tags">${p.tags.map((t) => `<span style="${propRankShade(t.q)}">${t.text}</span>`).join("")}</div>
   </div>`;
 }
 
