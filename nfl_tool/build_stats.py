@@ -976,6 +976,7 @@ def merge_td_odds(novig: dict, sgo: dict | None) -> dict:
     return merged
 
 
+# Behind the Discord login since 2026-09-28 -- see fetch_previous_odds_snapshot.
 LIVE_SITE_DATA_URL = "https://nfl.gmgsports.org/data.json"
 
 
