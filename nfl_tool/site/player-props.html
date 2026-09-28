@@ -102,15 +102,21 @@
       <input type="checkbox" id="show-backup-qbs">
       Show backup QBs
     </label>
-    <div class="stat-columns">
-      <section id="col-away-passing"></section>
-      <section id="col-away-passcoverage"></section>
-      <section id="col-home-passing"></section>
-      <section id="col-home-passcoverage"></section>
-    </div>
-    <div class="stat-columns">
-      <section id="col-away-scramble"></section>
-      <section id="col-home-scramble"></section>
+    <div class="team-pair-cols">
+      <div class="team-col-panel">
+        <section id="col-away-passing"></section>
+        <div class="team-col-row">
+          <section id="col-away-passcoverage"></section>
+          <section id="col-away-scramble"></section>
+        </div>
+      </div>
+      <div class="team-col-panel">
+        <section id="col-home-passing"></section>
+        <div class="team-col-row">
+          <section id="col-home-passcoverage"></section>
+          <section id="col-home-scramble"></section>
+        </div>
+      </div>
     </div>
     <h3 class="stat-column-title stat-column-title-spaced">Pass Zones</h3>
     <p class="section-note">Depth of target x field location, straight from this week's own pbp -- updates every week, no charting-file lag. Each offense paired with the defense it's actually facing this week -- volume, who's getting targeted, and catches, all at a glance.</p>

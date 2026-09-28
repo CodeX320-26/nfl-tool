@@ -2746,3 +2746,125 @@ footer { border-top-color: var(--border); }
 .zt-zone { padding: 2px 7px; border-radius: 6px; font-size: 0.64rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; color: var(--bad-text); background: rgba(var(--bad-rgb), 0.1); border: 1px solid rgba(var(--bad-rgb), 0.4); }
 .zt-none { margin: 0; font-size: 0.78rem; color: var(--muted); font-style: italic; }
 .ps-zone-star { color: rgb(var(--mid-rgb)); font-size: 0.8rem; margin-right: 1px; }
+
+/* ====================================================================
+   Facelift v2 -- the summary-card look everywhere. Every data table is
+   rounded tiles with small gaps instead of hairline grid lines; colored
+   values are shaded boxes (tint + matching edge) in the display font;
+   headers are small uppercase labels. Sits last so it wins.
+   ==================================================================== */
+.data-table:not(.pass-zone-grid) {
+  border-collapse: separate;
+  border-spacing: 3px;
+  border: none;
+}
+.data-table:not(.pass-zone-grid) th,
+.data-table:not(.pass-zone-grid) td {
+  border-bottom: none;
+  border-radius: 6px;
+  padding: 4px 5px;
+}
+.data-table:not(.pass-zone-grid) td { background-color: var(--panel-2); }
+.data-table:not(.pass-zone-grid) th {
+  background-color: transparent;
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.data-table:not(.pass-zone-grid) th.sub-hdr { background: transparent !important; font-size: 0.6rem !important; }
+.data-table:not(.pass-zone-grid) th[style] { color: var(--text); }
+.data-table:not(.pass-zone-grid) td.section-group-label {
+  background: transparent;
+  padding: 8px 2px 1px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.data-table:not(.pass-zone-grid) td.edge-cell:not([style]) { background: transparent; }
+.data-table tbody tr:hover > td:not([class*="tier-"]):not(.edge-cell):not(.section-group-label) { background-color: var(--table-head); }
+.data-table td.num { font-family: var(--font-display); font-size: 0.95rem; font-weight: 700; }
+
+/* Shaded boxes: tint plus a matching edge, like the summary chips */
+.data-table .tier-good, .data-table .tier-mid, .data-table .tier-bad { font-weight: 800; }
+.data-table .tier-good { background-color: rgba(var(--good-rgb), var(--tier-a, 0.18)); box-shadow: inset 0 0 0 1px rgba(var(--good-rgb), 0.45); }
+.data-table .tier-mid { background-color: rgba(var(--mid-rgb), var(--tier-a, 0.16)); box-shadow: inset 0 0 0 1px rgba(var(--mid-rgb), 0.4); }
+.data-table .tier-bad { background-color: rgba(var(--bad-rgb), var(--tier-a, 0.16)); box-shadow: inset 0 0 0 1px rgba(var(--bad-rgb), 0.42); }
+
+/* Team banners everywhere match the pass-zone banners */
+.team-banner { padding: 8px 12px; border-radius: 10px; }
+.team-banner .team-logo { width: 28px; height: 28px; }
+.team-banner-name { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
+
+/* Sub-panels inside a section read as summary blocks */
+.stat-column-title, .data-table caption {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.data-table:not(.pass-zone-grid) th { padding: 4px 2px; }
+.data-table:not(.pass-zone-grid) th.sub-hdr { letter-spacing: 0.02em; white-space: nowrap; }
+.data-table:not(.pass-zone-grid) td.num { padding: 4px 2px; }
+.props-rec-table th:nth-child(10), .props-rec-table td:nth-child(10) { border-left: none; }
+.general-stat-table th:nth-child(2), .general-stat-table td:nth-child(2) { border-right: none; }
+.scheme-table .group-row td { background: transparent; padding: 8px 2px 1px; }
+.pass-zone-heat-cell-exploit-bad { outline: 2px solid rgb(var(--bad-rgb)); outline-offset: -2px; }
+.pass-zone-heat-cell-exploit-mid { outline: 2px solid rgb(var(--mid-rgb)); outline-offset: -2px; }
+
+/* Rush lanes: same big-tile look as the pass-zone grids, filling the panel */
+.rush-lanes { width: 640px; max-width: 100%; }
+.rush-lanes-cols { gap: 5px; }
+.rush-lane-col { gap: 4px; }
+.rush-lane-off-block { gap: 4px; }
+.rush-lane-box, .rush-lane-off-success, .rush-lane-off-freq,
+.rush-lane-off-block.rush-lane-off-block-standalone { border-radius: 8px; border-top: none; }
+.rush-lane-off-block.rush-lane-off-block-standalone { overflow: visible; }
+.rush-lane-box { padding: 8px 2px 7px; background: var(--panel-2); }
+.rush-lane-off-success { padding: 7px 2px; background: var(--panel-2); }
+.rush-lane-off-freq { padding: 5px 2px; background: var(--panel-2); }
+.rush-lane-label { font-family: var(--font-display); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; opacity: 0.85; }
+.rush-lane-pct { font-family: var(--font-display); font-size: 1.45rem; font-weight: 800; line-height: 1.05; }
+.rush-lane-ypc { font-size: 0.72rem; font-weight: 700; }
+.rush-lane-n { font-size: 0.64rem; }
+.rush-lane-freq-pct { font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; }
+.rush-lane-box.tier-good, .rush-lane-off-success.tier-good { box-shadow: inset 0 0 0 1px rgba(var(--good-rgb), 0.5); }
+.rush-lane-box.tier-mid, .rush-lane-off-success.tier-mid { box-shadow: inset 0 0 0 1px rgba(var(--mid-rgb), 0.5); }
+.rush-lane-box.tier-bad, .rush-lane-off-success.tier-bad { box-shadow: inset 0 0 0 1px rgba(var(--bad-rgb), 0.5); }
+.rush-lane-box.rush-lane-nosample, .rush-lane-off-success.rush-lane-nosample { background: var(--panel-2); opacity: 0.6; }
+.rush-lanes-team-tag { font-family: var(--font-display); font-size: 0.95rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.rush-lanes-team-tag .muted-label { font-style: normal; }
+.rush-lanes-player-block { border-top: 1px dashed var(--border-strong); }
+
+/* Passing tab: one boxed column per team (table on top, coverage + QB
+   rushing / red zone side by side underneath) instead of a loose row */
+.team-pair-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 8px; }
+.team-col-panel { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--panel); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.team-col-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.team-col-row > section { min-width: 0; }
+@media (max-width: 1100px) { .team-pair-cols { grid-template-columns: 1fr; } }
+.pass-zone-pair, .rush-pair { border-radius: 12px; }
+.data-table:not(.pass-zone-grid) th { letter-spacing: 0.03em; }
+
+/* Pick Tracker form: same buttons as the summary card's My Picks rail */
+.pick-market-row { background: var(--panel-2); border-radius: 12px; padding: 10px 12px; gap: 12px; }
+.pick-market-label { font-family: var(--font-display); font-size: 1rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; min-width: 90px; }
+.pick-side-group, .pick-color-group { gap: 6px; }
+.pick-side-wrap { gap: 4px; }
+.pick-side-btn, .pick-color-btn, .pick-save-btn, .pick-edit-btn { background: var(--panel); border: 1px solid var(--border-strong); border-radius: 8px; font-weight: 800; }
+.pick-side-btn { padding: 6px 12px; font-size: 0.86rem; }
+.pick-color-btn { padding: 5px 10px; font-size: 0.66rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.pick-side-btn.selected { background: rgba(var(--accent-rgb), 0.16); border-color: var(--accent); }
+.pick-color-btn.pick-color-green.selected { color: var(--good-text); background: rgba(var(--good-rgb), 0.22); border-color: rgb(var(--good-rgb)); }
+.pick-color-btn.pick-color-yellow.selected { color: var(--mid-text); background: rgba(var(--mid-rgb), 0.22); border-color: rgb(var(--mid-rgb)); }
+.pick-color-btn.pick-color-red.selected { color: var(--bad-text); background: rgba(var(--bad-rgb), 0.2); border-color: rgb(var(--bad-rgb)); }
+.pp-check-inline input, .pp-toggle { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+.pick-badge, .pick-result { border-radius: 8px; font-weight: 800; }
+.pick-badge.pick-color-green { box-shadow: inset 0 0 0 1px rgba(var(--good-rgb), 0.5); }
+.pick-badge.pick-color-yellow { box-shadow: inset 0 0 0 1px rgba(var(--mid-rgb), 0.5); }
+.pick-badge.pick-color-red { box-shadow: inset 0 0 0 1px rgba(var(--bad-rgb), 0.5); }
+.qb-rushing-group-header:not(:first-child) th { border-top: none; padding-top: 8px; }
+.data-table:not(.pass-zone-grid) .metric-caption { background: transparent !important; }

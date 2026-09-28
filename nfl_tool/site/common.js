@@ -193,7 +193,7 @@ function teamFade(team, ratio, maxAlpha = 0.6) {
 function teamBannerHeader(team, clickable = false) {
   const rgb = teamAccentRgb(team);
   const cls = clickable ? "team-banner props-team-click" : "team-banner";
-  return `<div class="${cls}" style="background:rgba(${rgb.join(",")},0.16)" ${clickable ? `data-team="${team}"` : ""}>
+  return `<div class="${cls}" style="background:rgba(${rgb.join(",")},0.22);border-left:4px solid rgb(${rgb.join(",")})" ${clickable ? `data-team="${team}"` : ""}>
     <img src="${teamLogoUrl(team)}" class="team-logo" alt="${team}" loading="lazy">
     <span class="team-banner-name">${TEAM_NAMES[team] || team}</span>
   </div>`;

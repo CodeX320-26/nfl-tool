@@ -1816,7 +1816,7 @@ function renderQbRushingPanel(team, oppTeam) {
       return `<div class="player-name-row"><span class="player-name">${p.name}</span></div>
         <table class="data-table scramble-table qb-rushing-combined-table">
           <tbody>
-            <tr class="qb-rushing-group-header"><th>Split</th><th class="num">Scr%</th><th class="num">OppAllow%</th><th class="num">OppYds</th><th class="edge-hdr">ADV</th></tr>
+            <tr class="qb-rushing-group-header"><th>Split</th><th class="num">Scr%</th><th class="num">Opp Allow%</th><th class="num">Opp Yds</th><th class="edge-hdr">ADV</th></tr>
             ${scrambleRows}
             <tr class="qb-rushing-group-header"><th>Type</th><th class="num">Car</th><th class="num">Yds</th><th class="num">YPC</th><th></th></tr>
             ${typeRows}

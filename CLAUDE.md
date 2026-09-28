@@ -128,6 +128,16 @@ context. It is the only copy that travels with the repo.
     with A–F grades and Mismatch/Tough/Good vs Good/Bad vs Bad tags.
   - Right side: My Picks rail with the Novig ad.
   - "Scheme" is labeled "Blitz & Box" on the card.
+- **One look across the whole site (the summary-card look), set 2026-09-28.** It lives in the
+  "Facelift v2" block at the end of `style.css`:
+  - Every `.data-table` is rounded tiles with 3px gaps, not hairline grid lines.
+  - Colored values are shaded boxes (tint plus a matching 1px edge) in the bold display font.
+  - Headers are small uppercase muted labels.
+  - Team banners are team-color tints with a 4px team-color left edge (`teamBannerHeader`).
+  - Rush lanes are big tiles like the pass zones.
+  - The Passing tab is one boxed column per team.
+  - Pick Tracker buttons match the summary's My Picks rail.
+  - New UI should reuse these patterns rather than add a new look.
 - Player Props pass-zone grids (Pass D Allowed / Passing Offense) use the summary-card look: rounded zone tiles, big share numbers, header/row shares as big red→green numbers with fill bars (no small % tags), stat tiles underneath. The offense per-player mini grids sit 3 cards per row with uniform row heights.
 - Schedule strip (top of every page): finished games show each team's score under its logo (winner bold), not the date.
 - Player Props page extras:
