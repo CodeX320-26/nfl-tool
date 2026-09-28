@@ -70,6 +70,20 @@ context. It is the only copy that travels with the repo.
   4. Sell the role (Discord Server Subscriptions / Patreon / Whop).
   5. Optional Patreon/Whop login for people without Discord.
 - The user wants access tied to live roles; someone who paid a week must not keep access after cancelling.
+- **Gate code:** `nfl_tool/functions/_middleware.js` (Pages Functions; deploy.yml deploys from `nfl_tool/`
+  so the functions get bundled). It holds the config constants: GUILD_ID `1295760852892385290`,
+  CLIENT_ID, ALLOWED_ROLE_IDS (`1471877733868109937`, `1471880013824393266`) and INVITE_URL.
+  - The secrets `DISCORD_CLIENT_SECRET` and `DISCORD_BOT_TOKEN` live in GitHub secrets and are copied
+    into the Pages project by deploy.yml before each Cloudflare deploy.
+  - The gate stays **off** (site open) until CLIENT_ID, roles and both secrets exist.
+  - `https://nfl.gmgsports.org/auth/status` shows which pieces are in place, never the values.
+  - Roles are re-checked with the bot every 15 min. Sessions last 30 days. If Discord's API is down,
+    access is honored for 2 h after the last good check.
+  - OAuth scope is `identify` only; redirect URI `<origin>/auth/callback`.
+  - The session HMAC key is derived from the bot token, so rotating the token logs everyone out.
+  - Known bypass until fixed: the GitHub Pages copy still serves the site to anyone who hits
+    GitHub's IPs directly, and the repo is public. Turn off GitHub Pages and make the repo
+    private once the gate is confirmed.
 
 ### Local verification
 
