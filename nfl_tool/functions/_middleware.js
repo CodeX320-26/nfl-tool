@@ -10,9 +10,13 @@
 // secrets, pushed from GitHub secrets by deploy.yml) are all in place.
 
 const GUILD_ID = "1295760852892385290";
-const CLIENT_ID = ""; // Discord app's OAuth2 Client ID (not secret)
+const CLIENT_ID = "1554268816521957447"; // Discord app's OAuth2 Client ID (not secret)
 const ALLOWED_ROLE_IDS = ["1471877733868109937", "1471880013824393266"]; // roles that get in
 const INVITE_URL = ""; // "Join the Discord" button
+// false = TEST MODE: the site stays open to everyone, but /auth/login works
+// and /auth/check shows whether this Discord account WOULD get in. Flip to
+// true (one-line push) once that's confirmed.
+const ENFORCE = false;
 
 const COOKIE = "gmg_session";
 const STATE_COOKIE = "gmg_oauth_state";
@@ -76,8 +80,11 @@ async function memberRoles(env, userId) {
 }
 const hasAllowedRole = (roles) => roles.some((r) => ALLOWED_ROLE_IDS.includes(r));
 
-function gateEnabled(env) {
+function gateReady(env) {
   return !!(CLIENT_ID && ALLOWED_ROLE_IDS.length && env.DISCORD_CLIENT_SECRET && env.DISCORD_BOT_TOKEN);
+}
+function gateEnabled(env) {
+  return ENFORCE && gateReady(env);
 }
 
 // ---- pages ----
@@ -177,10 +184,30 @@ async function handleCallback(request, env) {
   if (!hasAllowedRole(check.roles)) return deniedPage("no-role");
   const now = Date.now();
   const session = await sign(env, { uid: me.id, name: me.global_name || me.username, checked: now, exp: now + SESSION_DAYS * 864e5 });
-  const headers = new Headers({ Location: saved.next || "/" });
+  const headers = new Headers({ Location: ENFORCE ? saved.next || "/" : "/auth/check" });
   headers.append("Set-Cookie", setCookie(COOKIE, session, SESSION_DAYS * 86400));
   headers.append("Set-Cookie", setCookie(STATE_COOKIE, "", 0));
   return new Response(null, { status: 302, headers });
+}
+
+// Test page: logs this Discord account's live result without gating anything.
+async function handleCheck(request, env) {
+  let session = null;
+  try {
+    session = await verify(env, getCookie(request, COOKIE));
+  } catch (e) {
+    session = null;
+  }
+  if (!session) return loginPage("/auth/check");
+  const check = await memberRoles(env, session.uid);
+  if (!check.ok) return deniedPage(check.reason);
+  if (!hasAllowedRole(check.roles)) return deniedPage("no-role");
+  return page(
+    "Access check -- GMG's NFL Suite",
+    `<p><b style="color:#6ee79b">You're in, ${session.name}.</b><br>Your Discord roles give you access to the NFL Suite.</p>
+     <a class="btn discord" href="/">Open the site</a>
+     <a class="btn ghost" href="/auth/logout">Log out</a>`
+  );
 }
 
 function handleLogout() {
@@ -196,7 +223,7 @@ export async function onRequest(context) {
   // Setup check: which pieces are in place (never the secret values).
   if (url.pathname === "/auth/status") {
     const status = {
-      gate: gateEnabled(env) ? "on" : "off",
+      gate: gateEnabled(env) ? "on" : gateReady(env) ? "test mode" : "off",
       clientId: !!CLIENT_ID,
       roles: ALLOWED_ROLE_IDS.length,
       clientSecret: !!env.DISCORD_CLIENT_SECRET,
@@ -204,11 +231,13 @@ export async function onRequest(context) {
     };
     return new Response(JSON.stringify(status), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
   }
-  if (!gateEnabled(env)) return next(); // not configured yet: site stays open
-
-  if (url.pathname === "/auth/login") return handleLogin(request);
-  if (url.pathname === "/auth/callback") return handleCallback(request, env);
-  if (url.pathname === "/auth/logout") return handleLogout();
+  if (gateReady(env)) {
+    if (url.pathname === "/auth/login") return handleLogin(request);
+    if (url.pathname === "/auth/callback") return handleCallback(request, env);
+    if (url.pathname === "/auth/logout") return handleLogout();
+    if (url.pathname === "/auth/check") return handleCheck(request, env);
+  }
+  if (!gateEnabled(env)) return next(); // not configured / test mode: site stays open
 
   let session = null;
   try {
