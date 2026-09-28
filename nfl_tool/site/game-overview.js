@@ -351,6 +351,39 @@ function summaryAdvCell(offZ, defZ, offTeam, defTeam) {
 // cat.extraCols (currently just RED_ZONE_CATEGORY) adds the raw counting
 // stats behind the grade -- Trips/TDs/FGs/Avg Points -- so the composite
 // is never a black box.
+// Paired version: the category's offense grades beside its defense grades
+// (TEAM | off | def | TEAM), with any extra raw-stat columns on each half.
+function openPairedGradeModal(cat, offTeam, defTeam) {
+  const half = (side) => {
+    const rows = gradeRankRows(cat, side);
+    const heads = (cat.extraCols || []).map((c) => c.label).concat(["Grade"]);
+    return { heads, rows, current: side === "off" ? offTeam : defTeam };
+  };
+  openPairedRankModal(`${cat.label}: Offense vs Defense`, half("off"), half("def"));
+}
+
+function gradeRankRows(cat, side) {
+  return teamsWithGames()
+    .map((t) => {
+      const z = cat.scheme ? schemeCompositeZ(t, side) : compositeZ(side === "off" ? cat.off : cat.def, t);
+      return { team: t, z, grade: gradeForZ(z) };
+    })
+    .filter((r) => r.grade !== null)
+    .sort((a, b) => b.z - a.z)
+    .map((r) => {
+      const extra = (cat.extraCols || []).map((c) => {
+        const statKey = side === "off" ? c.off : c.def;
+        const v = DATA.team_stats[r.team][statKey];
+        if (v === null || v === undefined) return `<td class="num">--</td>`;
+        const display = c.digits ? fmt(v, c.digits) : v;
+        const invert = side === "off" ? c.offInvert : c.defInvert;
+        if (invert === undefined) return `<td class="num">${display}</td>`;
+        return `<td class="num ${tierFor(statKey, r.team, invert)}"${tierForAlphaAttr(statKey, r.team, invert)}>${display}</td>`;
+      });
+      return { team: r.team, cells: extra.concat([`<td class="num grade-cell ${gradeClass(r.grade)}"${gradeAlphaAttr(r.grade)}>${r.grade}</td>`]) };
+    });
+}
+
 function openGradeRankModal(cat, side, currentTeam) {
   ensureStatRankModal();
   const rows = teamsWithGames()
@@ -400,7 +433,11 @@ document.addEventListener("click", (e) => {
   const cell = e.target.closest(".grade-rank-click");
   if (!cell) return;
   const { cat, side, team } = decodeDataAttr(cell.dataset.entry);
-  openGradeRankModal(cat, side, team);
+  const both = [...cell.closest("tr").querySelectorAll(".grade-rank-click")].map((c) => decodeDataAttr(c.dataset.entry));
+  const off = both.find((p) => p.side === "off");
+  const def = both.find((p) => p.side === "def");
+  if (off && def) openPairedGradeModal(cat, off.team, def.team);
+  else openGradeRankModal(cat, side, team);
 });
 
 function renderSummaryTable(offTeam, defTeam) {
@@ -1020,7 +1057,7 @@ function tendencyCell(r, defTeam) {
   // row still counts as "common" when the raw number is high, not when
   // its (flipped) display color happens to land on tier-good.
   const freqCls = invert ? tierFor(r.tendKey, defTeam, false) : tendCls;
-  const payload = { team: defTeam, statKey: r.tendKey, label: `${r.label} Tendency`, invert, percent: true };
+  const payload = { team: defTeam, statKey: r.tendKey, label: `${r.label} Tendency`, invert, percent: true, noPair: true };
   const html = numCell(`${Math.round(tendVal * 100)}%`, tendCls, tendA, payload);
   return { html, tendVal, freqCls };
 }
@@ -1036,7 +1073,7 @@ function defSuccessCell(group, r, defTeam) {
   const a = tierForAlphaAttr(r.defSuccessKey, defTeam, true);
   const unit = group.inlineUnit ? ` ${group.inlineUnit}` : "";
   const display = group.pct ? `${Math.round(succVal * 100)}%` : `${fmt(succVal, 2)}${unit}`;
-  return numCell(display, cls, a, { team: defTeam, statKey: r.defSuccessKey, label: `${r.label} Success Allowed`, invert: true, percent: !!group.pct });
+  return numCell(display, cls, a, { team: defTeam, statKey: r.defSuccessKey, label: group.inlineUnit ? `${r.label} ${group.inlineUnit} Allowed` : `${r.label} Success Allowed`, invert: true, percent: !!group.pct, digits: group.pct ? undefined : 2 });
 }
 
 function renderSchemeGroup(group, offTeam, defTeam) {
@@ -1069,7 +1106,7 @@ function renderSchemeGroup(group, offTeam, defTeam) {
       const perfCell =
         perfVal === null || perfVal === undefined
           ? `<td class="num">--</td>`
-          : numCell(perfDisplay, perfCls, perfA, { team: offTeam, statKey: r.perfKey, label: `${r.label} Performance`, invert: false, percent: !!group.pct });
+          : numCell(perfDisplay, perfCls, perfA, { team: offTeam, statKey: r.perfKey, label: group.inlineUnit ? `${r.label} ${group.inlineUnit}` : `${r.label} Success`, invert: false, percent: !!group.pct, digits: group.pct ? undefined : 2 });
       // Thin border under the last fixed-order row (e.g. "Man") -- visually
       // separates Zone/Man (coverage STYLE) from the specific shells sorted
       // in below them (coverage SCHEME), even though they share one group.

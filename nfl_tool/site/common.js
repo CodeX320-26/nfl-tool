@@ -607,6 +607,12 @@ function statRankGetter(p) {
 }
 
 function ensureStatRankModal() {
+  // Every opener starts from the normal width; the paired view widens it.
+  const existing = document.querySelector("#stat-rank-modal .modal-box");
+  if (existing) {
+    existing.classList.remove("prk-box");
+    existing.style.maxWidth = "";
+  }
   if (document.getElementById("stat-rank-modal")) return;
   const overlay = document.createElement("div");
   overlay.id = "stat-rank-modal";
@@ -666,9 +672,111 @@ function numCell(display, cls, alphaAttr, payload) {
   return `<td class="num ${cls} stat-rank-click"${alphaAttr} data-entry="${encodeDataAttr(payload)}">${display}</td>`;
 }
 
+// ---- Paired league ranks: offense beside defense ----
+// Clicking a number in an OFF/DEF matchup row shows BOTH league lists side
+// by side: TEAM | offense value | defense value | TEAM, each column sorted
+// on its own, with this matchup's offense highlighted on the left and its
+// defense on the right. The partner is the opposite side's cell in the
+// same slot of the same row (total<->total, rate<->rate).
+function statRankRows(p) {
+  const getter = statRankGetter(p);
+  const rows = teamsWithGames()
+    .map((t) => ({ team: t, value: getter(t) }))
+    .filter((r) => r.value !== null && r.value !== undefined)
+    .sort((a, b) => b.value - a.value);
+  const values = rows.map((r) => r.value);
+  const display = (v) => (p.percent ? `${Math.round(v * 100)}%` : fmt(v, p.digits ?? 0));
+  return rows.map((r) => ({
+    team: r.team,
+    cells: [`<td class="num ${percentileTier(r.value, values, !!p.invert)}"${tierAlphaAttr(r.value, values, !!p.invert)}>${display(r.value)}</td>`],
+  }));
+}
+
+function statRankKey(p) {
+  return JSON.stringify([p.statKey, p.dictKey, p.bucketKey, p.shareOf, p.computed]);
+}
+
+// left/right: { heads: [th labels...], rows: [{team, cells: [td html...]}], current: team }
+// The right side's value cells are mirrored so both value columns meet in
+// the middle; every value column shares one width so the halves match.
+function openPairedRankModal(title, left, right) {
+  ensureStatRankModal();
+  const n = Math.max(left.rows.length, right.rows.length);
+  const k = left.heads.length;
+  const teamTd = (r, cur) => `<td class="prk-team${r.team === cur ? " prk-current" : ""}">${teamLogoMini(r.team)} <span>${TEAM_NAMES[r.team] || r.team}</span></td>`;
+  const blank = (count) => "<td></td>".repeat(count);
+  const body = [];
+  for (let i = 0; i < n; i++) {
+    const l = left.rows[i];
+    const r = right.rows[i];
+    const lCells = l ? teamTd(l, left.current) + l.cells.map((c) => (l.team === left.current ? c.replace("<td", '<td data-cur="1"') : c)).join("") : blank(k + 1);
+    const rCells = r ? r.cells.slice().reverse().map((c) => (r.team === right.current ? c.replace("<td", '<td data-cur="1"') : c)).join("") + teamTd(r, right.current) : blank(k + 1);
+    body.push(`<tr><td class="prk-rank">${i + 1}</td>${lCells}<td class="prk-gap"></td>${rCells}</tr>`);
+  }
+  // One value column per side stays wide; several (Red Zone's Trips/TDs/
+  // FGs/Avg + Grade) share narrower ones, and the popup grows to fit.
+  const valW = k > 1 ? 58 : 96;
+  const teamW = 190;
+  const tableW = 30 + 14 + 2 * teamW + 2 * k * valW + (4 * k + 6) * 3;
+  const valCol = `<col style="width:${valW}px">`;
+  const cols = `<col style="width:30px"><col style="width:${teamW}px">${valCol.repeat(k)}<col style="width:14px">${valCol.repeat(k)}<col style="width:${teamW}px">`;
+  document.getElementById("stat-rank-modal-content").innerHTML = `<h3>${title}</h3>
+    <table class="data-table player-odds-table prk-table" style="width:${tableW}px">
+      <colgroup>${cols}</colgroup>
+      <thead><tr><th></th><th class="prk-team-h">Offense</th>${left.heads.map((h) => `<th class="num">${h}</th>`).join("")}<th></th>${right.heads.slice().reverse().map((h) => `<th class="num">${h}</th>`).join("")}<th class="prk-team-h">Defense</th></tr></thead>
+      <tbody>${body.join("")}</tbody>
+    </table>`;
+  document.getElementById("stat-rank-modal").hidden = false;
+  const box = document.querySelector("#stat-rank-modal .modal-box");
+  box.classList.add("prk-box");
+  box.style.maxWidth = `min(96vw, ${tableW + 60}px)`;
+}
+
+// The opposite-side cell for a clicked cell, or null when the row has no
+// real offense/defense counterpart (both cells are the same stat for two
+// teams, a blank partner, or the cell opted out with noPair). The partner
+// is found by COLUMN: a complete row in the same table (clickable cells for
+// two teams, equal counts) shows how far the defense columns sit from the
+// offense columns, so a missing "--" cell can never shift the pairing.
+function pairedRankPartner(cell, selector) {
+  const row = cell.closest("tr");
+  const table = cell.closest("table");
+  if (!row || !table) return null;
+  const me = decodeDataAttr(cell.dataset.entry);
+  if (!me || me.noPair) return null;
+  let offTeam = null;
+  let offset = null;
+  for (const tr of table.querySelectorAll("tr")) {
+    const cs = [...tr.querySelectorAll(selector)].filter((c) => !decodeDataAttr(c.dataset.entry).noPair);
+    if (cs.length < 2 || cs.length % 2) continue;
+    const teams = cs.map((c) => decodeDataAttr(c.dataset.entry).team);
+    const half = cs.length / 2;
+    if (new Set(teams.slice(0, half)).size !== 1 || new Set(teams.slice(half)).size !== 1 || teams[0] === teams[half]) continue;
+    offTeam = teams[0];
+    offset = cs[half].cellIndex - cs[0].cellIndex;
+    break;
+  }
+  if (!offTeam || !offset) return null;
+  const isOff = me.team === offTeam;
+  const other = row.cells[cell.cellIndex + (isOff ? offset : -offset)];
+  if (!other || !other.matches(selector)) return null;
+  const partner = decodeDataAttr(other.dataset.entry);
+  if (!partner || partner.noPair || partner.team === me.team) return null;
+  return isOff ? { off: me, def: partner } : { off: partner, def: me };
+}
+
 document.addEventListener("click", (e) => {
   const cell = e.target.closest(".stat-rank-click");
   if (!cell) return;
+  const pair = pairedRankPartner(cell, ".stat-rank-click");
+  if (pair && statRankKey(pair.off) !== statRankKey(pair.def)) {
+    openPairedRankModal(
+      `${pair.off.label} vs ${pair.def.label}`,
+      { heads: [pair.off.label], rows: statRankRows(pair.off), current: pair.off.team },
+      { heads: [pair.def.label], rows: statRankRows(pair.def), current: pair.def.team }
+    );
+    return;
+  }
   openStatRankModal(decodeDataAttr(cell.dataset.entry));
 });
 

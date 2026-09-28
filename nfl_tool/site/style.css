@@ -2942,3 +2942,20 @@ footer { border-top-color: var(--border); }
 .recent-game-row { cursor: pointer; }
 .recent-game-row:hover td:first-child, .recent-game-row:hover td:nth-child(2) { color: var(--accent); }
 .summary-toolbar .summary-save-btn { white-space: nowrap; flex: 0 0 auto; }
+
+/* Paired league-rank popup: TEAM | offense | defense | TEAM, equal halves */
+#stat-rank-modal .modal-box.prk-box { width: auto; overflow-x: auto; }
+.prk-table { table-layout: fixed; }
+.prk-table col.prk-rank-col { width: 30px; }
+.prk-table col.prk-team-col { width: auto; }
+.prk-table col.prk-val-col { width: 96px; }
+.prk-table col.prk-gap-col { width: 14px; }
+.prk-table td.prk-rank { background: transparent; color: var(--muted); font-size: 0.72rem; font-weight: 700; text-align: center; }
+.prk-table td.prk-gap, .prk-table th:empty { background: transparent; }
+.prk-table td.prk-team { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prk-table td.prk-team span { font-weight: 600; }
+.prk-table td.prk-team.prk-current { background-color: rgba(var(--accent-rgb), 0.16); box-shadow: inset 0 0 0 2px var(--accent); }
+.prk-table td.prk-team.prk-current span { font-weight: 800; }
+.prk-table td[data-cur] { box-shadow: inset 0 0 0 2px var(--accent) !important; }
+.prk-table th.prk-team-h { text-align: left; }
+.prk-table td.num { font-size: 1rem; }

@@ -148,6 +148,14 @@ context. It is the only copy that travels with the repo.
     Summary toolbar because the card's matchups use it too.
   - Recent Games runs Week 1 first, with opponent logos, the closing spread and total from the
     schedule, and ATS (Covered/Missed/Push) and O/U results. Clicking a row opens the box score.
+  - **League-rank popups are paired** (`openPairedRankModal` / `pairedRankPartner` in common.js):
+    - Clicking any number in an OFF/DEF matchup row shows TEAM | offense value | defense value |
+      TEAM. Each column is sorted on its own, with equal-width halves.
+    - This matchup's offense is highlighted on the left and its defense on the right.
+    - The partner is the opposite side's cell in the matching column, learned from a complete row
+      of the same table, so a blank "--" never mis-pairs.
+    - Cells with `noPair` (e.g. scheme Tendency %) or no real counterpart open the single list.
+    - Team Grades use `openPairedGradeModal`; Red Zone's Trips/TDs/FGs/Avg columns appear on both halves.
   - New UI should reuse these patterns rather than add a new look.
 - Player Props pass-zone grids (Pass D Allowed / Passing Offense) use the summary-card look: rounded zone tiles, big share numbers, header/row shares as big red→green numbers with fill bars (no small % tags), stat tiles underneath. The offense per-player mini grids sit 3 cards per row with uniform row heights.
 - Schedule strip (top of every page): finished games show each team's score under its logo (winner bold), not the date.
