@@ -1088,8 +1088,8 @@ async function saveSummaryImage() {
     // images by URL minus the query and stamps the first logo on every team.
     const url = await window.htmlToImage.toPng(card, { pixelRatio: 2, backgroundColor: bg, fontEmbedCSS, includeQueryParams: true });
     const a = document.createElement("a");
-    const away = document.getElementById("away-select").value;
-    const home = document.getElementById("home-select").value;
+    const away = card.dataset.away || document.getElementById("away-select")?.value;
+    const home = card.dataset.home || document.getElementById("home-select")?.value;
     a.href = url;
     a.download = `${away}-at-${home}-${card.dataset.kind || "td"}-summary.png`;
     a.click();

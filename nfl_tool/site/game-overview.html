@@ -42,8 +42,21 @@
     <button type="button" class="game-next-btn week-nav-btn">&rsaquo;</button>
   </div>
 
+  <div class="view-toggle">
+    <button type="button" class="view-toggle-btn preview-view-btn" data-view="full">Full Preview</button>
+    <button type="button" class="view-toggle-btn preview-view-btn" data-view="summary">Summary</button>
+  </div>
+
   <div id="empty-state" class="empty-state">
     <p>Loading this week's slate&hellip;</p>
+  </div>
+
+  <div id="section-game-summary" class="section-wrap" hidden>
+    <div class="summary-toolbar">
+      <button type="button" id="summary-save-btn" class="summary-save-btn">Save image</button>
+      <span class="section-note">Sized to your video template's left area (1.18 : 1). Make your picks on the right -- pick a side, then Good Play / Lean / No Confidence. They save to your Pick Tracker and show in the saved image. Click a chosen side again to clear it.</span>
+    </div>
+    <div id="summary-card" class="summary-card"></div>
   </div>
 
   <div id="section-injuries" class="section-wrap" hidden>
@@ -151,5 +164,6 @@
 <script src="common.js"></script>
 <script src="picks.js"></script>
 <script src="game-overview.js"></script>
+<script src="game-summary.js"></script>
 </body>
 </html>

@@ -1585,6 +1585,7 @@ function render() {
     headerEl.hidden = true;
     emptyEl.hidden = false;
     emptyEl.innerHTML = "<p>No games scheduled for this week.</p>";
+    applyPreviewView(null);
     return;
   }
 
@@ -1614,6 +1615,7 @@ function render() {
     emptyEl.hidden = false;
     const missing = [!awayReady && away, !homeReady && home].filter(Boolean).join(" and ");
     emptyEl.innerHTML = `<p>${missing} ${missing.includes(" and ") ? "have" : "has"} no games played yet this season.</p>`;
+    applyPreviewView(null);
     return;
   }
   emptyEl.hidden = true;
@@ -1638,6 +1640,7 @@ function render() {
   notesEl.dataset.gameId = game.game_id;
 
   renderPickTracker(game);
+  applyPreviewView(game);
 }
 
 document.getElementById("game-notes").addEventListener("input", (e) => {
