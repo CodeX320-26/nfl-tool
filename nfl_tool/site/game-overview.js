@@ -1102,29 +1102,50 @@ function renderSchemeTable(offTeam, defTeam) {
 }
 
 function renderRecentGamesPanel(team) {
-  const games = (DATA.recent_games[team] || []).slice().reverse();
+  // Oldest first (Week 1 at the top), each game with the closing spread and
+  // total from the schedule file plus how it landed against both.
+  const games = (DATA.recent_games[team] || []).slice().sort((a, b) => a.week - b.week);
   if (games.length === 0) {
-    return `<h3>${team}</h3><p class="no-data-note">No games played yet this season.</p>`;
+    return `${teamBannerHeader(team)}<p class="no-data-note">No games played yet this season.</p>`;
   }
+  const schedById = {};
+  (DATA.schedule || []).forEach((g) => (schedById[g.game_id] = g));
+  const chip = (text, cls) => `<td class="num ${cls}">${text}</td>`;
   const rows = games
     .map((g) => {
-      const oppLabel = g.home_away === "away" ? `@ ${g.opponent}` : g.opponent;
+      const isAway = g.home_away === "away";
+      const oppLabel = `<span class="rg-opp">${isAway ? "@" : "vs"} ${teamLogoMini(g.opponent, 20)} ${g.opponent}</span>`;
       const resultCls = g.result === "W" ? "tier-good" : g.result === "L" ? "tier-bad" : "tier-mid";
       const halfLabel = g.ht_for === null || g.ht_against === null ? "--" : `${g.ht_for}-${g.ht_against}`;
-      const away = g.home_away === "away" ? team : g.opponent;
-      const home = g.home_away === "away" ? g.opponent : team;
+      const away = isAway ? team : g.opponent;
+      const home = isAway ? g.opponent : team;
       const payload = { gameId: g.game_id, away, home };
-      return `<tr class="recent-game-row" data-entry="${encodeDataAttr(payload)}"><td>${g.week}</td><td>${oppLabel}</td><td class="num">${halfLabel}</td><td class="num">${g.final_for}-${g.final_against}</td><td class="num ${resultCls}">${g.result}</td></tr>`;
+      const sched = schedById[g.game_id] || {};
+      const spread = isAway ? sched.away_team_spread : sched.home_team_spread;
+      const total = sched.total_line;
+      const margin = g.final_for - g.final_against;
+      const points = g.final_for + g.final_against;
+      let spreadTd = `<td class="num">--</td>`;
+      let atsTd = `<td class="num">--</td>`;
+      if (spread !== null && spread !== undefined) {
+        spreadTd = `<td class="num">${spread > 0 ? "+" : ""}${fmt(spread, 1)}</td>`;
+        const ats = margin + spread;
+        atsTd = ats > 0 ? chip("Covered", "tier-good") : ats < 0 ? chip("Missed", "tier-bad") : chip("Push", "tier-mid");
+      }
+      let totalTd = `<td class="num">--</td>`;
+      let ouTd = `<td class="num">--</td>`;
+      if (total !== null && total !== undefined) {
+        totalTd = `<td class="num">${fmt(total, 1)}</td>`;
+        ouTd = points > total ? chip("Over", "rg-over") : points < total ? chip("Under", "rg-under") : chip("Push", "tier-mid");
+      }
+      return `<tr class="recent-game-row" data-entry="${encodeDataAttr(payload)}"><td class="num">${g.week}</td><td>${oppLabel}</td><td class="num">${halfLabel}</td><td class="num">${g.final_for}-${g.final_against}</td><td class="num ${resultCls}">${g.result}</td>${spreadTd}${atsTd}${totalTd}${ouTd}</tr>`;
     })
     .join("");
-  return `<h3>${team}</h3>
-    <details class="recent-games-dropdown">
-      <summary>Recent Games (${games.length})</summary>
-      <table class="data-table recent-games-table">
-        <thead><tr><th>Wk</th><th>Opp</th><th>Half</th><th>Final</th><th>W/L</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </details>`;
+  return `${teamBannerHeader(team)}
+    <table class="data-table recent-games-table">
+      <thead><tr><th>Wk</th><th>Opp</th><th>Half</th><th>Final</th><th>W/L</th><th>Spread</th><th>ATS</th><th>Total</th><th>O/U</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 // ---- Box score modal (click any Recent Games row) ----

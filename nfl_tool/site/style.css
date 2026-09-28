@@ -2914,3 +2914,31 @@ footer { border-top-color: var(--border); }
 .scheme-table th:nth-child(2), .scheme-table td:nth-child(2),
 .scheme-table th:nth-child(3), .scheme-table td:nth-child(3) { width: 72px; }
 .scheme-table td.num { white-space: nowrap; }
+
+/* Raw Stats / vs Opponents toggle sits in the General Stats header */
+.stats-mode-toggle { display: inline-flex; gap: 4px; margin-left: 14px; padding: 3px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border); text-transform: none; letter-spacing: 0; }
+.stats-mode-toggle .view-toggle-btn { font-family: "Barlow Semi Condensed", sans-serif; font-size: 0.8rem; padding: 4px 14px; border: none; }
+.summary-toolbar .stats-mode-toggle { margin-left: 0; flex: 0 0 auto; }
+
+/* Each matchup box's two columns fill the box -- no dead strip on the right */
+.gen-panel-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 16px; }
+.gen-panel .general-stat-table, .gen-panel .scheme-table, .gen-panel .summary-grade-table { width: 100%; }
+.gen-panel .scheme-grade-col { gap: 16px; }
+/* Team Grades sized like the scheme table above it */
+.gen-panel .summary-grade-table td { height: 36px; }
+.gen-panel .summary-grade-table td:first-child { font-size: 0.92rem; }
+.gen-panel .summary-grade-table td.grade-cell { font-size: 1.2rem; }
+.gen-panel .summary-grade-table th:last-child, .gen-panel .summary-grade-table td:last-child { width: 36px; }
+
+/* Recent Games: logos, lines and results, oldest week first */
+.recent-two-col { gap: 20px; }
+.recent-games-table { width: 100%; margin-top: 6px; table-layout: auto; }
+.recent-games-table td:first-child { width: 34px; }
+.rg-opp { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap; }
+.recent-games-table td.rg-over, .recent-games-table td.rg-under { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
+.recent-games-table td.rg-over { color: var(--mid-text); background-color: rgba(var(--mid-rgb), 0.16); }
+.recent-games-table td.rg-under { color: var(--text); background-color: rgba(96, 165, 250, 0.18); }
+.recent-games-table td.tier-good, .recent-games-table td.tier-bad, .recent-games-table td.tier-mid { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.recent-game-row { cursor: pointer; }
+.recent-game-row:hover td:first-child, .recent-game-row:hover td:nth-child(2) { color: var(--accent); }
+.summary-toolbar .summary-save-btn { white-space: nowrap; flex: 0 0 auto; }

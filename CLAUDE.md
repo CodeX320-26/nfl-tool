@@ -143,6 +143,11 @@ context. It is the only copy that travels with the repo.
   - Game Previews General Stats & Scheme is two boxed matchups ("ATL Offense vs GB Defense"),
     each holding its stat table plus scheme and Team Grades. Grade letters are the same size as
     the numbers, and Heavy/Light Box values stay on one line.
+  - Game Previews order: Injuries, Odds, **Recent Games**, General Stats & Scheme, Pick Tracker.
+    The Raw Stats / vs Opponents toggle sits in the General Stats header, with a copy on the
+    Summary toolbar because the card's matchups use it too.
+  - Recent Games runs Week 1 first, with opponent logos, the closing spread and total from the
+    schedule, and ATS (Covered/Missed/Push) and O/U results. Clicking a row opens the box score.
   - New UI should reuse these patterns rather than add a new look.
 - Player Props pass-zone grids (Pass D Allowed / Passing Offense) use the summary-card look: rounded zone tiles, big share numbers, header/row shares as big red→green numbers with fill bars (no small % tags), stat tiles underneath. The offense per-player mini grids sit 3 cards per row with uniform row heights.
 - Schedule strip (top of every page): finished games show each team's score under its logo (winner bold), not the date.

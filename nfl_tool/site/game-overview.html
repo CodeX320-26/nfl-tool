@@ -45,9 +45,6 @@
   <div class="view-toggle">
     <button type="button" class="view-toggle-btn preview-view-btn" data-view="full">Full Preview</button>
     <button type="button" class="view-toggle-btn preview-view-btn" data-view="summary">Summary</button>
-    <span class="view-toggle-sep"></span>
-    <button type="button" class="view-toggle-btn stats-mode-btn" data-mode="raw" title="Season numbers as they happened">Raw Stats</button>
-    <button type="button" class="view-toggle-btn stats-mode-btn" data-mode="adj" title="Every stat corrected for the offenses/defenses each team has faced">vs Opponents</button>
   </div>
 
   <div id="empty-state" class="empty-state">
@@ -57,6 +54,7 @@
   <div id="section-game-summary" class="section-wrap" hidden>
     <div class="summary-toolbar">
       <button type="button" id="summary-save-btn" class="summary-save-btn">Save image</button>
+      <span class="stats-mode-toggle"><button type="button" class="view-toggle-btn stats-mode-btn" data-mode="raw" title="Season numbers as they happened">Raw Stats</button><button type="button" class="view-toggle-btn stats-mode-btn" data-mode="adj" title="Every stat corrected for the offenses/defenses each team has faced">vs Opponents</button></span>
       <span class="section-note">Sized to your video template's left area (1.18 : 1). Make your picks on the right -- pick a side, then Good Play / Lean / No Confidence. They save to your Pick Tracker and show in the saved image. Click a chosen side again to clear it.</span>
     </div>
     <div id="summary-card" class="summary-card"></div>
@@ -94,8 +92,17 @@
     </div>
   </div>
 
+  <div id="section-recent" class="section-wrap" hidden>
+    <h2 class="section-title">Recent Games</h2>
+    <p class="section-note">Click any game to see box score data.</p>
+    <div class="two-col recent-two-col">
+      <section id="col-away-recent"></section>
+      <section id="col-home-recent"></section>
+    </div>
+  </div>
+
   <div id="section-general" class="section-wrap" hidden>
-    <h2 class="section-title">General Stats &amp; Scheme <button type="button" id="scheme-info-btn" class="info-icon" aria-label="What is Success Rate?">i</button></h2>
+    <h2 class="section-title">General Stats &amp; Scheme <button type="button" id="scheme-info-btn" class="info-icon" aria-label="What is Success Rate?">i</button><span class="stats-mode-toggle"><button type="button" class="view-toggle-btn stats-mode-btn" data-mode="raw" title="Season numbers as they happened">Raw Stats</button><button type="button" class="view-toggle-btn stats-mode-btn" data-mode="adj" title="Every stat corrected for the offenses/defenses each team has faced">vs Opponents</button></span></h2>
     <p id="scheme-info-text" class="info-text" hidden>Success Rate (nflfastR): a play "succeeds" if it gains at least 40% of yards-to-go on 1st down, 60% on 2nd down, or picks up the first down/TD on 3rd or 4th down &mdash; a per-play efficiency measure (staying on schedule), not total yards or points.</p>
     <ul id="scheme-notes" class="snapshot-list scheme-notes"></ul>
     <div class="gen-pair-cols">
@@ -131,14 +138,6 @@
           </div>
         </div>
       </section>
-    </div>
-  </div>
-
-  <div id="section-recent" class="section-wrap" hidden>
-    <h2 class="section-title">Recent Games</h2>
-    <div class="two-col">
-      <section id="col-away-recent"></section>
-      <section id="col-home-recent"></section>
     </div>
   </div>
 
