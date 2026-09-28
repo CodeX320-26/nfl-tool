@@ -131,7 +131,7 @@ function gsMatchupColumn(offTeam, defTeam) {
     : `<div class="gs-none">No big stat edges</div>`;
   const head = (team, side) => {
     const rgb = teamAccentRgb(team);
-    return `<span class="gs-head" style="background:rgba(${rgb.join(",")},0.35);border-bottom:3px solid rgb(${rgb.join(",")})">${teamLogoMini(team, 18)}<b>${team}</b><span>${side}</span></span>`;
+    return `<span class="gs-head" style="background:rgba(${rgb.join(",")},0.35);border-bottom:3px solid rgb(${rgb.join(",")})">${teamLogoMini(team, 22)}<span>${side}</span></span>`;
   };
   return `<div class="sc-col gs-col">
     <div class="gs-row gs-head-row"><span></span>${head(offTeam, "OFF")}<span></span>${head(defTeam, "DEF")}<span></span></div>
