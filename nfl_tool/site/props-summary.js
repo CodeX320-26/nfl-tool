@@ -759,10 +759,17 @@ function propPackages(offTeam, defTeam, game, lines) {
       })
       .filter(Boolean);
     if (!markets.length) return;
-    // Direction from the market that leans hardest; the package needs that
-    // lean to be real and the rest not to point the other way.
+    // Both sides of a market have to agree (common.js matchupCall's rule):
+    // a market can't lean Target when the defense is among the stingiest
+    // at it, or Fade when the offense is among the best -- an average of
+    // the two would otherwise let one side hide the other.
+    const clean = (m, dir) => m.parts.every((x) => x.o.lean * dir > -MATCHUP_CONTRA && x.d.lean * dir > -MATCHUP_CONTRA);
+    const candidates = markets.filter((m) => m.lean && clean(m, Math.sign(m.lean)));
+    if (!candidates.length) return;
+    // Direction from the clean market that leans hardest; the package needs
+    // that lean to be real and the rest not to point the other way.
     const lean = markets.reduce((a, m) => a + m.lean, 0) / markets.length;
-    const top = markets.slice().sort((a, b) => Math.abs(b.lean) - Math.abs(a.lean))[0];
+    const top = candidates.slice().sort((a, b) => Math.abs(b.lean) - Math.abs(a.lean))[0];
     const best = Math.abs(top.lean);
     const dir = Math.sign(top.lean);
     if (best < PROP_PACKAGE_MIN || lean * dir < 0.1) return;
@@ -775,7 +782,7 @@ function propPackages(offTeam, defTeam, game, lines) {
       if (dir > 0 && tt <= PROP_TT_BLOCK_LOW) return;
       if (dir < 0 && tt >= PROP_TT_BLOCK_HIGH) return;
     }
-    const shown = markets.filter((m) => Math.sign(m.lean) === dir && Math.abs(m.lean) >= PROP_MARKET_MIN).sort((a, b) => Math.abs(b.lean) - Math.abs(a.lean));
+    const shown = markets.filter((m) => Math.sign(m.lean) === dir && Math.abs(m.lean) >= PROP_MARKET_MIN && clean(m, dir)).sort((a, b) => Math.abs(b.lean) - Math.abs(a.lean));
     if (!shown.length) return;
     // Reason tags: the defense stat and the offense stat that push hardest.
     const parts = shown.flatMap((m) => m.parts);

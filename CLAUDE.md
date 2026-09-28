@@ -120,6 +120,20 @@ context. It is the only copy that travels with the repo.
     that unit.
   - No projections, "model edge" numbers or model-picked players anywhere. The user
     draws the conclusions and adds players to the Prop Picks rail themselves.
+- **Every matchup call reads BOTH sides (the user's rule, 2026-09-28).** Any Tough / Mismatch /
+  Target / Fade / ADV logo / tag must use the offense's number AND the defense's ALLOWED number for
+  the same thing. How often a defense shows a look (blitz %, box %) only decides whether the look
+  matters, never which way it points. Use `matchupCall` / `matchupKind` in common.js:
+  - A call needs one side clearly pointing one way and the other side not pointing the other way
+    (`MATCHUP_CONTRA`).
+  - An average alone is not enough, because it lets a strong side hide a contradicting one. That
+    bug had "PHI 3.0 Y/C vs heavy box" read as Tough while CHI allowed 4.9 Y/C in that box.
+  - Applied to: Game Summary Key stat edges (Blitz/Box rows show offense vs defense-allowed, with
+    the look % in the label), the Scheme ADV column, the TD Data tags (Beats the blitz, Pressure
+    trouble, Clean pocket, Light-box runs, Beats stacked box, RZ wall), and Props Summary packages
+    (a market is dropped if either side contradicts it).
+  - Rows where the sides don't act on each other (penalty yards) aren't matchups; keep them out of
+    edges.
 - **Distrust small samples.** 2–3 games can be one weird matchup (a backup QB, bad
   weather). Prefer approaches that discount flukes and lean on the market.
 - The TD Data page is considered solid; change it only when asked.

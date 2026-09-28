@@ -295,7 +295,8 @@ function matchupTags(offTeam, defTeam) {
     const oz = z("rz_td_rate", offTeam);
     const t = `${defTeam} allows RZ TD ${tagPct(d.rz_td_rate_allowed)} (lg ${tagPct(tagLeague("rz_td_rate_allowed"))}) · ${offTeam} scores ${tagPct(o.rz_td_rate)}`;
     if (ok(dz, oz) && dz >= TAG_Z && oz >= -0.3) add("good", "RZ leak", t);
-    else if (ok(dz) && dz <= -TAG_Z) add("warn", "RZ wall", t);
+    // A wall only when the offense isn't an elite finisher itself.
+    else if (matchupCall(oz, dz, TAG_Z).dir < 0) add("warn", "RZ wall", t);
   }
 
   // Goal-line run vs pass: offense's red zone lean meets the defense's weak side
@@ -351,26 +352,27 @@ function matchupTags(offTeam, defTeam) {
     }
   }
 
-  // Pressure / blitz mismatch
+  // Pressure / blitz looks: the defense has to lean on the look (relevance),
+  // then the call reads BOTH sides of it (matchupCall) -- the offense's
+  // result against the look AND the defense's own result when it shows it.
+  const lookCall = (offKey, defKey) => matchupCall(z(offKey, offTeam), z(defKey, defTeam), 0.5);
+  const allowedTxt = (key) => `${defTeam} allows ${tagPct(d[key])} (lg ${tagPct(tagLeague(key))})`;
   if (o.success_vs_clean_pocket_plays >= TAG_MIN_SPLIT_PLAYS) {
     const pz = z("pressure_rate", defTeam);
-    const cz = z("success_vs_clean_pocket", offTeam);
-    if (ok(pz, cz) && pz <= -0.6 && cz >= 0.3) {
-      add("good", "Clean pocket", `${defTeam} pressure ${tagPct(d.pressure_rate)} (lg ${tagPct(tagLeague("pressure_rate"))}) · ${offTeam} clean-pocket success ${tagPct(o.success_vs_clean_pocket)}`);
+    if (ok(pz) && pz <= -0.6 && lookCall("success_vs_clean_pocket", "def_success_allowed_clean_pocket").dir > 0) {
+      add("good", "Clean pocket", `${defTeam} pressure ${tagPct(d.pressure_rate)} (lg ${tagPct(tagLeague("pressure_rate"))}) · ${offTeam} clean-pocket success ${tagPct(o.success_vs_clean_pocket)} · ${allowedTxt("def_success_allowed_clean_pocket")}`);
     }
   }
   if (o.success_vs_pressure_plays >= TAG_MIN_SPLIT_PLAYS) {
     const pz = z("pressure_rate", defTeam);
-    const sz = z("success_vs_pressure", offTeam);
-    if (ok(pz, sz) && pz >= 0.6 && sz <= -0.3) {
-      add("warn", "Pressure trouble", `${defTeam} pressure ${tagPct(d.pressure_rate)} (lg ${tagPct(tagLeague("pressure_rate"))}) · ${offTeam} success when pressured ${tagPct(o.success_vs_pressure)}`);
+    if (ok(pz) && pz >= 0.6 && lookCall("success_vs_pressure", "def_success_allowed_pressure").dir < 0) {
+      add("warn", "Pressure trouble", `${defTeam} pressure ${tagPct(d.pressure_rate)} (lg ${tagPct(tagLeague("pressure_rate"))}) · ${offTeam} success when pressured ${tagPct(o.success_vs_pressure)} · ${allowedTxt("def_success_allowed_pressure")}`);
     }
   }
   if (o.success_vs_blitz_plays >= TAG_MIN_SPLIT_PLAYS) {
     const bz = z("blitz_rate", defTeam);
-    const sz = z("success_vs_blitz", offTeam);
-    if (ok(bz, sz) && bz >= 0.6 && sz >= 0.3) {
-      add("good", "Beats the blitz", `${defTeam} blitz ${tagPct(d.blitz_rate)} (lg ${tagPct(tagLeague("blitz_rate"))}) · ${offTeam} success vs blitz ${tagPct(o.success_vs_blitz)}`);
+    if (ok(bz) && bz >= 0.6 && lookCall("success_vs_blitz", "def_success_allowed_blitz").dir > 0) {
+      add("good", "Beats the blitz", `${defTeam} blitz ${tagPct(d.blitz_rate)} (lg ${tagPct(tagLeague("blitz_rate"))}) · ${offTeam} success vs blitz ${tagPct(o.success_vs_blitz)} · ${allowedTxt("def_success_allowed_blitz")}`);
     }
   }
 
@@ -396,19 +398,18 @@ function matchupTags(offTeam, defTeam) {
     add("good", `Run lane: ${RUSH_LANE_LABELS[l]}`, `${offTeam} ${tagNum(o[`rush_ypc_${l}`])} YPC (${o[`rush_carries_${l}`]} car) · ${defTeam} allows ${tagNum(d[`rush_ypc_allowed_${l}`])} (${d[`rush_carries_allowed_${l}`]} car)`);
   }
 
-  // Box-count edge
+  // Box-count edge: same two-sided read -- the offense's YPC against the
+  // box AND what this defense allows when it shows that box.
   if (o.ypc_vs_light_box_plays >= TAG_MIN_SPLIT_PLAYS) {
     const lz = z("box_light_rate", defTeam);
-    const yz = z("ypc_vs_light_box", offTeam);
-    if (ok(lz, yz) && lz >= 0.6 && yz >= 0.5) {
-      add("good", "Light-box runs", `${defTeam} light box ${tagPct(d.box_light_rate)} (lg ${tagPct(tagLeague("box_light_rate"))}) · ${offTeam} ${tagNum(o.ypc_vs_light_box)} YPC vs light`);
+    if (ok(lz) && lz >= 0.6 && lookCall("ypc_vs_light_box", "def_ypc_allowed_light_box").dir > 0) {
+      add("good", "Light-box runs", `${defTeam} light box ${tagPct(d.box_light_rate)} (lg ${tagPct(tagLeague("box_light_rate"))}) · ${offTeam} ${tagNum(o.ypc_vs_light_box)} YPC vs light · ${defTeam} allows ${tagNum(d.def_ypc_allowed_light_box)}`);
     }
   }
   if (o.ypc_vs_heavy_box_plays >= TAG_MIN_SPLIT_PLAYS) {
     const hz = z("box_heavy_rate", defTeam);
-    const yz = z("ypc_vs_heavy_box", offTeam);
-    if (ok(hz, yz) && hz >= 0.6 && yz >= 0.5) {
-      add("good", "Beats stacked box", `${defTeam} 7+ box ${tagPct(d.box_heavy_rate)} (lg ${tagPct(tagLeague("box_heavy_rate"))}) · ${offTeam} ${tagNum(o.ypc_vs_heavy_box)} YPC vs 7+`);
+    if (ok(hz) && hz >= 0.6 && lookCall("ypc_vs_heavy_box", "def_ypc_allowed_heavy_box").dir > 0) {
+      add("good", "Beats stacked box", `${defTeam} 7+ box ${tagPct(d.box_heavy_rate)} (lg ${tagPct(tagLeague("box_heavy_rate"))}) · ${offTeam} ${tagNum(o.ypc_vs_heavy_box)} YPC vs 7+ · ${defTeam} allows ${tagNum(d.def_ypc_allowed_heavy_box)}`);
     }
   }
 

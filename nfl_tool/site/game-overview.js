@@ -1024,19 +1024,20 @@ const SCHEME_ADV_MIN_TENDENCY = 0.2;
 // risk). A good performance number against a look the defense rarely shows
 // (e.g. "HOU beats the blitz, but BUF barely blitzes") deliberately falls
 // through to "--" -- it's true but unlikely to come up.
-function schemeEdgeCell(perfCls, freqCls, tendVal, offTeam, defTeam) {
+// ADV for a scheme row: only when this defense shows the look a lot, and
+// judged on BOTH sides of it (matchupCall) -- the offense's result against
+// the look and the defense's own result when it shows it.
+function schemeEdgeCell(r, tendVal, offTeam, defTeam) {
   if (tendVal === null || tendVal === undefined || tendVal < SCHEME_ADV_MIN_TENDENCY) {
     return `<td class="edge-cell">--</td>`;
   }
-  if (perfCls === "tier-good" && freqCls === "tier-good") {
-    const rgb = teamAccentRgb(offTeam);
-    return `<td class="edge-cell edge-hit" style="background:rgba(${rgb.join(",")},0.14)">${teamLogoMini(offTeam)}</td>`;
-  }
-  if (perfCls === "tier-bad" && freqCls === "tier-good") {
-    const rgb = teamAccentRgb(defTeam);
-    return `<td class="edge-cell edge-hit" style="background:rgba(${rgb.join(",")},0.14)">${teamLogoMini(defTeam)}</td>`;
-  }
-  return `<td class="edge-cell">--</td>`;
+  const pool = teamsWithGames();
+  const z = (key, team) => zScore(tierValue(team, key), pool.map((t) => tierValue(t, key)), false);
+  const call = matchupCall(z(r.perfKey, offTeam), z(r.defSuccessKey, defTeam));
+  if (!call.dir) return `<td class="edge-cell">--</td>`;
+  const team = call.dir > 0 ? offTeam : defTeam;
+  const rgb = teamAccentRgb(team);
+  return `<td class="edge-cell edge-hit" style="background:rgba(${rgb.join(",")},0.14)">${teamLogoMini(team)}</td>`;
 }
 
 // Just the tiered percentage now -- the bar chart this used to also draw
@@ -1112,7 +1113,7 @@ function renderSchemeGroup(group, offTeam, defTeam) {
       // in below them (coverage SCHEME), even though they share one group.
       const styleBoundary = group.sortFrom !== undefined && idx === group.sortFrom - 1;
       const rowCls = [dim ? "scheme-row-dim" : "", styleBoundary ? "scheme-style-boundary" : ""].filter(Boolean).join(" ");
-      return `<tr${rowCls ? ` class="${rowCls}"` : ""}><td>${r.label}</td>${perfCell}${defSuccessCell(group, r, defTeam)}${tendHtml}${schemeEdgeCell(perfCls, freqCls, tendVal, offTeam, defTeam)}</tr>`;
+      return `<tr${rowCls ? ` class="${rowCls}"` : ""}><td>${r.label}</td>${perfCell}${defSuccessCell(group, r, defTeam)}${tendHtml}${schemeEdgeCell(r, tendVal, offTeam, defTeam)}</tr>`;
     })
     .join("");
   const perfCaption = group.inlineUnit ? "" : group.perfLabel;

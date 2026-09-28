@@ -541,6 +541,39 @@ function headerRow(offTeam, defTeam, subLabels, market = "anytime_td") {
     <tr><th></th><th class="sub-hdr">${subLabels[0]}</th><th class="sub-hdr">${subLabels[1]}</th><th class="sub-hdr">${subLabels[0]}</th><th class="sub-hdr">${subLabels[1]}</th></tr>`;
 }
 
+// ---- The matchup rule: every offense-vs-defense call goes through here ----
+// A matchup is only as good as BOTH of its sides, so each side comes in on
+// the same footing: + = good for the OFFENSE (the offense produces it / the
+// defense allows it), as a z-score or a rank lean. A call needs one side
+// pointing clearly one way AND the other side not pointing the other way --
+// an average alone would let a great offense hide a great defense (or the
+// reverse), which is exactly how a "tough" call used to ignore a defense
+// that gets gashed in the very look it leans on. How OFTEN a defense shows
+// a look only decides whether the look matters, never which way it points.
+const MATCHUP_CONTRA = 0.3;
+// dir: +1 offense edge, -1 defense edge, 0 no call.
+function matchupCall(offZ, defZ, th = TIER_Z_THRESHOLD, contra = MATCHUP_CONTRA) {
+  if (offZ === null || offZ === undefined || defZ === null || defZ === undefined) return { dir: 0, edge: null };
+  const edge = (offZ + defZ) / 2;
+  const hi = Math.max(offZ, defZ);
+  const lo = Math.min(offZ, defZ);
+  if (hi >= th && lo > -contra) return { dir: 1, edge };
+  if (lo <= -th && hi < contra) return { dir: -1, edge };
+  return { dir: 0, edge };
+}
+// Four-way read from each unit's own point of view (offense: produces a
+// lot = good; defense: allows little = good), same z inputs as above.
+function matchupKind(offZ, defZ, th = TIER_Z_THRESHOLD) {
+  if (offZ === null || offZ === undefined || defZ === null || defZ === undefined) return null;
+  const offGood = offZ >= th, offBad = offZ <= -th;
+  const defGood = defZ <= -th, defBad = defZ >= th; // defZ is "allows" (+ = leaky)
+  if (offGood && defBad) return "mismatch";
+  if (offBad && defGood) return "tough";
+  if (offGood && defGood) return "strong";
+  if (offBad && defBad) return "weak";
+  return null;
+}
+
 // Plain-language decode of a row's two tier colors -- which team the stat
 // favors, so a viewer doesn't have to mentally cross-reference green/red
 // against which side is offense vs defense. OFFENSE-ONLY BY DESIGN: the ADV

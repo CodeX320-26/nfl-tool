@@ -76,10 +76,12 @@ const GS_SCHEME_SHORT = {
 };
 
 // Biggest General Stats + Scheme edges for this offense vs that defense.
-// Pace (plays/game), quarter splits and the red zone composite are left
-// out -- pace isn't good or bad, quarters are noise at this size, and red
-// zone already has its own grade above.
-const GS_SKIP_ROWS = new Set(["Plays / Game", "Red Zone"]);
+// Only rows where the two sides actually act on each other. Left out: pace
+// (plays/game isn't good or bad), quarter splits (noise at this size), the
+// red zone composite (has its own grade above), and penalty yards (each
+// unit's own flags -- the offense's holding calls don't depend on the
+// defense's pass interference, so the pair isn't a matchup).
+const GS_SKIP_ROWS = new Set(["Plays / Game", "Red Zone", "Penalty Yards"]);
 function gsStatEdges(offTeam, defTeam) {
   const edges = [];
   const fmtV = (v, r) => (v === null || v === undefined ? "--" : r.pct ? `${Math.round(v * 100)}%` : fmt(v, r.digits ?? 0));
@@ -100,23 +102,30 @@ function gsStatEdges(offTeam, defTeam) {
       });
     })
   );
-  // Scheme: only looks this defense actually uses a lot (same rule as the
-  // Scheme table's ADV column), offense good or bad against it.
+  // Scheme: only looks this defense actually uses a lot. The call reads
+  // BOTH sides of the look -- the offense's result against it AND the
+  // defense's own result when it shows it (matchupKind) -- so a defense that
+  // stacks the box 62% of the time but gets gashed doing it can't turn a
+  // weak offense split into "Tough". Frequency only decides relevance.
   SCHEME_GROUPS.forEach((group) =>
     group.rows.forEach((r) => {
       const tend = DATA.team_stats[defTeam][r.tendKey];
       if (tend === null || tend === undefined || tend < SCHEME_ADV_MIN_TENDENCY) return;
       const freqZ = gsStatZ(r.tendKey, defTeam, false);
-      const perfZ = gsStatZ(r.perfKey, offTeam, false);
-      if (freqZ === null || perfZ === null || freqZ < GS_EDGE_Z || Math.abs(perfZ) < GS_EDGE_Z) return;
+      const offZ = gsStatZ(r.perfKey, offTeam, false);
+      const defZ = gsStatZ(r.defSuccessKey, defTeam, false); // + = leaky
+      if (freqZ === null || freqZ < GS_EDGE_Z) return;
+      const tag = matchupKind(offZ, defZ, GS_EDGE_Z);
+      if (!tag) return;
       const perf = DATA.team_stats[offTeam][r.perfKey];
-      const perfText = group.pct ? `${Math.round(perf * 100)}%` : `${fmt(perf, 1)} Y/C`;
+      const allowed = DATA.team_stats[defTeam][r.defSuccessKey];
+      const txt = (v) => (group.pct ? `${Math.round(v * 100)}%` : `${fmt(v, 1)}`);
       edges.push({
-        label: `vs ${GS_SCHEME_SHORT[r.label] || r.label}`,
-        off: `<span class="gs-val ${gsZClass(perfZ)}">${perfText}</span>`,
-        def: `<span class="gs-val gs-freq" title="How often ${defTeam} shows this look">${Math.round(tend * 100)}%</span>`,
-        tag: perfZ > 0 ? "mismatch" : "tough",
-        weight: Math.abs(perfZ) + freqZ,
+        label: `vs ${GS_SCHEME_SHORT[r.label] || r.label} <span class="gs-freq-tag" title="How often ${defTeam} shows this look">${Math.round(tend * 100)}%</span>`,
+        off: `<span class="gs-val ${gsZClass(offZ)}">${txt(perf)}</span>`,
+        def: `<span class="gs-val ${gsZClass(-defZ)}" title="${defTeam} allows this when it shows the look">${txt(allowed)}</span>`,
+        tag,
+        weight: Math.abs(offZ) + Math.abs(defZ) + 0.5 * freqZ,
         scheme: true,
       });
     })
@@ -304,7 +313,7 @@ function renderGameSummaryCard(game) {
     </div>
     <div class="sc-footer">
       <span><span class="gs-res gs-res-q gs-res-w"><b>W</b></span> quality <span class="gs-res gs-res-n gs-res-w"><b>W</b></span> neutral <span class="gs-res gs-res-b gs-res-w"><b>W</b></span> bad (vs the spread) &middot; grades A-F vs the league</span>
-      <span>Ratings 1-100 vs the league (ESPN FPI) &middot; SOS 1st = toughest schedule so far &middot; <span class="gs-val gs-good">green</span> good for that side &middot; <span class="gs-val gs-bad">red</span> bad &middot; vs Blitz / Box % = how often the defense shows it</span>
+      <span>Ratings 1-100 vs the league (ESPN FPI) &middot; SOS 1st = toughest schedule so far &middot; <span class="gs-val gs-good">green</span> good for that side &middot; <span class="gs-val gs-bad">red</span> bad &middot; Blitz / Box rows: offense's result vs the defense's result in that look, % = how often the defense shows it</span>
     </div>
   </div>`;
   fitSummaryCard();
