@@ -46,7 +46,7 @@ context. It is the only copy that travels with the repo.
   - `picks.js`: the Pick Tracker.
   - `common.js`: shared helpers — tiers, possible plays, modals, the summary-card
     photo/banner/fit/**Save image** helpers, and lineup weights.
-  - `firebase-sync.js`: syncs possible plays, notes and picks across devices.
+  - `sync.js`: **member profiles**. It mirrors saved plays, picks, notes, summary rails and manual Outs to the logged-in Discord member's profile (`/api/state`, Cloudflare D1), so they follow them to any device. (Replaced the owner-only Firebase sync on 2026-09-28.)
   - `teams.js`: team names, colors and logo URLs.
   - `style.css`: dark/light theme tokens and all page styles.
 
@@ -87,6 +87,17 @@ context. It is the only copy that travels with the repo.
     access is honored for 2 h after the last good check.
   - OAuth scope is `identify` only; redirect URI `<origin>/auth/callback`.
   - The session HMAC key is derived from the bot token, so rotating the token logs everyone out.
+  - **Member profiles:**
+    - `/api/state` in the middleware (GET all, PUT one key; newest `updated` wins) is backed by the D1
+      database `gmg-nfl-users` (table `user_state(uid,k,v,updated)`), bound as `DB`.
+    - deploy.yml creates the database and table and writes `nfl_tool/wrangler.toml` in CI, so the
+      token needs **D1 Edit** as well as Pages Edit.
+    - `site/sync.js` keeps localStorage as the working copy. It pulls on load and on tab focus,
+      pushes each save debounced, and on first contact merges pre-profile local data (lists by id,
+      objects by key) instead of overwriting it.
+    - Synced keys are listed in both `SYNC_KEYS` (middleware) and `KEYS` (sync.js). **Add new
+      per-user data to both**, and call `window.NFLSync?.push(key, value)` in its save function.
+    - Display prefs (theme, views, selected game) stay per-device.
   - Known bypass until fixed: the GitHub Pages copy still serves the site to anyone who hits
     GitHub's IPs directly, and the repo is public. Turn off GitHub Pages and make the repo
     private once the gate is confirmed.

@@ -1223,6 +1223,7 @@ function saveSummaryPicks(gameKey, picks) {
     const all = JSON.parse(localStorage.getItem(SUMMARY_PICKS_KEY)) || {};
     all[gameKey] = picks;
     localStorage.setItem(SUMMARY_PICKS_KEY, JSON.stringify(all));
+    window.NFLSync?.push(SUMMARY_PICKS_KEY, all);
   } catch (e) {
     // localStorage unavailable -- picks just won't stick across reloads.
   }

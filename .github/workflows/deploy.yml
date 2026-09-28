@@ -126,6 +126,39 @@ jobs:
           if [ -n "$DCS" ]; then printf '%s' "$DCS" | npx -y wrangler@3 pages secret put DISCORD_CLIENT_SECRET --project-name=gmg-nfl; fi
           if [ -n "$DBT" ]; then printf '%s' "$DBT" | npx -y wrangler@3 pages secret put DISCORD_BOT_TOKEN --project-name=gmg-nfl; fi
 
+      # Member profiles (saved plays/picks/notes per Discord account): a D1
+      # database, created on the first run, its table created if missing,
+      # and bound to the Pages project as DB through a generated
+      # nfl_tool/wrangler.toml (the database ID isn't secret). If any of
+      # this fails the deploy still goes out, just without profiles
+      # (/auth/status shows profiles:false and sync.js stays local-only).
+      - name: Member profile database (D1)
+        continue-on-error: true
+        working-directory: nfl_tool
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx -y wrangler@3 d1 list --json > d1.json || echo "[]" > d1.json
+          DBID=$(jq -r '.[] | select(.name=="gmg-nfl-users") | .uuid' d1.json)
+          if [ -z "$DBID" ]; then
+            npx -y wrangler@3 d1 create gmg-nfl-users
+            npx -y wrangler@3 d1 list --json > d1.json
+            DBID=$(jq -r '.[] | select(.name=="gmg-nfl-users") | .uuid' d1.json)
+          fi
+          rm -f d1.json
+          test -n "$DBID"
+          {
+            echo 'name = "gmg-nfl"'
+            echo 'pages_build_output_dir = "site"'
+            echo 'compatibility_date = "2024-09-01"'
+            echo '[[d1_databases]]'
+            echo 'binding = "DB"'
+            echo 'database_name = "gmg-nfl-users"'
+            echo "database_id = \"$DBID\""
+          } > wrangler.toml
+          npx -y wrangler@3 d1 execute gmg-nfl-users --remote --command "CREATE TABLE IF NOT EXISTS user_state (uid TEXT NOT NULL, k TEXT NOT NULL, v TEXT NOT NULL, updated INTEGER NOT NULL, PRIMARY KEY (uid, k))"
+
       # Deployed from nfl_tool/ so wrangler bundles nfl_tool/functions (the
       # login gate) alongside the static site folder.
       - name: Deploy to Cloudflare Pages

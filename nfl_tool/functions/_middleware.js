@@ -228,6 +228,54 @@ function handleLogout() {
   return new Response(null, { status: 302, headers });
 }
 
+// ---- member profiles: saved plays/picks/notes per Discord account ----
+// One row per (member, item) in the D1 database bound as DB (created by
+// deploy.yml). The browser (site/sync.js) keeps localStorage as its
+// working copy and mirrors these keys here, so they follow the member to
+// any device. Only the logged-in member's own rows are ever read/written.
+const SYNC_KEYS = new Set([
+  "nfl-tool.possible-plays.v1",
+  "nfl-tool.picks.v1",
+  "nfl-tool.game-notes.v1",
+  "nfl-tool.td-notes.v1",
+  "nfl-tool.manual-outs.v1",
+  "nfl-tool.props-summary-picks.v1",
+  "nfl-tool.summary-picks.v1",
+]);
+const SYNC_MAX_BYTES = 512 * 1024;
+
+async function handleApi(request, env, session, json) {
+  const url = new URL(request.url);
+  if (url.pathname !== "/api/state") return json({ error: "not found" }, 404);
+  if (!env.DB) return json({ error: "no database" }, 503);
+  if (request.method === "GET") {
+    const { results } = await env.DB.prepare("SELECT k, v, updated FROM user_state WHERE uid = ?").bind(session.uid).all();
+    const state = {};
+    for (const r of results || []) state[r.k] = { v: r.v, updated: r.updated };
+    return json({ user: { name: session.name }, state });
+  }
+  if (request.method === "PUT") {
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return json({ error: "bad json" }, 400);
+    }
+    const { k, v, updated } = body || {};
+    if (!SYNC_KEYS.has(k) || typeof v !== "string" || !Number.isFinite(updated)) return json({ error: "bad item" }, 400);
+    if (v.length > SYNC_MAX_BYTES) return json({ error: "too big" }, 413);
+    // Newest write wins: an older device catching up can't overwrite a
+    // newer save from another device.
+    await env.DB.prepare(
+      "INSERT INTO user_state (uid, k, v, updated) VALUES (?, ?, ?, ?) ON CONFLICT(uid, k) DO UPDATE SET v = excluded.v, updated = excluded.updated WHERE excluded.updated >= user_state.updated"
+    )
+      .bind(session.uid, k, v, Math.round(updated))
+      .run();
+    return json({ ok: true });
+  }
+  return json({ error: "method" }, 405);
+}
+
 // ---- the gate ----
 export async function onRequest(context) {
   const { request, env, next } = context;
@@ -240,6 +288,7 @@ export async function onRequest(context) {
       roles: ALLOWED_ROLE_IDS.length,
       clientSecret: !!env.DISCORD_CLIENT_SECRET,
       botToken: !!env.DISCORD_BOT_TOKEN,
+      profiles: !!env.DB,
     };
     return new Response(JSON.stringify(status), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
   }
@@ -252,26 +301,33 @@ export async function onRequest(context) {
   if (!gateEnabled(env)) return next(); // not configured / test mode: site stays open
   if (await isBuildRequest(request, env)) return next();
 
+  const isApi = url.pathname.startsWith("/api/");
+  const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+
   let session = null;
   try {
     session = await verify(env, getCookie(request, COOKIE));
   } catch (e) {
     session = null;
   }
-  if (!session) return loginPage(url.pathname + url.search);
+  if (!session) return isApi ? json({ error: "login" }, 401) : loginPage(url.pathname + url.search);
 
   // Roles re-checked with Discord whenever the last check is older than
   // RECHECK_MS -- this is what makes a cancelled role stop working.
   const age = Date.now() - session.checked;
-  if (age < RECHECK_MS) return next();
-  const check = await memberRoles(env, session.uid);
-  if (!check.ok && check.reason === "api") {
-    return age < OUTAGE_GRACE_MS ? next() : deniedPage("api");
+  let refreshed = null;
+  if (age >= RECHECK_MS) {
+    const check = await memberRoles(env, session.uid);
+    if (!check.ok && check.reason === "api") {
+      if (age >= OUTAGE_GRACE_MS) return isApi ? json({ error: "discord" }, 503) : deniedPage("api");
+    } else {
+      if (!check.ok) return isApi ? json({ error: check.reason }, 403) : deniedPage(check.reason);
+      if (!hasAllowedRole(check.roles)) return isApi ? json({ error: "no-role" }, 403) : deniedPage("no-role");
+      refreshed = await sign(env, { ...session, checked: Date.now() });
+    }
   }
-  if (!check.ok) return deniedPage(check.reason);
-  if (!hasAllowedRole(check.roles)) return deniedPage("no-role");
-  const refreshed = await sign(env, { ...session, checked: Date.now() });
-  const res = await next();
+  const res = isApi ? await handleApi(request, env, session, json) : await next();
+  if (!refreshed) return res;
   const out = new Response(res.body, res);
   out.headers.append("Set-Cookie", setCookie(COOKIE, refreshed, SESSION_DAYS * 86400));
   out.headers.set("Cache-Control", "private, no-store");

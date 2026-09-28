@@ -194,6 +194,7 @@ function toggleManualOut(week, team, name) {
     else list.add(key);
     all[week] = [...list];
     localStorage.setItem(MANUAL_OUTS_KEY, JSON.stringify(all));
+    window.NFLSync?.push(MANUAL_OUTS_KEY, all);
   } catch (e) {
     // localStorage unavailable -- the switch just won't stick.
   }
@@ -871,6 +872,7 @@ function savePropsSummaryPicks(gameKey, picks) {
     const all = JSON.parse(localStorage.getItem(PROPS_SUMMARY_PICKS_KEY)) || {};
     all[gameKey] = picks;
     localStorage.setItem(PROPS_SUMMARY_PICKS_KEY, JSON.stringify(all));
+    window.NFLSync?.push(PROPS_SUMMARY_PICKS_KEY, all);
   } catch (e) {
     // localStorage unavailable -- picks just won't stick across reloads.
   }
