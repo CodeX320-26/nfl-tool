@@ -327,6 +327,19 @@ function renderMatchupRow(rowEl, week, selectedAway, selectedHome) {
   rowEl.innerHTML = games
     .map((g) => {
       const selected = g.away === selectedAway && g.home === selectedHome ? " selected" : "";
+      // Finished games show each team's score under its logo (winner bold)
+      // instead of the date.
+      const final = g.status === "final" && g.away_score !== null && g.away_score !== undefined && g.home_score !== null && g.home_score !== undefined;
+      if (final) {
+        const score = (team, pts, opp) => `<span class="matchup-team-col"><img src="${teamLogoUrl(team)}" class="team-logo" alt="${team}" loading="lazy"><span class="matchup-score${pts > opp ? " matchup-score-win" : pts < opp ? " matchup-score-loss" : ""}">${pts}</span></span>`;
+        return `<button type="button" class="matchup-card matchup-card-final${selected}" data-away="${g.away}" data-home="${g.home}" title="Final">
+        <span class="matchup-teams-row">
+          ${score(g.away, g.away_score, g.home_score)}
+          <span class="at">@</span>
+          ${score(g.home, g.home_score, g.away_score)}
+        </span>
+      </button>`;
+      }
       const dateLabel = g.date ? new Date(g.date + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric" }) : "";
       return `<button type="button" class="matchup-card${selected}" data-away="${g.away}" data-home="${g.home}">
         <span class="matchup-teams-row">

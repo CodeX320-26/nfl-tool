@@ -123,6 +123,7 @@ context. It is the only copy that travels with the repo.
     with A–F grades and Mismatch/Tough/Good vs Good/Bad vs Bad tags.
   - Right side: My Picks rail with the Novig ad.
   - "Scheme" is labeled "Blitz & Box" on the card.
+- Schedule strip (top of every page): finished games show each team's score under its logo (winner bold), not the date.
 - Player Props page extras:
   - The **Pick props** list is grouped Passing / Rushing / Receiving / Other, then by player.
   - Each player has an **Out?** switch for late news the injury report misses.
