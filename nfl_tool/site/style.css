@@ -3072,3 +3072,39 @@ html.local-dev .update-odds-link { display: inline-flex; }
 .pz-blurb-bad { background: rgba(var(--bad-rgb), 0.1); border-left-color: rgb(var(--bad-rgb)); }
 .pz-blurb-bad b { color: var(--bad-text); }
 .pz-note { margin: 4px 0 0; font-size: 0.68rem; font-style: italic; color: var(--muted); }
+
+/* ---- Zone matchup panel (beside the QB grid) + overall read ---- */
+.pass-zone-players-inline.pzm-row { flex-wrap: wrap; align-items: flex-start; gap: 14px; }
+.pzm-row > .pass-zone-qb-card { flex: 0 1 420px; }
+.pzm-panel { flex: 1 1 360px; min-width: 330px; display: flex; flex-direction: column; gap: 4px; }
+.pzm-title { font-family: var(--font-display); font-size: 0.9rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 7px; background: var(--table-head); box-shadow: inset 3px 0 0 var(--accent); }
+.pzm-key { display: flex; justify-content: flex-end; gap: 10px; font-size: 0.62rem; font-weight: 700; color: var(--muted); padding-right: 76px; }
+.pzm-key span:first-child::before, .pzm-key span:last-child::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; background: var(--border-strong); }
+.pzm-table { width: 100%; table-layout: auto; }
+.pzm-table th { font-size: 0.58rem; }
+.pzm-table thead + tbody + thead th { padding-top: 10px; }
+.pzm-table td.pzm-label { font-family: var(--font-display); font-weight: 800; font-size: 0.92rem; }
+.pzm-table td.pzm-share { color: var(--muted); font-weight: 700; font-size: 0.8rem; }
+.pzm-table td.pzm-pair { white-space: nowrap; padding: 3px; }
+.pzm-v { display: inline-block; min-width: 34px; padding: 2px 4px; margin: 0 1px; border-radius: 5px; font-family: var(--font-display); font-size: 0.84rem; font-weight: 800; background: var(--panel); }
+.pzm-v.tier-good, .pzm-v.tier-bad, .pzm-v.tier-mid { background-color: rgba(var(--mid-rgb), 0.18); }
+.pzm-v.tier-good { background-color: rgba(var(--good-rgb), calc(var(--tier-a, 0.16) + 0.14)); }
+.pzm-v.tier-bad { background-color: rgba(var(--bad-rgb), calc(var(--tier-a, 0.16) + 0.14)); }
+.pzm-chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; background: var(--table-head); color: var(--muted); }
+.pzm-chip.pzm-good { background: rgba(var(--good-rgb), 0.22); color: var(--good-text); }
+.pzm-chip.pzm-bad { background: rgba(var(--bad-rgb), 0.2); color: var(--bad-text); }
+.pzm-read { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--panel); border: 1px solid var(--border); }
+.pzm-read-main { font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 10px; border-radius: 8px; background: var(--table-head); }
+.pzm-read-main.pzm-good { background: rgba(var(--good-rgb), 0.2); color: var(--good-text); }
+.pzm-read-main.pzm-bad { background: rgba(var(--bad-rgb), 0.18); color: var(--bad-text); }
+.pzm-read-item { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; }
+.pzm-read-item small { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.pzm-read-item b { font-family: var(--font-display); font-size: 0.95rem; }
+.pzm-row > .pass-zone-qb-card { flex: 0 0 360px; max-width: 360px; }
+.pzm-row > .pass-zone-qb-card .pass-zone-grid-qb { width: 100%; }
+.pzm-row .pass-zone-heat-cell-qb small { font-size: 0.56rem; }
+.pzm-panel { min-width: 330px; }
+.pzm-v { min-width: 30px; font-size: 0.8rem; }
+/* Wide monitors: use the room (was capped at 1600px, leaving big empty margins) */
+main { max-width: 1840px; }
+.pzm-table td.pzm-label { white-space: nowrap; }

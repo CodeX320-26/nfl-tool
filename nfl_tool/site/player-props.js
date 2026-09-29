@@ -1265,12 +1265,183 @@ function renderQbPassZoneCards(team, side, opponent) {
   const qb = mainPasser(team);
   const chart = (DATA.pass_shot_charts[team] || {})[side];
   const body = qb && chart
-    ? `<div class="pass-zone-players-inline">${renderQbZoneMiniCard(team, qb, chart, opponent)}</div>`
+    ? `<div class="pass-zone-players-inline pzm-row">${renderQbZoneMiniCard(team, qb, chart, opponent)}${opponent ? renderZoneMatchupPanel(team, opponent) : ""}</div>`
     : `<p class="no-data-note">No qualifying passers yet this season.</p>`;
   return `<div class="pass-zone-block">
     ${passZoneTeamHeader(team, side)}
     ${body}
     ${renderPassIdentityCard(team, side)}
+    ${qb && chart && opponent ? renderZoneMatchupRead(team, opponent) : ""}
+  </div>`;
+}
+
+// ---- Zone matchup: this offense vs this week's defense, by depth and side ----
+// Each depth row (20+ / 10-19 / 0-9 / SCR) rolls up its 3 zones, each side
+// (L / M / R) its 4 depths -- the same numbers the zone popup shows, per
+// group: catch %, yards/throw, YAC/catch, EPA/throw, success rate.
+// Game script: throws in garbage time (win prob under 10% or over 90%, the
+// build's "gt" flag) count HALF, so a defense that sat on big leads isn't
+// punished for soft prevent yards, and the read uses only per-throw
+// efficiency -- never throw volume, which is what game script inflates.
+// Rates are pulled toward the league with PZM_PRIOR throws. Offense and
+// defense are each graded against the league at that same group, then read
+// with the two-sided matchup rule; the % is where this pairing ranks among
+// every offense-vs-defense pairing in the league for that group.
+const PZM_PRIOR = 10;
+const PZM_WEIGHTS = { epa: 0.35, ypt: 0.25, succ: 0.2, comp: 0.1, yacpc: 0.1 };
+function pzmGroups() {
+  return [
+    ...PASS_ZONE_ROWS.map((r) => ({ key: r.key, label: r.short, zones: PASS_ZONE_COLS.map((c) => `${r.key}_${c}`), kind: "depth" })),
+    ...PASS_ZONE_COLS.map((c) => ({ key: c, label: c[0].toUpperCase() + c.slice(1), zones: PASS_ZONE_ROWS.map((r) => `${r.key}_${c}`), kind: "side" })),
+  ];
+}
+function pzmAgg(team, side, zones) {
+  const chart = (DATA.pass_shot_charts[team] || {})[side];
+  // Weighted sums (garbage time = half) drive the grades; raw sums are what
+  // gets displayed.
+  const a = { w: 0, n: 0, compN: 0, comp: 0, yds: 0, yac: 0, epa: 0, succ: 0, rYds: 0, rYac: 0, rEpa: 0, total: chart?.pass_attempts || 0 };
+  zones.forEach((zk) =>
+    ((chart?.zones?.[zk]?.plays) || []).forEach((p) => {
+      const wt = p.gt ? 0.5 : 1;
+      a.n += 1;
+      a.w += wt;
+      if (p.complete) {
+        a.compN += 1;
+        a.comp += wt;
+        a.yds += wt * (p.yards || 0);
+        a.yac += wt * (p.yac || 0);
+        a.rYds += p.yards || 0;
+        a.rYac += p.yac || 0;
+      }
+      a.epa += wt * (p.epa || 0);
+      a.rEpa += p.epa || 0;
+      a.succ += wt * (p.s || 0);
+    })
+  );
+  a.raw = {
+    comp: a.n ? a.compN / a.n : null,
+    ypt: a.n ? a.rYds / a.n : null,
+    yacpc: a.compN ? a.rYac / a.compN : null,
+    epa: a.n ? a.rEpa / a.n : null,
+  };
+  return a;
+}
+// League table for one group + side: every team's shrunk rates and z's.
+function pzmLeague(groupKey, zones, side) {
+  pzmLeague.cache = pzmLeague.cache || {};
+  const ck = `${groupKey}|${side}`;
+  if (pzmLeague.cache[ck]) return pzmLeague.cache[ck];
+  const rows = DATA.teams.map((t) => ({ t, a: pzmAgg(t, side, zones) }));
+  const L = rows.reduce((s, r) => ({ w: s.w + r.a.w, comp: s.comp + r.a.comp, yds: s.yds + r.a.yds, yac: s.yac + r.a.yac, epa: s.epa + r.a.epa, succ: s.succ + r.a.succ }), { w: 0, comp: 0, yds: 0, yac: 0, epa: 0, succ: 0 });
+  const sh = (num, den, lNum, lDen, prior = PZM_PRIOR) => (num + prior * (lDen ? lNum / lDen : 0)) / (den + prior);
+  rows.forEach((r) => {
+    r.m = {
+      comp: sh(r.a.comp, r.a.w, L.comp, L.w),
+      ypt: sh(r.a.yds, r.a.w, L.yds, L.w),
+      yacpc: sh(r.a.yac, r.a.comp, L.yac, L.comp, 4),
+      epa: sh(r.a.epa, r.a.w, L.epa, L.w),
+      succ: sh(r.a.succ, r.a.w, L.succ, L.w),
+    };
+  });
+  Object.keys(PZM_WEIGHTS).forEach((k) => {
+    const pool = rows.map((r) => r.m[k]);
+    rows.forEach((r) => ((r.z = r.z || {}), (r.z[k] = zScore(r.m[k], pool, false) || 0)));
+  });
+  rows.forEach((r) => (r.score = Object.entries(PZM_WEIGHTS).reduce((s, [k, w]) => s + w * r.z[k], 0)));
+  const out = { byTeam: Object.fromEntries(rows.map((r) => [r.t, r])) };
+  pzmLeague.cache[ck] = out;
+  return out;
+}
+// This pairing's read for one group: z's, label, top/bottom %.
+function pzmRead(group, offTeam, defTeam) {
+  const off = pzmLeague(group.key, group.zones, "off");
+  const def = pzmLeague(group.key, group.zones, "def");
+  const o = off.byTeam[offTeam];
+  const d = def.byTeam[defTeam];
+  if (!o || !d) return null;
+  const score = (o.score + d.score) / 2;
+  const all = [];
+  Object.values(off.byTeam).forEach((x) => Object.values(def.byTeam).forEach((y) => all.push((x.score + y.score) / 2)));
+  const better = all.filter((s) => s > score).length;
+  const topPct = Math.max(1, Math.ceil(((better + 1) / all.length) * 100));
+  const contra = (o.score >= TIER_Z_THRESHOLD && d.score <= -MATCHUP_CONTRA) || (d.score >= TIER_Z_THRESHOLD && o.score <= -MATCHUP_CONTRA);
+  let label = "Neutral";
+  let cls = "";
+  if (contra) label = "Mixed";
+  else if (topPct <= 33) {
+    label = `Top ${topPct}%`;
+    cls = "pzm-good";
+  } else if (topPct > 67) {
+    label = `Bottom ${101 - topPct}%`;
+    cls = "pzm-bad";
+  }
+  return { o, d, score, topPct, label, cls, share: o.a.total ? o.a.n / o.a.total : 0 };
+}
+
+function renderZoneMatchupPanel(offTeam, defTeam) {
+  const cell = (v, z, fmtV, defSide) => {
+    const zz = defSide ? -z : z; // defense colored from its own side
+    return `<span class="pzm-v ${tierFromZ(zz)}"${alphaAttrFromZ(zz)}>${v === null || v === undefined ? "--" : fmtV(v)}</span>`;
+  };
+  const pct = (v) => `${Math.round(v * 100)}%`;
+  const one = (v) => fmt(v, 1);
+  const epa = (v) => `${v >= 0 ? "+" : ""}${fmt(v, 2)}`;
+  const rowsFor = (kind) =>
+    pzmGroups()
+      .filter((g) => g.kind === kind)
+      .map((g) => {
+        const r = pzmRead(g, offTeam, defTeam);
+        if (!r) return "";
+        const pair = (k, f) => `<td class="num pzm-pair">${cell(r.o.a.raw[k], r.o.z[k], f, false)}${cell(r.d.a.raw[k], r.d.z[k], f, true)}</td>`;
+        return `<tr>
+          <td class="pzm-label">${g.label}</td>
+          <td class="num pzm-share">${pct(r.share)}</td>
+          ${pair("comp", pct)}${pair("ypt", one)}${pair("yacpc", one)}${pair("epa", epa)}
+          <td class="num"><span class="pzm-chip ${r.cls}">${r.label}</span></td>
+        </tr>`;
+      })
+      .join("");
+  const head = (first) => `<tr><th>${first}</th><th class="num" title="Share of ${offTeam}'s throws">Share</th><th class="num">Catch%</th><th class="num">Yds/T</th><th class="num">YAC/C</th><th class="num">EPA/T</th><th class="num">Matchup</th></tr>`;
+  return `<div class="pzm-panel">
+    <div class="pzm-title">${teamLogoMini(offTeam, 16)} ${offTeam} vs ${teamLogoMini(defTeam, 16)} ${defTeam} pass D</div>
+    <div class="pzm-key"><span>${offTeam} gets</span><span>${defTeam} allows</span></div>
+    <table class="data-table pzm-table">
+      <thead>${head("Depth")}</thead>
+      <tbody>${rowsFor("depth")}</tbody>
+      <thead>${head("Side")}</thead>
+      <tbody>${rowsFor("side")}</tbody>
+    </table>
+    <p class="pz-note">Each pair: ${offTeam}'s number, then what ${defTeam} allows (colored vs the league from each unit's side). Garbage-time throws count half; rates are sample-adjusted.</p>
+  </div>`;
+}
+
+// Short overall read under the lead-zone tiles: the pass game as a whole
+// (depths weighted by how often this offense throws there), plus the best
+// and toughest spots it actually uses.
+function renderZoneMatchupRead(offTeam, defTeam) {
+  const depth = pzmGroups().filter((g) => g.kind === "depth").map((g) => ({ g, r: pzmRead(g, offTeam, defTeam) })).filter((x) => x.r);
+  const all = pzmGroups().map((g) => ({ g, r: pzmRead(g, offTeam, defTeam) })).filter((x) => x.r && x.r.share >= 0.1);
+  if (!depth.length) return "";
+  // Overall: share-weighted depth score vs every pairing's share-weighted score.
+  const weighted = (o, d) => depth.reduce((s, x) => {
+    const off = pzmLeague(x.g.key, x.g.zones, "off").byTeam[o];
+    const def = pzmLeague(x.g.key, x.g.zones, "def").byTeam[d];
+    const share = off.a.total ? off.a.n / off.a.total : 0;
+    return s + share * (off.score + def.score) / 2;
+  }, 0);
+  const mine = weighted(offTeam, defTeam);
+  const scores = [];
+  DATA.teams.forEach((o) => DATA.teams.forEach((d) => o !== d && scores.push(weighted(o, d))));
+  const top = Math.max(1, Math.ceil(((scores.filter((s) => s > mine).length + 1) / scores.length) * 100));
+  const overall = top <= 33 ? { t: `Top ${top}% passing matchup`, c: "pzm-good" } : top > 67 ? { t: `Bottom ${101 - top}% passing matchup`, c: "pzm-bad" } : { t: "Neutral passing matchup", c: "" };
+  const sorted = all.slice().sort((a, b) => a.r.topPct - b.r.topPct);
+  const best = sorted[0];
+  const worst = sorted[sorted.length - 1];
+  const chip = (x, pre) => `<span class="pzm-read-item"><small>${pre}</small><b>${x.g.label}</b><span class="pzm-chip ${x.r.cls}">${x.r.label}</span></span>`;
+  return `<div class="pzm-read">
+    <span class="pzm-read-main ${overall.c}">${overall.t}</span>
+    ${best ? chip(best, "Best spot") : ""}
+    ${worst && worst !== best ? chip(worst, "Toughest") : ""}
   </div>`;
 }
 

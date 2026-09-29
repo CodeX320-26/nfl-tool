@@ -270,6 +270,22 @@ context. It is the only copy that travels with the repo.
         Zone Targets uses), so they always agree with each other and with the Zone Targets chips;
     - every throw grouped by player, newest first, with opponent, air yards, YAC and EPA.
   - QB grid cells show comp/att plus yards · YAC.
+- **Zone matchup panel** (`renderZoneMatchupPanel`, beside the QB grid; wraps below it on narrow screens):
+  - One row per depth (20+ / 10-19 / 0-9 / SCR, its 3 zones combined) and per side (L / M / R, its
+    4 depths combined).
+  - Each row shows share of the offense's throws, then Catch%, Yds/throw, YAC/catch and EPA/throw as
+    offense-vs-defense-allowed pairs, colored vs the league from each unit's side, plus a
+    Top X% / Bottom X% / Neutral / Mixed chip.
+  - Grades weight EPA 0.35, Y/T 0.25, success 0.2, catch 0.1, YAC 0.1, shrunk by 10 prior throws.
+    The % is this pairing's rank among every offense × defense pairing for that group.
+  - **"Mixed"** means one side is clearly good and the other clearly bad (the two-sided rule).
+- **Overall read** (`renderZoneMatchupRead`) under the lead-zone tiles: an overall passing matchup
+  (depth grades weighted by the offense's throw share), plus the Best spot and Toughest spot among
+  groups with at least 10% of throws.
+- **Game script:** build_stats flags each throw `gt` when win probability is under 10% or over 90%
+  (`GARBAGE_WP`), and records `s` for play success. Garbage-time throws count **half** in these
+  grades, and the grades use only per-throw efficiency, never volume, which game script inflates.
+- The page max width is 1840px (was 1600), so wide monitors fit the panel beside the grid.
 - Player Props page extras:
   - The **Pick props** list is grouped Passing / Rushing / Receiving / Other, then by player.
   - Each player has an **Out?** switch for late news the injury report misses.

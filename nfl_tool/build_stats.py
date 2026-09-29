@@ -179,6 +179,9 @@ PASS_DEPTH_BUCKETS = [
     ("deep", 20, 9999),
 ]
 PASS_LOCATIONS = ["left", "middle", "right"]
+# Win probability outside [GARBAGE_WP, 1 - GARBAGE_WP] = garbage time for a
+# play (see compute_pass_shot_chart's "gt" flag).
+GARBAGE_WP = 0.10
 
 
 def pass_depth_bucket(air_yards):
@@ -243,6 +246,12 @@ def compute_pass_shot_chart(pbp: pd.DataFrame, teams, pos_lookup) -> dict:
                 "yac": None if pd.isna(row.yards_after_catch) else int(row.yards_after_catch),
                 "epa": None if pd.isna(row.epa) else round(float(row.epa), 2),
                 "defender": row.pass_defense_1_player_name if pd.notna(row.pass_defense_1_player_name) else None,
+                # Game script: 1 when the throwing team's win probability was
+                # under 10% or over 90% (garbage time / game decided) -- a
+                # defense sitting on a big lead gives up soft yards there, so
+                # the frontend's zone matchup counts these at half weight.
+                "gt": 1 if pd.notna(row.wp) and (row.wp < GARBAGE_WP or row.wp > 1 - GARBAGE_WP) else 0,
+                "s": 1 if row.success == 1 else 0,
             })
         return recs
 
