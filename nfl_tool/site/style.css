@@ -3121,7 +3121,19 @@ main { max-width: 1840px; }
 
   /* Top menu: tighter tabs so all four fit on most phones; swipeable
      (no visible scrollbar) with an edge fade on the narrowest screens. */
-  .topbar { padding: 8px 12px; }
+  /* Never let anything make the page wider than the phone (that is what made
+     iOS zoom out and leave a dark strip down the right side). clip, not
+     hidden, so position:sticky keeps working. */
+  html, body { overflow-x: clip; }
+
+  .topbar { padding: 8px 12px; column-gap: 8px; }
+  /* Owner/member controls: just "Log out" (no name) and an icon-only
+     Update Odds, so the first row fits next to the logo. */
+  .topbar-actions { gap: 6px; min-width: 0; }
+  .acct-chip { padding: 3px; }
+  .acct-chip .acct-name { display: none; }
+  .update-odds-link { font-size: 0; padding: 6px 9px; }
+  .update-odds-link::before { content: "🔄"; font-size: 1rem; line-height: 1; }
   .page-nav { width: 100%; justify-content: space-between; scrollbar-width: none; }
   .page-nav::-webkit-scrollbar { display: none; }
   .page-nav a, .page-nav-current { padding: 6px 10px; font-size: 0.8rem; flex: 0 0 auto; }
@@ -3150,6 +3162,11 @@ main { max-width: 1840px; }
     -webkit-overflow-scrolling: touch;
   }
   .stat-columns > section, .stat-column { flex: 1 1 100%; }
+  /* Tables wider than their box get their own sideways scroller
+     (.m-scroll, added by wrapWideTablesForPhone in common.js), so only the
+     table moves -- the banners, grids and cards around it stay put. */
+  .m-scroll { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .pzm-panel { overflow-x: auto; }
   .gen-pair-cols { grid-template-columns: minmax(0, 1fr); }
   .gen-panel-body { grid-template-columns: minmax(0, 1fr); }
   .pass-zone-pair, .rush-pair { padding: 10px 8px; }

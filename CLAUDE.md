@@ -69,6 +69,12 @@ context. It is the only copy that travels with the repo.
       Target Zones cards go two across, and the tab menu tightens (edge fade under 380px).
       New wide tables/grids should live inside `.stat-columns > section` (or get `min-width: 0;
       overflow-x: auto` in that block) so they don't widen the page on phones.
+    - Phones also get: `html, body { overflow-x: clip }` (anything too wide made iOS zoom the whole
+      page out, leaving a dark strip on the right); a compact topbar (acct name hidden, Update Odds
+      icon-only), since the live logged-in topbar is wider than the local copy's; and
+      `wrapWideTablesForPhone` (common.js), which wraps any table wider than its box in `.m-scroll`
+      so only that table scrolls, not its whole section. Test phone layout with the acct chip and
+      `is-owner` class added, or the topbar overflow won't show up locally.
     - The Summary cards are fixed 1160px images; on phones `zoomSummaryCardForPhone` (common.js,
       same 760px breakpoint) shrinks the card to fit, and `saveSummaryImage` lifts the zoom while
       capturing, so saved PNGs are identical on every device.

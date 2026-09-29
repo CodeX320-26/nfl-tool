@@ -1218,6 +1218,44 @@ function zoomSummaryCardForPhone() {
 window.addEventListener("resize", zoomSummaryCardForPhone);
 PHONE_QUERY.addEventListener("change", zoomSummaryCardForPhone);
 
+// Phones only: any table wider than the box it sits in gets wrapped in its
+// own sideways scroller (.m-scroll, style.css phone block), so only that
+// table scrolls instead of its whole section. Pages re-render by replacing
+// innerHTML, so watch <main> and re-check shortly after each change.
+// Desktop never runs this.
+function wrapWideTablesForPhone() {
+  if (!PHONE_QUERY.matches) return;
+  for (const table of document.querySelectorAll("main table")) {
+    const parent = table.parentElement;
+    if (!parent || parent.classList.contains("m-scroll") || table.closest(".summary-card")) continue;
+    const cs = getComputedStyle(parent);
+    const room = parent.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    if (room > 0 && table.getBoundingClientRect().width > room + 1) {
+      const wrap = document.createElement("div");
+      wrap.className = "m-scroll";
+      parent.insertBefore(wrap, table);
+      wrap.appendChild(table);
+    }
+  }
+}
+let wrapWideTablesTimer = null;
+function scheduleWrapWideTables() {
+  if (!PHONE_QUERY.matches) return;
+  clearTimeout(wrapWideTablesTimer);
+  wrapWideTablesTimer = setTimeout(wrapWideTablesForPhone, 120);
+}
+function startWrapWideTables() {
+  const main = document.querySelector("main");
+  // attributes: tabs switch by toggling hidden/class, and a table only has a
+  // width once its tab is showing.
+  if (main) new MutationObserver(scheduleWrapWideTables).observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
+  scheduleWrapWideTables();
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startWrapWideTables);
+else startWrapWideTables();
+window.addEventListener("resize", scheduleWrapWideTables);
+PHONE_QUERY.addEventListener("change", scheduleWrapWideTables);
+
 // The exported PNG only uses fonts embedded into it -- html-to-image can't
 // read Google Fonts' cross-origin stylesheet itself, so fetch it, keep the
 // latin subsets, and inline each font file as a data URL.
