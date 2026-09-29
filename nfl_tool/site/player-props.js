@@ -430,32 +430,6 @@ function qualifyingPassers(team) {
   return showBackupQbs ? all.slice(0, 2) : all.slice(0, 1);
 }
 
-function renderPassingTable(team, oppTeam) {
-  const players = qualifyingPassers(team);
-  if (!players.length) {
-    return `${teamBannerHeader(team, true)}<p class="no-data-note">No qualifying passers yet this season.</p>`;
-  }
-  const rows = players
-    .map((p) => {
-      return `<tr>
-        <td><span class="player-click" data-entry="${encodeDataAttr({ team, name: p.name, oppTeam })}">${p.name}</span></td>
-        ${passStatCell(p, "pass_att_per_g", { label: "Pass Attempts/Game" })}
-        ${passStatCell(p, "comp_pct", { label: "Completion %", percent: true })}
-        ${passStatCell(p, "pass_yards_per_g", { label: "Passing Yards/Game" })}
-        ${passStatCell(p, "int_per_g", { label: "Interceptions/Game", digits: 2, invert: true })}
-        ${passStatCell(p, "epa_per_att", { label: "EPA per Attempt", digits: 2 })}
-        ${passStatCell(p, "adot_thrown", { label: "Average Depth of Target" })}
-        ${playerAdvCell(p, oppTeam, "pass_yards_per_g", "pass_yards_allowed_per_g")}
-      </tr>`;
-    })
-    .join("");
-  return `${teamBannerHeader(team, true)}
-    <table class="data-table props-pass-table">
-      <thead><tr><th class="lb-player">Player</th><th class="num">Att/g</th><th class="num">Cmp%</th><th class="num">Yds/g</th><th class="num">INT/g</th><th class="num">EPA/Att</th><th class="num">aDOT</th><th class="edge-hdr">ADV</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-}
-
 // ---- Coverage & Pressure (Passing tab) ----
 // Per-QB complement to compute_scheme_splits' team-level zone/man/blitz/
 // pressure numbers (build_stats.py's compute_player_pass_splits): how THIS
@@ -556,55 +530,6 @@ function passSplitOppRateCell(oppTeam, tendKey, label) {
   const cls = percentileTier(val, pool, false);
   const alpha = tierAlphaAttr(val, pool, false);
   return numCell(`${Math.round(val * 100)}%`, cls, alpha, { team: oppTeam, statKey: tendKey, label, invert: false, percent: true });
-}
-
-function passSplitAdvCell(team, oppTeam, successVal, pool, defAllowedKey) {
-  if (successVal === null || successVal === undefined) return `<td class="edge-cell">--</td>`;
-  const offTier = percentileTier(successVal, pool, false);
-  const offExtreme = percentileTier(successVal, pool, false, TIER_Z_EXTREME_THRESHOLD);
-  const defVal = DATA.team_stats[oppTeam]?.[defAllowedKey];
-  let defTier = "", defExtreme = "";
-  if (defVal !== null && defVal !== undefined) {
-    const teamPool = teamsWithGames()
-      .map((t) => DATA.team_stats[t]?.[defAllowedKey])
-      .filter((v) => v !== null && v !== undefined);
-    defTier = percentileTier(defVal, teamPool, true);
-    defExtreme = percentileTier(defVal, teamPool, true, TIER_Z_EXTREME_THRESHOLD);
-  }
-  return edgeCell(offTier, defTier, team, oppTeam, offExtreme, defExtreme);
-}
-
-function renderPassCoveragePanel(team, oppTeam) {
-  const players = qualifyingPassers(team);
-  if (!players.length) {
-    return `<div class="stat-column-title">Coverage &amp; Pressure</div><p class="no-data-note">No qualifying passers yet this season.</p>`;
-  }
-  const blocks = players
-    .map((p) => {
-      const splits = (DATA.player_pass_splits[team] || {})[p.name];
-      if (!splits) {
-        return `<div class="player-name-row"><span class="player-name player-click" data-entry="${encodeDataAttr({ team, name: p.name, oppTeam })}">${p.name}</span></div><p class="no-data-note">No charted coverage/pressure data yet.</p>`;
-      }
-      const rows = PASS_SPLIT_ROWS.map((r) => {
-        const cond = splits[r.key] || {};
-        const successPool = passSplitPool(r.key, "success");
-        return `<tr>
-          <td>${r.label}</td>
-          ${passSplitOppRateCell(oppTeam, r.tendKey, r.tendLabel)}
-          ${passSplitRateCell(cond.comp_pct, passSplitPool(r.key, "comp_pct"), { team, name: p.name, condition: r.key, stat: "comp_pct", label: `${r.label} Comp %`, percent: true })}
-          ${passSplitRateCell(cond.ypa, passSplitPool(r.key, "ypa"), { team, name: p.name, condition: r.key, stat: "ypa", label: `${r.label} YPA`, digits: 1 })}
-          ${passSplitRateCell(cond.success, successPool, { team, name: p.name, condition: r.key, stat: "success", label: `${r.label} Success %`, percent: true })}
-          ${passSplitAdvCell(team, oppTeam, cond.success, successPool, r.defAllowedKey)}
-        </tr>`;
-      }).join("");
-      return `<div class="player-name-row"><span class="player-name player-click" data-entry="${encodeDataAttr({ team, name: p.name, oppTeam })}">${p.name}</span></div>
-        <table class="data-table pass-coverage-table">
-          <thead><tr><th>Split</th><th class="num">Opp%</th><th class="num">Cmp%</th><th class="num">YPA</th><th class="num">Succ%</th><th class="edge-hdr">ADV</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`;
-    })
-    .join("");
-  return `<div class="stat-column-title">Coverage &amp; Pressure</div>${blocks}`;
 }
 
 
@@ -1326,22 +1251,6 @@ function teamRateCell(team, statKey, label, opts = {}) {
   return numCell(display, cls, alpha, { team, statKey, label, invert, percent: !!opts.percent, digits: opts.digits });
 }
 
-function scrambleAdvCell(team, oppTeam, ownVal, pool, oppRateKey) {
-  if (ownVal === null || ownVal === undefined) return `<td class="edge-cell">--</td>`;
-  const offTier = percentileTier(ownVal, pool, false);
-  const offExtreme = percentileTier(ownVal, pool, false, TIER_Z_EXTREME_THRESHOLD);
-  const defVal = DATA.team_stats[oppTeam]?.[oppRateKey];
-  let defTier = "", defExtreme = "";
-  if (defVal !== null && defVal !== undefined) {
-    const teamPool = teamsWithGames()
-      .map((t) => DATA.team_stats[t]?.[oppRateKey])
-      .filter((v) => v !== null && v !== undefined);
-    defTier = percentileTier(defVal, teamPool, true);
-    defExtreme = percentileTier(defVal, teamPool, true, TIER_Z_EXTREME_THRESHOLD);
-  }
-  return edgeCell(offTier, defTier, team, oppTeam, offExtreme, defExtreme);
-}
-
 // Every qualifying QB's value for one scramble-split field, sorted best to
 // worst -- same shell/highlight convention as openPassSplitRankModal, just
 // sourced from DATA.player_scramble_splits' flat fields instead of a
@@ -1380,51 +1289,6 @@ document.addEventListener("click", (e) => {
   openScrambleRankModal(decodeDataAttr(cell.dataset.entry));
 });
 
-// One table instead of two stacked ones -- the pressure-split rows
-// (Scr%/OppAllow%/OppYds/ADV) and the designed-vs-scramble rows (Car/Yds/
-// YPC) don't share a column meaning, so this isn't a single shared header;
-// it's one bordered table with two inline group-header rows, which reads
-// as "one table" (no gap, no second box) without forcing Car/Yds into
-// columns labeled Scr%/OppAllow%.
-function renderQbRushingPanel(team, oppTeam) {
-  const players = qualifyingPassers(team);
-  if (!players.length) {
-    return `<div class="stat-column-title">QB Rushing</div><p class="no-data-note">No qualifying passers yet this season.</p>`;
-  }
-  const blocks = players
-    .map((p) => {
-      const s = (DATA.player_scramble_splits[team] || {})[p.name];
-      const scrambleRows = !s
-        ? `<tr><td colspan="5" class="no-data-note">No charted scramble data yet.</td></tr>`
-        : SCRAMBLE_ROWS.map((r) => {
-            const pool = scrambleRatePool(r.rateField);
-            const ownVal = s[r.rateField];
-            return `<tr>
-              <td>${r.label}</td>
-              ${scrambleRateCell(ownVal, pool, { team, name: p.name, field: r.rateField, label: `${r.label} Scramble Rate` })}
-              ${teamRateCell(oppTeam, r.oppRateKey, `Opp Scramble Rate Allowed (${r.label})`, { percent: true, invert: true })}
-              ${teamRateCell(oppTeam, r.oppYardsKey, `Opp Yards/Scramble Allowed (${r.label})`, { digits: 1, invert: true })}
-              ${scrambleAdvCell(team, oppTeam, ownVal, pool, r.oppRateKey)}
-            </tr>`;
-          }).join("");
-      const typeRows = `
-        <tr><td>Designed</td><td class="num">${p.designed_carries}</td><td class="num">${fmt(p.designed_rush_yards, 0)}</td>${passStatCell(p, "designed_ypc", { label: "Designed Rush YPC" })}<td></td></tr>
-        <tr><td>Scramble</td><td class="num">${p.scramble_carries}</td><td class="num">${fmt(p.scramble_rush_yards, 0)}</td>${passStatCell(p, "scramble_ypc", { label: "Scramble YPC" })}<td></td></tr>
-      `;
-      return `<div class="player-name-row"><span class="player-name player-click" data-entry="${encodeDataAttr({ team, name: p.name, oppTeam })}">${p.name}</span></div>
-        <table class="data-table scramble-table qb-rushing-combined-table">
-          <tbody>
-            <tr class="qb-rushing-group-header"><th>Split</th><th class="num">Scr%</th><th class="num">Opp Allow%</th><th class="num">Opp Yds</th><th class="edge-hdr">ADV</th></tr>
-            ${scrambleRows}
-            <tr class="qb-rushing-group-header"><th>Type</th><th class="num">Car</th><th class="num">Yds</th><th class="num">YPC</th><th></th></tr>
-            ${typeRows}
-          </tbody>
-        </table>`;
-    })
-    .join("");
-  return `<div class="stat-column-title">QB Rushing</div>${blocks}`;
-}
-
 // ---- Red Zone Approach (team-level pass/run mix) ----
 // build_stats.py's build_team_stats: this offense's own pass-vs-run SHARE
 // of its red zone snaps, and each type's own TD conversion rate -- "does
@@ -1438,7 +1302,132 @@ const RZ_MIX_ROWS = [
   { label: "Rush", rateKey: "rz_rush_rate", tdKey: "rz_rush_td_rate", oppRateKey: "rz_rush_rate_allowed", oppTdKey: "rz_rush_td_rate_allowed" },
 ];
 
-function renderRedZoneMixPanel(team, oppTeam) {
+// ---- QB card (Passing tab): one tidy block per starter ----
+// Replaces the loose Passing table / Coverage & Pressure / QB Rushing / Red
+// Zone stack. Order, top to bottom: header (photo, name, sample), eight
+// equal season tiles, his posted lines, a 2x2 of equal boxes (matchup vs
+// this week's pass D, pressure splits, QB rushing, red zone), then his
+// recent weeks shaded against his own games.
+
+// Y/A and TD/G aren't build fields -- derived once from the game logs onto
+// the QB rows so tiles, pools and the rank popup all read them the same way.
+function enrichQbRows() {
+  if (enrichQbRows.done) return;
+  enrichQbRows.done = true;
+  for (const [team, rows] of Object.entries(DATA.player_props || {})) {
+    rows
+      .filter((p) => p.position === "QB" && p.pass_att)
+      .forEach((p) => {
+        const logs = (pcGameLogs(team, p.name) || { logs: [] }).logs.filter((r) => r.pass_att > 0);
+        const td = logs.reduce((s, r) => s + (r.pass_td || 0), 0);
+        const games = p.pass_games || logs.length || 1;
+        p.ypa = p.pass_yards / p.pass_att;
+        p.pass_td_per_g = td / games;
+      });
+  }
+}
+
+const QB_TILES = [
+  { key: "pass_att_per_g", label: "Att/G", tip: "Pass Attempts/Game" },
+  { key: "comp_pct", label: "Cmp%", tip: "Completion %", percent: true },
+  { key: "pass_yards_per_g", label: "Yds/G", tip: "Passing Yards/Game" },
+  { key: "ypa", label: "Y/A", tip: "Yards per Attempt" },
+  { key: "pass_td_per_g", label: "TD/G", tip: "Passing TDs/Game", digits: 2 },
+  { key: "int_per_g", label: "INT/G", tip: "Interceptions/Game", digits: 2, invert: true },
+  { key: "epa_per_att", label: "EPA/Att", tip: "EPA per Attempt", digits: 2 },
+  { key: "adot_thrown", label: "ADOT", tip: "Average Depth of Target" },
+];
+
+function qbTile(p, t) {
+  const v = p[t.key];
+  const display = v === null || v === undefined ? "--" : t.percent ? `${Math.round(v * 100)}%` : fmt(v, t.digits ?? 1);
+  let cls = "";
+  let alpha = "";
+  if (v !== null && v !== undefined) {
+    const pool = passStatPool(t.key);
+    cls = percentileTier(v, pool, !!t.invert);
+    alpha = tierAlphaAttr(v, pool, !!t.invert);
+  }
+  const payload = { team: p.team, name: p.name, statKey: t.key, label: t.tip, invert: !!t.invert, percent: !!t.percent, digits: t.digits };
+  return `<div class="qb-tile ${cls} player-stat-rank-click"${alpha} data-entry="${encodeDataAttr(payload)}" title="${t.tip} -- click for every QB"><span>${t.label}</span><b>${display}</b></div>`;
+}
+
+// QB vs what this week's defense allows -- both sides of every row, and
+// the edge only when the two-sided rule (matchupCall) says so.
+const QB_MATCHUP_ROWS = [
+  { label: "Cmp%", qbKey: "comp_pct", defKey: "comp_pct_allowed", percent: true },
+  { label: "Y/A", qbKey: "ypa", defKey: "yards_per_att_allowed" },
+  { label: "Yds/G", qbKey: "pass_yards_per_g", defKey: "pass_yards_allowed_per_g", digits: 0 },
+  { label: "TD/G", qbKey: "pass_td_per_g", defKey: "pass_td_allowed_per_g", digits: 2 },
+  { label: "EPA/Att", qbKey: "epa_per_att", defKey: "epa_per_play_pass_allowed", digits: 2 },
+];
+function qbMatchupTable(p, team, oppTeam) {
+  const qbPool = (key) => passStatPool(key);
+  const teamPool = (key) => teamsWithGames().map((t) => DATA.team_stats[t]?.[key]).filter((v) => v !== null && v !== undefined);
+  const fmtV = (v, r) => (v === null || v === undefined ? "--" : r.percent ? `${Math.round(v * 100)}%` : fmt(v, r.digits ?? 1));
+  const rows = QB_MATCHUP_ROWS.map((r) => {
+    const qv = p[r.qbKey];
+    const dv = DATA.team_stats[oppTeam]?.[r.defKey];
+    const qz = qv === null || qv === undefined ? null : zScore(qv, qbPool(r.qbKey), false);
+    const dz = dv === null || dv === undefined ? null : zScore(dv, teamPool(r.defKey), false);
+    const call = matchupCall(qz, dz);
+    const edgeTeam = call.dir > 0 ? team : call.dir < 0 ? oppTeam : null;
+    const edge = edgeTeam
+      ? `<td class="edge-cell edge-hit" style="background:rgba(${teamAccentRgb(edgeTeam).join(",")},0.16)">${teamLogoMini(edgeTeam)}</td>`
+      : `<td class="edge-cell">--</td>`;
+    const qCls = qv === null || qv === undefined ? "" : `${percentileTier(qv, qbPool(r.qbKey), false)}`;
+    const qA = qv === null || qv === undefined ? "" : tierAlphaAttr(qv, qbPool(r.qbKey), false);
+    return `<tr><td>${r.label}</td><td class="num ${qCls}"${qA}>${fmtV(qv, r)}</td>${teamRateCell(oppTeam, r.defKey, `${r.label} Allowed`, { percent: !!r.percent, digits: r.digits, invert: true })}${edge}</tr>`;
+  }).join("");
+  return `<table class="data-table qb-box-table">
+    <thead><tr><th></th><th class="num">${playerClick(team, p.name, shortName(p.name))}</th><th class="num">${teamLogoMini(oppTeam, 16)} Allows</th><th class="edge-hdr">Edge</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function qbPressureTable(p, team, oppTeam) {
+  const splits = (DATA.player_pass_splits[team] || {})[p.name];
+  if (!splits) return `<p class="no-data-note">No charted pressure data yet.</p>`;
+  const rows = PASS_SPLIT_ROWS.map((r) => {
+    const cond = splits[r.key] || {};
+    const successPool = passSplitPool(r.key, "success");
+    return `<tr>
+      <td>${r.label}</td>
+      ${passSplitOppRateCell(oppTeam, r.tendKey, r.tendLabel)}
+      ${passSplitRateCell(cond.comp_pct, passSplitPool(r.key, "comp_pct"), { team, name: p.name, condition: r.key, stat: "comp_pct", label: `${r.label} Comp %`, percent: true })}
+      ${passSplitRateCell(cond.ypa, passSplitPool(r.key, "ypa"), { team, name: p.name, condition: r.key, stat: "ypa", label: `${r.label} YPA`, digits: 1 })}
+      ${passSplitRateCell(cond.success, successPool, { team, name: p.name, condition: r.key, stat: "success", label: `${r.label} Success %`, percent: true })}
+    </tr>`;
+  }).join("");
+  return `<table class="data-table qb-box-table">
+    <thead><tr><th></th><th class="num" title="How often ${oppTeam} gets pressure / lets the QB sit clean">${teamLogoMini(oppTeam, 16)} Rate</th><th class="num">Cmp%</th><th class="num">YPA</th><th class="num">Succ%</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function qbRushTable(p, team, oppTeam) {
+  const s = (DATA.player_scramble_splits[team] || {})[p.name];
+  const scr = !s
+    ? ""
+    : SCRAMBLE_ROWS.map((r) => {
+        const pool = scrambleRatePool(r.rateField);
+        return `<tr><td>Scramble when ${r.label === "Pressured" ? "pressured" : "clean"}</td>${scrambleRateCell(s[r.rateField], pool, { team, name: p.name, field: r.rateField, label: `${r.label} Scramble Rate` })}${teamRateCell(oppTeam, r.oppRateKey, `Opp Scramble Rate Allowed (${r.label})`, { percent: true, invert: true })}</tr>`;
+      }).join("");
+  const car = (p.designed_carries || 0) + (p.scramble_carries || 0);
+  const yds = (p.designed_rush_yards || 0) + (p.scramble_rush_yards || 0);
+  const games = p.pass_games || 1;
+  const ypc = car ? yds / car : null;
+  return `<table class="data-table qb-box-table">
+    <thead><tr><th></th><th class="num">${shortName(p.name)}</th><th class="num">${teamLogoMini(oppTeam, 16)} Allows</th></tr></thead>
+    <tbody>
+      ${scr}
+      <tr><td>Rush att / game</td><td class="num">${fmt(car / games, 1)}</td>${teamRateCell(oppTeam, "rush_att_allowed_qb_per_g", "QB Rush Att Allowed/G", { digits: 1, invert: true })}</tr>
+      <tr><td>Rush yds / game</td><td class="num">${fmt(yds / games, 1)}</td><td class="num muted-label">${ypc === null ? "--" : `${fmt(ypc, 1)} ypc`}</td></tr>
+    </tbody>
+  </table>`;
+}
+
+function qbRedZoneTable(team, oppTeam) {
   const rows = RZ_MIX_ROWS.map(
     (r) => `<tr>
       <td>${r.label}</td>
@@ -1448,11 +1437,69 @@ function renderRedZoneMixPanel(team, oppTeam) {
       ${teamRateCell(oppTeam, r.oppTdKey, `Opp ${r.label} TD Rate Allowed (Red Zone)`, { percent: true, invert: true })}
     </tr>`
   ).join("");
-  return `<div class="stat-column-title">Red Zone Approach</div>
-    <table class="data-table rz-mix-table">
-      <thead><tr><th>Play</th><th class="num">Rate</th><th class="num">TD%</th><th class="num">OppRate</th><th class="num">OppTD%</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+  return `<table class="data-table qb-box-table">
+    <thead><tr><th></th><th class="num">${teamLogoMini(team, 16)} Mix</th><th class="num">TD%</th><th class="num">${teamLogoMini(oppTeam, 16)} Mix</th><th class="num">TD% Alw</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function qbLinesStrip(p, team) {
+  const rows = playerPropsAcrossMarkets(team, p.name);
+  if (!rows.length) return "";
+  return `<div class="qb-lines">${rows
+    .slice(0, 8)
+    .map((r) => `<span class="qb-line">${r.market} <b>${fmt(r.line, 1)}</b></span>`)
+    .join("")}<span class="qb-line-hint">${playerClick(team, p.name, "All lines &rsaquo;")}</span></div>`;
+}
+
+function qbRecentWeeks(p, team) {
+  const found = pcGameLogs(team, p.name);
+  const rows = found ? found.logs.filter((r) => r.pass_att > 0).slice(0, 6) : [];
+  if (!rows.length) return "";
+  const oppFor = (r) => r.opp || "";
+  return pcLogTable(
+    "Recent weeks",
+    [
+      { label: "Wk", raw: (r) => r.week, cls: "num" },
+      { label: "Opp", raw: (r) => `${teamLogoMini(oppFor(r), 16)} ${oppFor(r)}` },
+      { label: "Cmp", get: (r) => r.completions },
+      { label: "Att", get: (r) => r.pass_att },
+      { label: "Yds", get: (r) => r.pass_yards, fmt: (v) => fmt(v, 0) },
+      { label: "Y/A", get: (r) => r.pass_yards / r.pass_att, fmt: (v) => fmt(v, 1) },
+      { label: "TD", get: (r) => r.pass_td },
+      { label: "INT", get: (r) => r.interceptions, invert: true },
+      { label: "Long", get: (r) => r.longest_pass, fmt: (v) => fmt(v, 0) },
+    ],
+    rows
+  );
+}
+
+function renderQbCards(team, oppTeam) {
+  enrichQbRows();
+  const players = qualifyingPassers(team);
+  if (!players.length) return `${teamBannerHeader(team, true)}<p class="no-data-note">No qualifying passers yet this season.</p>`;
+  const cards = players
+    .map((p) => {
+      const games = p.pass_games || 0;
+      const box = (title, inner) => `<div class="qb-box"><div class="qb-box-title">${title}</div>${inner}</div>`;
+      return `<div class="qb-card">
+        <div class="qb-hero player-click" data-entry="${encodeDataAttr({ team, name: p.name, oppTeam })}">
+          ${summaryHeadshot(team, p.name, 60)}
+          <div class="qb-hero-id"><div class="qb-hero-name">${p.name}</div><div class="qb-hero-sub">QB &middot; ${games} game${games === 1 ? "" : "s"} &middot; ${p.pass_att} att</div></div>
+        </div>
+        <div class="qb-tiles">${QB_TILES.map((t) => qbTile(p, t)).join("")}</div>
+        ${qbLinesStrip(p, team)}
+        <div class="qb-boxes">
+          ${box(`vs ${teamLogoMini(oppTeam, 16)} ${oppTeam} pass D`, qbMatchupTable(p, team, oppTeam))}
+          ${box("Pressure", qbPressureTable(p, team, oppTeam))}
+          ${box("QB rushing", qbRushTable(p, team, oppTeam))}
+          ${box("Red zone", qbRedZoneTable(team, oppTeam))}
+        </div>
+        ${qbRecentWeeks(p, team)}
+      </div>`;
+    })
+    .join("");
+  return `${teamBannerHeader(team, true)}${cards}`;
 }
 
 // ---- Full player-props modal (every market SGO offers, per team header
@@ -1665,12 +1712,8 @@ function render() {
   document.getElementById("col-away-rushlanes").innerHTML = renderRushLanesPlayers(away, home);
   document.getElementById("col-home-rushing").innerHTML = renderRushingTable(home, away);
   document.getElementById("col-home-rushlanes").innerHTML = renderRushLanesPlayers(home, away);
-  document.getElementById("col-away-passing").innerHTML = renderPassingTable(away, home);
-  document.getElementById("col-home-passing").innerHTML = renderPassingTable(home, away);
-  document.getElementById("col-away-passcoverage").innerHTML = renderPassCoveragePanel(away, home);
-  document.getElementById("col-home-passcoverage").innerHTML = renderPassCoveragePanel(home, away);
-  document.getElementById("col-away-scramble").innerHTML = renderQbRushingPanel(away, home) + renderRedZoneMixPanel(away, home);
-  document.getElementById("col-home-scramble").innerHTML = renderQbRushingPanel(home, away) + renderRedZoneMixPanel(home, away);
+  document.getElementById("col-away-qb").innerHTML = renderQbCards(away, home);
+  document.getElementById("col-home-qb").innerHTML = renderQbCards(home, away);
   document.getElementById("col-away-passzones-off").innerHTML = renderQbPassZoneCards(away, "off", home);
   document.getElementById("col-away-passzones-def").innerHTML = renderPassZoneBlock(away, "def", home);
   document.getElementById("col-home-passzones-off").innerHTML = renderQbPassZoneCards(home, "off", away);

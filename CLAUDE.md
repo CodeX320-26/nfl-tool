@@ -217,7 +217,15 @@ context. It is the only copy that travels with the repo.
   - Headers are small uppercase muted labels.
   - Team banners are team-color tints with a 4px team-color left edge (`teamBannerHeader`).
   - Rush lanes are big tiles like the pass zones.
-  - The Passing tab is one boxed column per team.
+  - **Passing tab = one QB card per team** (`renderQbCards`), in this order:
+    1. Header: photo, name, games and attempts.
+    2. Eight equal season tiles (Att/G, Cmp%, Yds/G, Y/A, TD/G, INT/G, EPA/Att, ADOT), colored vs
+       every QB and clickable for the QB list. Y/A and TD/G are derived from game logs by `enrichQbRows`.
+    3. His posted lines.
+    4. A 2×2 of equal boxes: vs OPP pass D (QB vs defense-allowed, with a two-sided Edge),
+       Pressure, QB rushing, Red zone.
+    5. Recent weeks, shaded against his own games.
+    The Show backup QBs toggle stacks a second card.
   - Pick Tracker buttons match the summary's My Picks rail.
   - Tier cells are **filled** (tint plus a soft edge), never outline-only, in both themes.
   - Group headers inside tables (Production, Turnovers & Pressure, Run Defense, Team Grades...)
