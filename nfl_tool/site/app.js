@@ -579,7 +579,7 @@ function tdBreakdownPlayerRow(p, kind) {
   // targeted WR) -- tells you whether a defense gave up a TD to a team's
   // clear #1 option or someone further down the depth chart.
   const wrRankTag = p.position === "WR" && p.wr_rank ? ` <span class="muted-label">(WR${p.wr_rank})</span>` : "";
-  return `<tr style="${rowStyle}"><td>${teamLogoMini(p.team)} ${p.name}${wrRankTag}${dstTag}</td><td class="num">${countLabel}</td></tr>`;
+  return `<tr style="${rowStyle}"><td>${teamLogoMini(p.team)} ${p.position === "DST" ? p.name : playerClick(p.team, p.name)}${wrRankTag}${dstTag}</td><td class="num">${countLabel}</td></tr>`;
 }
 
 function renderTdBreakdownModalContent(kind, awayTeam, homeTeam, highlightKey) {
@@ -665,7 +665,7 @@ function renderLeaderboard(team) {
       const tag = p.position !== "DST" && p.dst_tds > 0 ? ` <span class="dst-tag">(DST)</span>` : "";
       const tdBg = teamFade(team, maxTds ? p.tds / maxTds : 0);
       const firstTdBg = teamFade(team, maxFirstTds ? p.first_tds / maxFirstTds : 0);
-      return `<tr><td>${p.name}${tag}</td><td>${p.position}</td><td class="num" style="background:${tdBg}">${p.tds}</td><td class="num" style="background:${firstTdBg}">${p.first_tds}</td></tr>`;
+      return `<tr><td>${p.position === "DST" ? p.name : playerClick(team, p.name)}${tag}</td><td>${p.position}</td><td class="num" style="background:${tdBg}">${p.tds}</td><td class="num" style="background:${firstTdBg}">${p.first_tds}</td></tr>`;
     })
     .join("");
   return `${teamBannerHeader(team)}
@@ -914,7 +914,7 @@ function renderFirstTdTargets(awayTeam, homeTeam) {
         const edgeCls = p.edge === null ? "" : p.edge >= 1.25 ? " ftd-edge-strong" : p.edge >= 1 ? " ftd-edge-lean" : "";
         const oddsCell = p.odds === null ? `<span class="muted">--</span>` : `${p.odds > 0 ? "+" : ""}${p.odds} <span class="muted">${pct(p.implied)}</span>`;
         const inj = p.injury ? ` <span class="ftd-inj">${p.injury}</span>` : "";
-        return `<tr class="${edgeCls.trim()}"><td>${p.name} <span class="muted">${p.position}</span>${inj}</td><td class="num ftd-est">${pct(p.est)}</td><td class="num">${oddsCell}</td></tr>`;
+        return `<tr class="${edgeCls.trim()}"><td>${playerClick(offTeam, p.name, p.name, defTeam)} <span class="muted">${p.position}</span>${inj}</td><td class="num ftd-est">${pct(p.est)}</td><td class="num">${oddsCell}</td></tr>`;
       })
       .join("");
     return `<div class="target-block ftd-block">
@@ -980,7 +980,7 @@ function renderRzUsageTable(team) {
       const carriesBg = teamFade(team, maxCarries ? p.carries / maxCarries : 0);
       const targetsBg = teamFade(team, maxTargets ? p.targets / maxTargets : 0);
       const receptionsBg = teamFade(team, maxReceptions ? p.receptions / maxReceptions : 0);
-      return `<tr><td>${p.name}</td><td>${p.position}</td><td class="num" style="background:${firstTdBg}">${firstTds}</td><td class="num" style="background:${carriesBg}">${p.carries}</td><td class="num" style="background:${targetsBg}">${p.targets}</td><td class="num" style="background:${receptionsBg}">${p.receptions}</td></tr>`;
+      return `<tr><td>${playerClick(team, p.name)}</td><td>${p.position}</td><td class="num" style="background:${firstTdBg}">${firstTds}</td><td class="num" style="background:${carriesBg}">${p.carries}</td><td class="num" style="background:${targetsBg}">${p.targets}</td><td class="num" style="background:${receptionsBg}">${p.receptions}</td></tr>`;
     })
     .join("");
   return `${teamBannerHeader(team)}
@@ -1145,7 +1145,7 @@ function summarySeasonColumn(offTeam, defTeam, week) {
   const keyPlayers = Object.values(byPlayer)
     .sort((a, b) => b.nums.length - a.nums.length || a.nums[0] - b.nums[0])
     .slice(0, KEY_PLAYERS_MAX)
-    .map((e) => `<span class="sc-key${e.good ? "" : " sc-key-warn"}">${summaryHeadshot(offTeam, e.name, 18)}${shortName(e.name)}${e.nums.map(numBadge).join("")}</span>`)
+    .map((e) => `<span class="sc-key${e.good ? "" : " sc-key-warn"}">${playerClick(offTeam, e.name, `${summaryHeadshot(offTeam, e.name, 18)}${shortName(e.name)}`, defTeam)}${e.nums.map(numBadge).join("")}</span>`)
     .join("");
   // Four fixed blocks (banner / targets / tags / key players) -- the two
   // team columns share row lines (CSS subgrid), so each block starts at
@@ -1171,7 +1171,7 @@ function summaryFirstTdColumn(offTeam, defTeam, chance, week) {
       const edgeCls = p.edge === null ? "" : p.edge >= 1.25 ? "ftd-edge-strong" : p.edge >= 1 ? "ftd-edge-lean" : "";
       const odds = p.odds === null ? "--" : `${p.odds > 0 ? "+" : ""}${p.odds} <span class="muted">${pct(p.implied)}</span>`;
       const inj = p.injury ? ` <span class="ftd-inj">${p.injury}</span>` : "";
-      return `<tr class="${edgeCls}"><td><span class="sc-player">${summaryHeadshot(offTeam, p.name, 24)}<span>${p.name} <span class="muted">${p.position}</span>${inj}</span></span></td><td class="num ftd-est">${pct(p.est)}</td><td class="num">${odds}</td></tr>`;
+      return `<tr class="${edgeCls}"><td><span class="sc-player player-click" data-entry="${encodeDataAttr({ team: offTeam, name: p.name, oppTeam: defTeam })}">${summaryHeadshot(offTeam, p.name, 24)}<span>${p.name} <span class="muted">${p.position}</span>${inj}</span></span></td><td class="num ftd-est">${pct(p.est)}</td><td class="num">${odds}</td></tr>`;
     })
     .join("");
   return `<div class="sc-col">
@@ -1257,7 +1257,7 @@ function summaryOddsRail(away, home, week) {
       .filter((p) => chosen.has(p.key))
       .map((p) => {
         const cell = (odds, market) => (odds ? summaryPlayCheck(summaryPlayEntry(week, matchup, market, team, p.name, odds), fmtOddsSigned(odds.best_odds)) : `<span class="muted">--</span>`);
-        return `<tr><td><span class="sc-player">${summaryHeadshot(team, p.name, 26)}<span class="sc-odds-name">${p.name} <span class="muted">${p.position || ""}</span></span></span></td><td class="num">${cell(p.any, "anytime_td")}</td><td class="num">${cell(p.first, "first_td")}</td></tr>`;
+        return `<tr><td><span class="sc-player player-click" data-entry="${encodeDataAttr({ team, name: p.name })}">${summaryHeadshot(team, p.name, 26)}<span class="sc-odds-name">${p.name} <span class="muted">${p.position || ""}</span></span></span></td><td class="num">${cell(p.any, "anytime_td")}</td><td class="num">${cell(p.first, "first_td")}</td></tr>`;
       })
       .join("");
     const rgb = teamAccentRgb(team);

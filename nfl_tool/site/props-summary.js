@@ -1016,7 +1016,7 @@ function renderPropsPicker() {
           const p = lines[0];
           const out = p.injury === "out";
           const outBtn = `<button type="button" class="ps-out-btn${out ? " ps-out-on" : ""}" data-team="${team}" data-name="${encodeDataAttr(p.name)}" title="Mark him out for this week (late news)">${out ? "Out &#10003;" : "Out?"}</button>`;
-          const head = `<tr class="ps-pick-player${out ? " ps-pick-out" : ""}"><td colspan="5">${summaryHeadshot(team, p.name, 22)} <b>${p.name}</b> <span class="muted-label">${p.position || ""}</span>${p.injury === "Q" ? ` <span class="ftd-inj">Q</span>` : ""}${outBtn}</td></tr>`;
+          const head = `<tr class="ps-pick-player${out ? " ps-pick-out" : ""}"><td colspan="5">${playerClick(team, p.name, `${summaryHeadshot(team, p.name, 22)} <b>${p.name}</b>`)} <span class="muted-label">${p.position || ""}</span>${p.injury === "Q" ? ` <span class="ftd-inj">Q</span>` : ""}${outBtn}</td></tr>`;
           if (out) return head;
           const body = lines
             .sort((a, b) => marketOrder.indexOf(a.marketKey) - marketOrder.indexOf(b.marketKey))

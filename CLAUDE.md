@@ -46,6 +46,19 @@ context. It is the only copy that travels with the repo.
   - `picks.js`: the Pick Tracker.
   - `common.js`: shared helpers — tiers, possible plays, modals, the summary-card
     photo/banner/fit/**Save image** helpers, and lineup weights.
+  - `player-card.js`: **the player card**, the ONE popup for every player name or photo on every
+    page. Anything wrapped with `playerClick(team, name, inner?, oppTeam?)` (or `.player-click` +
+    `data-entry {team, name, oppTeam}`) opens it.
+    - **Odds tab:** every prop line plus Anytime and First TD, with Possible Plays checkboxes, and
+      "+ Summary" on the Player Props page.
+    - **Game Log tab:** weekly versions of the Receiving / Rushing / Passing table stats (snap %,
+      target share, ADOT, YAC/rec, depth buckets, 10+ runs, RZ looks), each column shaded against
+      the player's own weeks, with an Avg row.
+    - **Rush/Catch Lanes tab:** RB/QB rushing first, WR/TE catch zones first.
+    - The file also holds the rush-lane and pass-zone drawing code (moved out of player-props.js),
+      so every page can draw them.
+    - Injury lists and box scores link skill positions only (`SKILL_POSITIONS`).
+    - **Any new place that shows a player must use playerClick.**
   - `sync.js`: **member profiles**. It mirrors saved plays, picks, notes, summary rails and manual Outs to the logged-in Discord member's profile (`/api/state`, Cloudflare D1), so they follow them to any device. (Replaced the owner-only Firebase sync on 2026-09-28.)
   - `teams.js`: team names, colors and logo URLs.
   - `style.css`: dark/light theme tokens and all page styles.

@@ -2971,3 +2971,29 @@ footer { border-top-color: var(--border); }
    Local dev (no profile server) shows it as before. */
 html:not(.is-owner) .update-odds-link { display: none; }
 html.local-dev .update-odds-link { display: inline-flex; }
+
+/* ---- Player card (player-card.js): one popup for every player ---- */
+#player-card-modal { z-index: 1200; }
+#player-card-modal .modal-box.pc-box { max-width: 1060px; width: 96vw; max-height: 92vh; overflow-y: auto; }
+.pc-head { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-radius: 12px; margin: 0 36px 12px 0; }
+.pc-name { font-family: var(--font-display); font-size: 1.7rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; line-height: 1.05; }
+.pc-sub { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 0.84rem; font-weight: 700; color: var(--muted); margin-top: 3px; }
+#player-card-modal .player-modal-toggle { display: flex; gap: 6px; margin-bottom: 12px; }
+.pc-log-section, .pc-lane-section { margin-bottom: 16px; }
+.pc-log-title { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 1rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 6px; padding: 5px 10px; border-radius: 8px; background: var(--table-head); box-shadow: inset 3px 0 0 var(--accent); }
+.pc-vs { display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; letter-spacing: 0.03em; color: var(--muted); text-transform: none; font-family: "Barlow Semi Condensed", sans-serif; }
+.pc-log-scroll { overflow-x: auto; }
+.pc-log-table { width: auto; min-width: 100%; }
+.pc-log-table td, .pc-log-table th { white-space: nowrap; }
+.pc-log-table td.num { min-width: 46px; }
+.pc-log-table tr.pc-avg-row td { background: transparent; color: var(--muted); font-weight: 700; border-top: 1px dashed var(--border-strong); }
+.pc-log-table td.pc-avg-label { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.pc-key { display: inline-block; padding: 0 7px; border-radius: 6px; font-weight: 800; font-style: normal; font-size: 0.72rem; }
+.pc-zone-wrap { max-width: 420px; }
+.pc-zone-wrap .pass-zone-grid-mini { font-size: 0.95rem; width: 100%; }
+.pc-zone-wrap .pass-zone-grid-mini td { height: 42px; }
+.pc-odds-table td.pc-implied { color: var(--muted); font-weight: 700; }
+.pc-lane-section .rush-lanes { width: 100%; max-width: 760px; }
+.pass-zone-player-banner.player-click { cursor: pointer; }
+.pass-zone-player-banner.player-click:hover .pass-zone-player-name { text-decoration: underline; }
+.sc-key .player-click, .gs-inj .player-click { display: inline-flex; align-items: center; gap: 4px; }

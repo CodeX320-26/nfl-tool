@@ -235,7 +235,7 @@ function gsInjuries(team, week) {
     .sort((a, b) => GS_STATUS_RANK[a.abbr] - GS_STATUS_RANK[b.abbr] || (b.snap_share || 0) - (a.snap_share || 0));
   const shown = starters.slice(0, GS_INJURIES_SHOWN);
   const chips = shown
-    .map((p) => `<span class="gs-inj">${summaryHeadshot(team, p.full_name, 22)}<span class="gs-inj-name">${shortName(p.full_name)} <span class="muted">${p.position}</span></span><span class="gs-inj-status ${statusClass(p.status)}">${p.abbr === "Questionable" ? "Q" : p.abbr}</span></span>`)
+    .map((p) => `<span class="gs-inj">${SKILL_POSITIONS.has(p.position) ? playerClick(team, p.full_name, `${summaryHeadshot(team, p.full_name, 22)}<span class="gs-inj-name">${shortName(p.full_name)} <span class="muted">${p.position}</span></span>`) : `${summaryHeadshot(team, p.full_name, 22)}<span class="gs-inj-name">${shortName(p.full_name)} <span class="muted">${p.position}</span></span>`}<span class="gs-inj-status ${statusClass(p.status)}">${p.abbr === "Questionable" ? "Q" : p.abbr}</span></span>`)
     .join("");
   const more = starters.length > shown.length ? `<span class="gs-inj-more">+${starters.length - shown.length}</span>` : "";
   return `<div class="gs-inj-row"><span class="gs-res-team">${teamLogoMini(team, 18)} ${team}</span><span class="gs-inj-list">${chips || `<span class="gs-none">No starters listed</span>`}${more}</span></div>`;

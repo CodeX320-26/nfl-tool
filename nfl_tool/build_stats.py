@@ -3586,6 +3586,14 @@ def compute_player_game_logs(pbp: pd.DataFrame, pos_lookup) -> dict:
                 "targets": 0, "receptions": 0, "rec_yards": 0.0, "rec_td": 0, "longest_rec": 0.0,
                 "carries": 0, "rush_yards": 0.0, "rush_td": 0, "longest_rush": 0.0,
                 "pass_att": 0, "completions": 0, "pass_yards": 0.0, "pass_td": 0, "interceptions": 0, "longest_pass": 0.0,
+                # Extended per-game lines for the player popup's Game Log --
+                # the same stats the Receiving/Rushing tables show for the
+                # season, week by week (targets by depth use
+                # PASS_DEPTH_BUCKETS, like the season columns).
+                "air_yards": 0.0, "air_n": 0, "yac": 0.0, "rz_targets": 0,
+                "tgt_deep": 0, "tgt_intermediate": 0, "tgt_short": 0, "tgt_screen": 0,
+                "explosive_rushes": 0, "rz_carries": 0,
+                "pass_air_yards": 0.0, "pass_air_n": 0,
             },
         )
 
@@ -3594,9 +3602,17 @@ def compute_player_game_logs(pbp: pd.DataFrame, pos_lookup) -> dict:
         if g is None:
             continue
         g["targets"] += 1
+        if pd.notna(row.air_yards):
+            g["air_yards"] += row.air_yards
+            g["air_n"] += 1
+            g["tgt_" + pass_depth_bucket(row.air_yards)] += 1
+        if pd.notna(row.yardline_100) and row.yardline_100 <= 20:
+            g["rz_targets"] += 1
         if row.complete_pass == 1:
             g["receptions"] += 1
             g["rec_yards"] += row.yards_gained
+            if pd.notna(row.yards_after_catch):
+                g["yac"] += row.yards_after_catch
             g["longest_rec"] = max(g["longest_rec"], row.yards_gained)
             if row.pass_touchdown == 1:
                 g["rec_td"] += 1
@@ -3608,6 +3624,10 @@ def compute_player_game_logs(pbp: pd.DataFrame, pos_lookup) -> dict:
         g["carries"] += 1
         g["rush_yards"] += row.yards_gained
         g["longest_rush"] = max(g["longest_rush"], row.yards_gained)
+        if row.yards_gained >= EXPLOSIVE_RUSH_YARDS:
+            g["explosive_rushes"] += 1
+        if pd.notna(row.yardline_100) and row.yardline_100 <= 20:
+            g["rz_carries"] += 1
         if row.rush_touchdown == 1:
             g["rush_td"] += 1
 
@@ -3616,6 +3636,9 @@ def compute_player_game_logs(pbp: pd.DataFrame, pos_lookup) -> dict:
         if g is None:
             continue
         g["pass_att"] += 1
+        if pd.notna(row.air_yards):
+            g["pass_air_yards"] += row.air_yards
+            g["pass_air_n"] += 1
         if row.complete_pass == 1:
             g["completions"] += 1
             g["pass_yards"] += row.yards_gained
@@ -3625,10 +3648,17 @@ def compute_player_game_logs(pbp: pd.DataFrame, pos_lookup) -> dict:
         if row.interception == 1:
             g["interceptions"] += 1
 
+    # Team targets per game, for each week's target share.
+    team_targets = targets.groupby(["posteam", "week"]).size().to_dict()
+
     out = {}
     for (team, name), by_week in logs.items():
         rows = sorted(by_week.values(), key=lambda r: -r["week"])
         for r in rows:
+            r["team_targets"] = int(team_targets.get((team, r["week"]), 0))
+            r["air_yards"] = round(r["air_yards"], 1)
+            r["yac"] = round(r["yac"], 1)
+            r["pass_air_yards"] = round(r["pass_air_yards"], 1)
             r["rush_yards"] = round(r["rush_yards"], 0)
             r["rec_yards"] = round(r["rec_yards"], 0)
             r["pass_yards"] = round(r["pass_yards"], 0)

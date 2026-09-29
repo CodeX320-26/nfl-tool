@@ -508,7 +508,7 @@ function renderResultsModalContent() {
         <td>${p.week}</td>
         <td>${p.matchup}</td>
         <td>${p.category}</td>
-        <td>${p.team ? teamLogoMini(p.team) : ""} ${p.description}</td>
+        <td>${p.team ? teamLogoMini(p.team) : ""} ${playDescriptionHtml(p)}</td>
         <td class="num">${p.odds}</td>
         <td class="num">${unitsDisplay}</td>
         <td><span class="pick-result pick-result-${p.result || "pending"}">${resultLabel}</span></td>
@@ -612,7 +612,7 @@ function renderPlaysList() {
             <td><input type="checkbox" class="wheel-select" data-id="${p.id}"${checked}></td>
             <td>${p.matchup}</td>
             <td>${p.category}</td>
-            <td>${p.team ? teamLogoMini(p.team) : ""} ${p.description}</td>
+            <td>${p.team ? teamLogoMini(p.team) : ""} ${playDescriptionHtml(p)}</td>
             <td class="num">${p.odds}${pct !== null ? ` <span class="muted-label">(${pct}%)</span>` : ""}${p.book ? ` <span class="muted-label">(${p.book})</span>` : ""}</td>
             <td><span class="pick-result pick-result-${p.result || "pending"}">${resultLabel}</span></td>
             <td><button type="button" class="pick-edit-btn" data-remove-id="${p.id}">Remove</button></td>
@@ -719,6 +719,13 @@ const WHEEL_SIZE = 600;
 // own length so it never asks for more letters than exist.
 function wheelIsPlayerName(p) {
   return !GAME_LINE_CATEGORIES[p.category];
+}
+// A saved player play's description with the player's name opening the
+// player card ("Name Over 13.5" -> linked "Name" + " Over 13.5").
+function playDescriptionHtml(p) {
+  if (!p.team || !wheelIsPlayerName(p) || typeof playerClick !== "function") return p.description;
+  const m = p.description.match(/^(.*?)( (?:Over|Under) [\d.]+)?$/);
+  return `${playerClick(p.team, m[1])}${m[2] || ""}`;
 }
 function wheelAbbreviate(name, prefixLen) {
   const parts = name.trim().split(" ");

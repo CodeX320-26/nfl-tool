@@ -202,7 +202,7 @@ function openReceivingColumnRankModal(statKey, label, opts = {}) {
     .map((r) => {
       const cls = percentileTier(r.value, values, invert);
       const alpha = tierAlphaAttr(r.value, values, invert);
-      return `<tr><td>${teamLogoMini(r.team)} ${r.name} <span class="muted-label">(${r.position})</span></td><td class="num ${cls}"${alpha}>${display(r.value)}</td></tr>`;
+      return `<tr><td>${teamLogoMini(r.team)} ${playerClick(r.team, r.name)} <span class="muted-label">(${r.position})</span></td><td class="num ${cls}"${alpha}>${display(r.value)}</td></tr>`;
     })
     .join("");
   document.getElementById("stat-rank-modal-content").innerHTML = `<h3>${label} &mdash; All Pass-Catchers</h3>
@@ -231,202 +231,6 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// Same 7 lanes as build_stats.py's RUSH_ZONES, left to right the way a
-// broadcast angle actually reads them (defense's own left is the offense's
-// right, but this follows the OFFENSE's perspective site-wide, same as
-// "left"/"right" in run_location itself).
-const RUSH_ZONES = [
-  { key: "left_end", label: "LE", full: "Left End" },
-  { key: "left_tackle", label: "LT", full: "Left Tackle" },
-  { key: "left_guard", label: "LG", full: "Left Guard" },
-  { key: "middle", label: "M", full: "Middle" },
-  { key: "right_guard", label: "RG", full: "Right Guard" },
-  { key: "right_tackle", label: "RT", full: "Right Tackle" },
-  { key: "right_end", label: "RE", full: "Right End" },
-];
-
-// Defense box: this team's own success rate/YPC allowed running into that
-// lane, tiered against every other team the same percentile way as every
-// other colored cell on the site, and clickable into the league-rank
-// modal. No sample floor -- build_stats.py returns a number as soon as
-// there's at least one play, so the carry count is shown right alongside
-// it (n=2 reads very differently than n=20) instead of hiding thin lanes
-// outright.
-// Success rate allowed alone is blind to explosive severity -- a lane
-// with 2 stuffs and 2 backbreaking long runs can average 20+ YPC while
-// still landing near a normal success%, since "success" is a binary
-// per-play efficiency call, not a magnitude. Blends in YPC allowed (50/50)
-// so a lane that's actually getting gashed reads red even when the
-// per-play tally looks unremarkable. Self-referential only, same
-// principle as the pass zone grid: this team's own other 6 lanes are the
-// pool, not the other 31 teams' own (often equally thin) samples.
-function rushLaneDefenseCompositeZ(team, zoneKey) {
-  const val = DATA.team_stats[team][`rush_success_allowed_${zoneKey}`];
-  if (val === null || val === undefined) return null;
-  const successPool = RUSH_ZONES.map((z) => DATA.team_stats[team][`rush_success_allowed_${z.key}`]).filter((v) => v !== null && v !== undefined);
-  const ypcPool = RUSH_ZONES.map((z) => DATA.team_stats[team][`rush_ypc_allowed_${z.key}`]).filter((v) => v !== null && v !== undefined);
-  const successZ = zScore(val, successPool, true);
-  const ypcZ = zScore(DATA.team_stats[team][`rush_ypc_allowed_${zoneKey}`], ypcPool, true);
-  if (successZ === null && ypcZ === null) return null;
-  return 0.5 * (successZ || 0) + 0.5 * (ypcZ || 0);
-}
-
-function defenseLaneCell(team, zone) {
-  const successKey = `rush_success_allowed_${zone.key}`;
-  const ypcKey = `rush_ypc_allowed_${zone.key}`;
-  const val = DATA.team_stats[team][successKey];
-  const ypc = DATA.team_stats[team][ypcKey];
-  const n = DATA.team_stats[team][`rush_carries_allowed_${zone.key}`] || 0;
-  const hasSample = val !== null && val !== undefined;
-  let cls = "rush-lane-nosample";
-  let alpha = "";
-  let clickAttrs = "";
-  if (hasSample) {
-    const z = rushLaneDefenseCompositeZ(team, zone.key);
-    cls = tierFromZ(z);
-    alpha = alphaAttrFromZ(z);
-    const payload = { team, statKey: successKey, label: `${zone.full} Rush Success % Allowed`, invert: true, percent: true };
-    clickAttrs = ` stat-rank-click" data-entry="${encodeDataAttr(payload)}`;
-  }
-  const display = hasSample ? `${Math.round(val * 100)}%` : "--";
-  const ypcDisplay = ypc !== null && ypc !== undefined ? fmt(ypc, 1) : "--";
-  return `<div class="rush-lane-box ${cls}${clickAttrs}"${alpha}>
-    <span class="rush-lane-label">${zone.label}</span>
-    <span class="rush-lane-pct">${display}</span>
-    <span class="rush-lane-ypc">${ypcDisplay} YPC</span>
-    <span class="rush-lane-n">n=${n}</span>
-  </div>`;
-}
-
-// Offense block, top half: success rate/YPC running into that lane (team's
-// own, or via successVal/pool/label overrides, a single player's). Sits
-// directly under the defense box above it with no gap -- both halves are
-// "how good," meant to read as one connected stack from defense down
-// through offense effectiveness. carries is shown alongside the rate for
-// the same reason as defenseLaneCell -- no sample floor upstream anymore,
-// so the reader judges thin samples themselves instead of them being hidden.
-function offenseSuccessCell(successVal, ypcVal, pool, label, clickPayload, carries) {
-  const hasSample = successVal !== null && successVal !== undefined;
-  const cls = hasSample ? percentileTier(successVal, pool, false) : "rush-lane-nosample";
-  const display = hasSample ? `${Math.round(successVal * 100)}%` : "--";
-  const ypcDisplay = ypcVal !== null && ypcVal !== undefined ? fmt(ypcVal, 1) : "--";
-  const clickAttrs = hasSample && clickPayload ? ` stat-rank-click" data-entry="${encodeDataAttr(clickPayload)}` : "";
-  const nDisplay = carries !== null && carries !== undefined ? `<span class="rush-lane-n">n=${carries}</span>` : "";
-  return `<div class="rush-lane-off-success ${cls}${clickAttrs}">
-    <span class="rush-lane-pct">${display}</span>
-    <span class="rush-lane-ypc">${ypcDisplay} YPC</span>
-    ${nDisplay}
-  </div>`;
-}
-
-// Offense block, bottom half: how often (frequency) -- not a "good/bad"
-// rate, so no percentile tier, but shaded in a flat accent blue scaled by
-// its own magnitude (darker = more often, lighter = rarely) rather than
-// left uncolored, so a glance at shade alone says which lanes actually get
-// used. Scale caps at FREQ_SHADE_CAP -- lane shares rarely clear ~35% even
-// for a heavily-used lane, so capping there (instead of at the
-// mathematical max of 100%) keeps real differences visible instead of
-// every lane looking pale.
-const FREQ_SHADE_CAP = 0.35;
-const FREQ_SHADE_MIN_ALPHA = 0.08;
-const FREQ_SHADE_MAX_ALPHA = 0.85;
-
-function offenseFreqCell(freqVal) {
-  if (freqVal === null || freqVal === undefined) {
-    return `<div class="rush-lane-off-freq"><span class="rush-lane-freq-pct">--</span></div>`;
-  }
-  const t = Math.min(freqVal / FREQ_SHADE_CAP, 1);
-  const alpha = FREQ_SHADE_MIN_ALPHA + t * (FREQ_SHADE_MAX_ALPHA - FREQ_SHADE_MIN_ALPHA);
-  const display = `${Math.round(freqVal * 100)}%`;
-  return `<div class="rush-lane-off-freq" style="background: rgba(var(--accent-rgb), ${alpha.toFixed(2)})"><span class="rush-lane-freq-pct">${display}</span></div>`;
-}
-
-// One lane column: defense box on top, the offense block (success half
-// over frequency half) on the bottom -- offense stays on the bottom
-// everywhere on this chart, team view and player view alike.
-function rushLaneColumn(defBox, offSuccessCell, offFreqCell) {
-  return `<div class="rush-lane-col">
-    ${defBox}
-    <div class="rush-lane-off-block">
-      ${offSuccessCell}
-      ${offFreqCell}
-    </div>
-  </div>`;
-}
-
-// Same offense block with no defense box above it -- used by the "See All
-// Players" modal, where the shared defense row is shown ONCE up top
-// instead of once per player. Gets its own rounded-top treatment (the
-// normal column relies on the defense box above it for that corner).
-function rushLaneColumnStandalone(offSuccessCell, offFreqCell) {
-  return `<div class="rush-lane-col">
-    <div class="rush-lane-off-block rush-lane-off-block-standalone">
-      ${offSuccessCell}
-      ${offFreqCell}
-    </div>
-  </div>`;
-}
-
-// A defense box on its own, still wrapped in .rush-lane-col so it stretches
-// to the same width as every offense column below it -- .rush-lane-box
-// itself has no flex-grow of its own (it relies on .rush-lane-col for
-// that), so used bare it shrinks to its content width instead of lining up
-// with the (wrapped) offense blocks underneath.
-function rushLaneColumnDefenseOnly(defBox) {
-  return `<div class="rush-lane-col">${defBox}</div>`;
-}
-
-// League-wide success-rate pool per lane -- every player with a qualifying
-// sample in DATA.player_rush_zones, regardless of position. Tiering a
-// back's own lane success against this answers "does he actually run well
-// to that side" (vs. the league), not just "well relative to his other
-// lanes."
-function buildRushZonePools() {
-  const pools = {};
-  RUSH_ZONES.forEach((z) => (pools[z.key] = []));
-  const all = DATA.player_rush_zones || {};
-  for (const t of Object.keys(all)) {
-    for (const n of Object.keys(all[t])) {
-      const zones = all[t][n];
-      RUSH_ZONES.forEach((z) => {
-        const v = zones[z.key] && zones[z.key].success;
-        if (v !== null && v !== undefined) pools[z.key].push(v);
-      });
-    }
-  }
-  return pools;
-}
-
-// The individual-player complement to renderRushLanesPlayers below: this
-// player's own success rate/YPC and usage frequency per lane, paired with
-// the SAME opponent-allowed box -- "does this back like this lane, is he
-// actually good at it, and is this defense's own weak side lined up with
-// it." Reachable by clicking ANY player's name (the shared player-detail
-// modal's "Rush Lanes" tab), including a receiver/QB who also carries --
-// not redundant with the main page's per-team view below, which only
-// covers that team's own qualifying rushers in place. No click-through-
-// to-rank-modal here (a single player's number isn't a team to rank
-// against other teams).
-function renderPlayerRushLanesContent(team, name, oppTeam) {
-  const zones = ((DATA.player_rush_zones || {})[team] || {})[name];
-  const heading = `<h3>${name} <span class="muted-label">(${team})</span> &mdash; Rush Lanes</h3>`;
-  if (!zones || !oppTeam) {
-    return `${heading}<p class="no-data-note">No charted rush attempts for this player yet.</p>`;
-  }
-  const pools = buildRushZonePools();
-  const cols = RUSH_ZONES.map((z) => {
-    const zd = zones[z.key] || {};
-    const off = offenseSuccessCell(zd.success, zd.ypc, pools[z.key], z.full, null, zd.carries);
-    const freq = offenseFreqCell(zd.share);
-    return rushLaneColumn(defenseLaneCell(oppTeam, z), off, freq);
-  }).join("");
-  return `${heading}
-    <div class="rush-lanes">
-      <div class="rush-lanes-team-tag">${teamLogoMini(oppTeam)} ${oppTeam} run defense</div>
-      <div class="rush-lanes-cols">${cols}</div>
-      <div class="rush-lanes-team-tag">${name} carries</div>
-    </div>`;
-}
 
 // Main-page rush lanes: the opponent's defense row shown once at the top,
 // then every rusher who's actually touched the ball gets his OWN lane
@@ -454,7 +258,7 @@ function renderRushLanesPlayers(team, oppTeam) {
         return rushLaneColumnStandalone(off, freq);
       }).join("");
       return `<div class="rush-lanes-player-block">
-        <div class="rush-lanes-team-tag">${p.name} <span class="muted-label">(${p.position})</span></div>
+        <div class="rush-lanes-team-tag">${playerClick(team, p.name, p.name, oppTeam)} <span class="muted-label">(${p.position})</span></div>
         <div class="rush-lanes-cols">${cols}</div>
       </div>`;
     })
@@ -551,7 +355,7 @@ function openPlayerStatRankModal(p) {
       const cls = percentileTier(r.value, values, !!p.invert);
       const alpha = tierAlphaAttr(r.value, values, !!p.invert);
       const rowCls = r.team === p.team && r.name === p.name ? ' class="stat-rank-current"' : "";
-      return `<tr${rowCls}><td>${teamLogoMini(r.team)} ${r.name}</td><td class="num ${cls}"${alpha}>${display(r.value)}</td></tr>`;
+      return `<tr${rowCls}><td>${teamLogoMini(r.team)} ${playerClick(r.team, r.name)}</td><td class="num ${cls}"${alpha}>${display(r.value)}</td></tr>`;
     })
     .join("");
   document.getElementById("stat-rank-modal-content").innerHTML = `<h3>${p.label} &mdash; All QBs</h3>
@@ -698,7 +502,7 @@ function openPassSplitRankModal(p) {
       const cls = percentileTier(r.value, values, false);
       const alpha = tierAlphaAttr(r.value, values, false);
       const rowCls = r.team === p.team && r.name === p.name ? ' class="stat-rank-current"' : "";
-      return `<tr${rowCls}><td>${teamLogoMini(r.team)} ${r.name}</td><td class="num ${cls}"${alpha}>${display(r.value)}</td></tr>`;
+      return `<tr${rowCls}><td>${teamLogoMini(r.team)} ${playerClick(r.team, r.name)}</td><td class="num ${cls}"${alpha}>${display(r.value)}</td></tr>`;
     })
     .join("");
   document.getElementById("stat-rank-modal-content").innerHTML = `<h3>${p.label} &mdash; All QBs</h3>
@@ -758,7 +562,7 @@ function renderPassCoveragePanel(team, oppTeam) {
     .map((p) => {
       const splits = (DATA.player_pass_splits[team] || {})[p.name];
       if (!splits) {
-        return `<div class="player-name-row"><span class="player-name">${p.name}</span></div><p class="no-data-note">No charted coverage/pressure data yet.</p>`;
+        return `<div class="player-name-row"><span class="player-name player-click" data-entry="${encodeDataAttr({ team, name: p.name, oppTeam })}">${p.name}</span></div><p class="no-data-note">No charted coverage/pressure data yet.</p>`;
       }
       const rows = PASS_SPLIT_ROWS.map((r) => {
         const cond = splits[r.key] || {};
@@ -772,7 +576,7 @@ function renderPassCoveragePanel(team, oppTeam) {
           ${passSplitAdvCell(team, oppTeam, cond.success, successPool, r.defAllowedKey)}
         </tr>`;
       }).join("");
-      return `<div class="player-name-row"><span class="player-name">${p.name}</span></div>
+      return `<div class="player-name-row"><span class="player-name player-click" data-entry="${encodeDataAttr({ team, name: p.name, oppTeam })}">${p.name}</span></div>
         <table class="data-table pass-coverage-table">
           <thead><tr><th>Split</th><th class="num">Opp%</th><th class="num">Cmp%</th><th class="num">YPA</th><th class="num">Succ%</th><th class="edge-hdr">ADV</th></tr></thead>
           <tbody>${rows}</tbody>
@@ -782,186 +586,6 @@ function renderPassCoveragePanel(team, oppTeam) {
   return `<div class="stat-column-title">Coverage &amp; Pressure</div>${blocks}`;
 }
 
-// ---- Pass Zone shot chart (Passing + Receiving tabs) ----
-// Where a team's passing game actually attacks the field -- depth of
-// target (screen/short/intermediate/deep, by air_yards) x pass_location
-// (left/middle/right). Built entirely from build_stats.py's
-// compute_pass_shot_chart, which -- unlike the Coverage & Pressure panel
-// above -- uses only standard pbp columns nflverse publishes every week
-// during the season, so this stays live all year instead of getting
-// stuck on last season's data.
-// Yardage ranges instead of words -- matches build_stats.py's
-// PASS_DEPTH_BUCKETS boundaries exactly (deep=20+, intermediate=10-19,
-// short=0-9, screen=behind the LOS). Spelled out now that each grid gets
-// a real row-label box instead of a cramped narrow column (see
-// .pass-zone-row-label) -- there's room.
-const PASS_ZONE_ROWS = [
-  { key: "deep", label: "20+ yards", short: "20+" },
-  { key: "intermediate", label: "10-19 yards", short: "10-19" },
-  { key: "short", label: "0-9 yards", short: "0-9" },
-  { key: "screen", label: "SCREEN", short: "SCR" },
-];
-const PASS_ZONE_COLS = ["left", "middle", "right"];
-
-// Completion rate -- no longer the headline % on the cell (that's volume
-// share now, see passZoneVolumeShare/passZoneCellDefenseDetail) or what
-// drives the cell color (see passZoneCompositeZ), but still shown as the
-// defense side's success detail line, and still used as-is in the
-// league-rank modal's own column.
-function passZoneRate(zone) {
-  return zone && zone.attempts ? zone.completions / zone.attempts : null;
-}
-function passZoneEpaPerPlay(zone) {
-  return zone && zone.attempts ? zone.epa_sum / zone.attempts : null;
-}
-
-// Self-referential ONLY -- deliberately no comparison to the other 31
-// defenses. The old version z-scored this zone's volume/EPA against every
-// OTHER team's own version of the same zone, which answered "is this an
-// unusual zone leaguewide" -- a completely different, and much less
-// useful, question than "where do teams actually exploit THIS defense."
-// A zone that gets modest volume by league standards can still be this
-// specific defense's clear soft spot if it's where THEY, relative to
-// their OWN other 11 zones, get attacked most and/or hold up worst -- and
-// that's exactly what this compares now: this zone's attempts/EPA against
-// this same team's other zones, nothing else.
-//
-// 75% how often this zone gets used (volume -- a raw attempts count, not
-// a rate) + 25% EPA/play there. Deliberately NOT completion rate -- 2/2
-// and 7/8 read as the same "100%"-ish color under a rate-only scheme
-// despite being very different signals (one snapshot, one a real,
-// repeatable tendency), and a huge-volume zone at moderate efficiency is
-// a more real "soft spot" than a tiny-sample zone that happened to hit.
-// Both components invert (bad = red): getting thrown at often in one zone
-// relative to this defense's own other areas, or allowing better EPA
-// there than elsewhere, are both exactly the "this is where they go after
-// this defense" signal.
-function passZoneCompositeZ(chart, zoneKey, zone) {
-  if (!zone || !zone.attempts) return null;
-  const allZones = Object.values(chart.zones);
-  const volumePool = allZones.map((z) => (z && z.attempts ? z.attempts : null)).filter((v) => v !== null);
-  const epaPool = allZones.map(passZoneEpaPerPlay).filter((v) => v !== null);
-  const volZ = zScore(zone.attempts, volumePool, true);
-  const epaZ = zScore(passZoneEpaPerPlay(zone), epaPool, true);
-  if (volZ === null && epaZ === null) return null;
-  return 0.75 * (volZ || 0) + 0.25 * (epaZ || 0);
-}
-// ---- League-rank coloring (toggle) ----
-// The self-referential composite above answers "where do teams go after
-// THIS defense"; this answers "how does this zone rank against the other
-// 31 defenses' same zone." Per game (games played differ -- bye/MNF weeks),
-// three parts:
-//   40% attempts allowed per game (volume -- how often it gets tested)
-//   25% completion % allowed
-//   35% EPA per attempt allowed
-// Efficiency (60% combined) outweighs volume on purpose: a defense that
-// gets thrown at a lot but shuts it down (e.g. 1/5 deep) is being tested,
-// not beaten, and shouldn't read red just for the volume. Completion % and
-// EPA are shrunk toward the league average for that zone by
-// PASS_ZONE_SHRINK_ATT phantom attempts, so a 1/1 or 0/2 sample can't
-// swing the color on its own -- the rate has to hold over real volume.
-const PASS_ZONE_LEAGUE_WEIGHTS = { volume: 0.4, comp: 0.25, epa: 0.35 };
-const PASS_ZONE_SHRINK_ATT = 5;
-const PASS_ZONE_COLOR_MODE_KEY = "nfl-tool.pass-zone-color-mode.v1";
-let passZoneColorMode = loadPassZoneColorMode();
-
-function loadPassZoneColorMode() {
-  try {
-    return localStorage.getItem(PASS_ZONE_COLOR_MODE_KEY) === "league" ? "league" : "self";
-  } catch (e) {
-    return "self";
-  }
-}
-function setPassZoneColorMode(mode) {
-  passZoneColorMode = mode;
-  try {
-    localStorage.setItem(PASS_ZONE_COLOR_MODE_KEY, mode);
-  } catch (e) {
-    // localStorage unavailable -- toggle just won't stick across reloads.
-  }
-}
-
-// One or more zones of a chart summed into a single sample -- a single
-// cell, or a whole row/column for the total badges.
-function passZoneSum(chart, zoneKeys) {
-  const out = { attempts: 0, completions: 0, epa_sum: 0 };
-  zoneKeys.forEach((k) => {
-    const z = chart.zones[k];
-    if (!z) return;
-    out.attempts += z.attempts || 0;
-    out.completions += z.completions || 0;
-    out.epa_sum += z.epa_sum || 0;
-  });
-  return out;
-}
-
-// Per-team league samples for one zone set: attempts/game plus shrunk
-// completion % and EPA/attempt.
-function passZoneLeagueSamples(zoneKeys, side) {
-  const raw = DATA.teams
-    .map((t) => {
-      const chart = (DATA.pass_shot_charts[t] || {})[side];
-      const g = DATA.team_stats[t]?.games_played || 0;
-      return chart && g ? { team: t, g, ...passZoneSum(chart, zoneKeys) } : null;
-    })
-    .filter(Boolean);
-  const att = raw.reduce((s, r) => s + r.attempts, 0);
-  if (!att) return [];
-  const lgComp = raw.reduce((s, r) => s + r.completions, 0) / att;
-  const lgEpa = raw.reduce((s, r) => s + r.epa_sum, 0) / att;
-  const k = PASS_ZONE_SHRINK_ATT;
-  return raw.map((r) => ({
-    team: r.team,
-    perG: r.attempts / r.g,
-    comp: (r.completions + k * lgComp) / (r.attempts + k),
-    epa: (r.epa_sum + k * lgEpa) / (r.attempts + k),
-  }));
-}
-
-// Positive = good for this side (defense: less volume/comp/EPA allowed).
-function passZoneLeagueCompositeZ(team, side, zoneKeys) {
-  const samples = passZoneLeagueSamples(zoneKeys, side);
-  const me = samples.find((s) => s.team === team);
-  if (!me) return null;
-  const invert = side === "def";
-  const z = (key) => zScore(me[key], samples.map((s) => s[key]), invert) || 0;
-  const w = PASS_ZONE_LEAGUE_WEIGHTS;
-  return w.volume * z("perG") + w.comp * z("comp") + w.epa * z("epa");
-}
-
-// Whichever mode the toggle is on, for one cell.
-function passZoneCellZ(chart, team, side, zoneKey) {
-  if (passZoneColorMode === "league") return passZoneLeagueCompositeZ(team, side, [zoneKey]);
-  return passZoneCompositeZ(chart, zoneKey, chart.zones[zoneKey]);
-}
-
-function renderPassZoneColorToggle() {
-  const btn = (mode, label) =>
-    `<button type="button" class="pass-zone-mode-btn${passZoneColorMode === mode ? " active" : ""}" data-mode="${mode}">${label}</button>`;
-  return `<span class="pass-zone-mode-label">Defense colors:</span>${btn("self", "Own tendencies")}${btn("league", "League rank")}`;
-}
-
-document.addEventListener("click", (e) => {
-  const btn = e.target.closest(".pass-zone-mode-btn");
-  if (!btn || btn.dataset.mode === passZoneColorMode) return;
-  setPassZoneColorMode(btn.dataset.mode);
-  render();
-});
-
-function tierFromZ(z, threshold = TIER_Z_THRESHOLD) {
-  if (z === null || z === undefined) return "";
-  if (z >= threshold) return "tier-good";
-  if (z <= -threshold) return "tier-bad";
-  return "tier-mid";
-}
-function alphaAttrFromZ(z, threshold = TIER_Z_THRESHOLD) {
-  if (z === null || z === undefined) return "";
-  const az = Math.abs(z);
-  if (az < threshold) return "";
-  const t = Math.min((az - threshold) / (TIER_Z_SATURATE - threshold), 1);
-  const a = TIER_ALPHA_MIN + (TIER_ALPHA_MAX - TIER_ALPHA_MIN) * t;
-  return ` style="--tier-a:${a.toFixed(2)}"`;
-}
 
 // Sum of a team's own attempts across all 3 locations at ONE depth (a row
 // total) or across all 4 depths at ONE location (a column total) -- same
@@ -1166,13 +790,13 @@ function passZonePlayerSummary(plays) {
   return Object.values(groups).sort((a, b) => b.targets - a.targets);
 }
 
-function renderPassZonePlayerSummaryTable(summary) {
+function renderPassZonePlayerSummaryTable(summary, team = null) {
   const body = summary
     .map((g) => {
       const epaCls = g.epa > 0 ? "tier-good" : g.epa < 0 ? "tier-bad" : "";
       const epaSign = g.epa >= 0 ? "+" : "";
       return `<tr>
-        <td>${g.name}</td>
+        <td>${team ? playerClick(team, g.name) : g.name}</td>
         <td>${g.position}</td>
         <td class="num">${g.targets}</td>
         <td class="num">${g.rec}</td>
@@ -1226,7 +850,7 @@ function renderPassZonePositionTable(summary) {
 // into air (where it was caught -- the same depth this grid buckets by)
 // and yac, since a short completion that housed it on YAC is a very
 // different play than one that fell short of the sticks.
-function renderPassZonePlayList(summary) {
+function renderPassZonePlayList(summary, team = null) {
   return summary
     .map((g) => {
       const rows = g.plays
@@ -1242,7 +866,7 @@ function renderPassZonePlayList(summary) {
         })
         .join("");
       return `<div class="pass-zone-plays-player">
-        <div class="stat-column-title">${g.name} <span class="muted-label">(${g.position} &middot; ${g.targets} tgt)</span></div>
+        <div class="stat-column-title">${team ? playerClick(team, g.name) : g.name} <span class="muted-label">(${g.position} &middot; ${g.targets} tgt)</span></div>
         <table class="data-table player-odds-table">
           <thead><tr><th>Wk</th><th>Result</th><th class="num">EPA</th></tr></thead>
           <tbody>${rows}</tbody>
@@ -1264,7 +888,7 @@ function renderPassZoneOpponentBlock(opponent, zoneKey) {
     return `<h4 class="pass-zone-modal-subhead">${opponent} Offense in This Zone</h4><p class="no-data-note">No attempts here yet.</p>`;
   }
   const oppSummary = passZonePlayerSummary(oppPlays);
-  return `<h4 class="pass-zone-modal-subhead">${teamLogoMini(opponent)} ${opponent} Offense in This Zone</h4>${renderPassZonePlayerSummaryTable(oppSummary)}`;
+  return `<h4 class="pass-zone-modal-subhead">${teamLogoMini(opponent)} ${opponent} Offense in This Zone</h4>${renderPassZonePlayerSummaryTable(oppSummary, opponent)}`;
 }
 
 // Everything in one wide view -- league rank, the who-to-target summary,
@@ -1282,7 +906,7 @@ function renderPassZoneModalContent(team, side, zoneKey, opponent) {
     ? `<h4 class="pass-zone-modal-subhead">By Position</h4>${renderPassZonePositionTable(summary)}
        <h4 class="pass-zone-modal-subhead">By Player</h4>${renderPassZonePlayerSummaryTable(summary)}
        ${opponent ? renderPassZoneOpponentBlock(opponent, zoneKey) : ""}`
-    : `<h4 class="pass-zone-modal-subhead">Who's Getting Targeted</h4>${renderPassZonePlayerSummaryTable(summary)}`;
+    : `<h4 class="pass-zone-modal-subhead">Who's Getting Targeted</h4>${renderPassZonePlayerSummaryTable(summary, team)}`;
   return `<h3>${heading}</h3>
     <div class="pass-zone-modal-layout">
       <div class="pass-zone-modal-col pass-zone-modal-col-rank">
@@ -1293,7 +917,7 @@ function renderPassZoneModalContent(team, side, zoneKey, opponent) {
         ${summaryBlock}
       </div>
       <div class="pass-zone-modal-col pass-zone-modal-col-plays">
-        ${plays.length ? `<h4 class="pass-zone-modal-subhead">Every Play</h4><div class="pass-zone-plays-wrap">${renderPassZonePlayList(summary)}</div>` : ""}
+        ${plays.length ? `<h4 class="pass-zone-modal-subhead">Every Play</h4><div class="pass-zone-plays-wrap">${renderPassZonePlayList(summary, side === "off" ? team : null)}</div>` : ""}
       </div>
     </div>`;
 }
@@ -1408,53 +1032,6 @@ function renderPassZoneBlock(team, side, opponent) {
 // self-referential heatmap (each player's own busiest zone reads darkest),
 // not a comparison to the rest of the league. No % anywhere -- raw
 // receptions/targets counts only, same as a broadcast target chart. */
-const PLAYER_ZONE_HEAT_MIN_ALPHA = 0.06;
-const PLAYER_ZONE_HEAT_MAX_ALPHA = 0.85;
-
-// Same composite (volume+EPA, defense-inverted) the defense grid colors
-// its own cells with -- evaluated for one zone instead of a whole grid, so
-// a hotspot card can flag "this is also a soft spot for the exact defense
-// he's facing" without making the reader cross-reference the two grids by
-// eye. tier-bad/tier-mid on the defense grid mean "exposed"/"average" --
-// tier-good means the defense actually handles this zone, nothing to flag.
-function defenseZoneTier(oppTeam, zoneKey) {
-  const chart = (DATA.pass_shot_charts[oppTeam] || {}).def;
-  if (!chart) return "";
-  return tierFromZ(passZoneCellZ(chart, oppTeam, "def", zoneKey));
-}
-
-function renderPlayerZoneHeatGrid(zones, oppTeam) {
-  let maxTargets = 0;
-  PASS_ZONE_ROWS.forEach((r) =>
-    PASS_ZONE_COLS.forEach((c) => {
-      const t = zones[`${r.key}_${c}`]?.targets || 0;
-      if (t > maxTargets) maxTargets = t;
-    })
-  );
-  const rows = PASS_ZONE_ROWS.map((r) => {
-    const cells = PASS_ZONE_COLS.map((loc) => {
-      const zk = `${r.key}_${loc}`;
-      const zone = zones[zk];
-      const targets = zone?.targets || 0;
-      const rec = zone?.receptions || 0;
-      const style = targets
-        ? ` style="background: rgba(var(--accent-rgb), ${(PLAYER_ZONE_HEAT_MIN_ALPHA + (targets / maxTargets) * (PLAYER_ZONE_HEAT_MAX_ALPHA - PLAYER_ZONE_HEAT_MIN_ALPHA)).toFixed(2)})"`
-        : "";
-      const display = targets ? `${rec}/${targets}` : "--";
-      // Only a real zone gets the outline -- flagging an empty "--" cell as
-      // a soft spot the player has never actually been sent to is a
-      // meaningless signal, not an insight.
-      const tier = targets && oppTeam ? defenseZoneTier(oppTeam, zk) : "";
-      const exploitCls = tier === "tier-bad" ? " pass-zone-heat-cell-exploit-bad" : tier === "tier-mid" ? " pass-zone-heat-cell-exploit-mid" : "";
-      return `<td class="num pass-zone-heat-cell${exploitCls}"${style}>${display}</td>`;
-    }).join("");
-    return `<tr><th class="pass-zone-row-label-mini">${r.short}</th>${cells}</tr>`;
-  }).join("");
-  return `<table class="data-table pass-zone-grid pass-zone-grid-mini">
-    <thead><tr><th></th><th>L</th><th>M</th><th>R</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
-}
 
 function renderPlayerZoneMiniCard(team, name, player, oppTeam) {
   const headshot = (DATA.player_headshots[team] || {})[name];
@@ -1463,7 +1040,7 @@ function renderPlayerZoneMiniCard(team, name, player, oppTeam) {
     : `<div class="pass-zone-player-photo pass-zone-player-photo-mini pass-zone-player-photo-blank"></div>`;
   const totalTgt = Object.values(player.zones).reduce((s, z) => s + (z.targets || 0), 0);
   return `<div class="pass-zone-player-mini-card">
-    <div class="pass-zone-player-banner pass-zone-player-banner-mini">
+    <div class="pass-zone-player-banner pass-zone-player-banner-mini player-click" data-entry="${encodeDataAttr({ team, name, oppTeam })}">
       ${photo}
       <div class="pass-zone-player-info">
         <span class="pass-zone-player-name">${name}</span>
@@ -1557,7 +1134,7 @@ function renderQbZoneMiniCard(team, qb, chart, oppTeam) {
     ? `<img src="${headshot}" class="pass-zone-player-photo pass-zone-player-photo-qb" alt="${qb.name}" loading="lazy">`
     : `<div class="pass-zone-player-photo pass-zone-player-photo-qb pass-zone-player-photo-blank"></div>`;
   return `<div class="pass-zone-qb-card">
-    <div class="pass-zone-player-banner pass-zone-player-banner-qb">
+    <div class="pass-zone-player-banner pass-zone-player-banner-qb player-click" data-entry="${encodeDataAttr({ team, name: qb.name, oppTeam })}">
       ${photo}
       <div class="pass-zone-player-info">
         <span class="pass-zone-player-name pass-zone-player-name-qb">${qb.name}</span>
@@ -1627,7 +1204,7 @@ function renderPlayerZoneCard(team, name, player) {
     : `<div class="pass-zone-player-photo pass-zone-player-photo-blank"></div>`;
   const totalTgt = Object.values(player.zones).reduce((s, z) => s + z.targets, 0);
   return `<div class="pass-zone-block">
-    <div class="pass-zone-player-banner">
+    <div class="pass-zone-player-banner player-click" data-entry="${encodeDataAttr({ team, name })}">
       ${photo}
       <div class="pass-zone-player-info">
         <span class="pass-zone-player-name">${name}</span>
@@ -1765,7 +1342,7 @@ function openScrambleRankModal(p) {
       const cls = percentileTier(r.value, values, false);
       const alpha = tierAlphaAttr(r.value, values, false);
       const rowCls = r.team === p.team && r.name === p.name ? ' class="stat-rank-current"' : "";
-      return `<tr${rowCls}><td>${teamLogoMini(r.team)} ${r.name}</td><td class="num ${cls}"${alpha}>${Math.round(r.value * 100)}%</td></tr>`;
+      return `<tr${rowCls}><td>${teamLogoMini(r.team)} ${playerClick(r.team, r.name)}</td><td class="num ${cls}"${alpha}>${Math.round(r.value * 100)}%</td></tr>`;
     })
     .join("");
   document.getElementById("stat-rank-modal-content").innerHTML = `<h3>${p.label} &mdash; All QBs</h3>
@@ -1813,7 +1390,7 @@ function renderQbRushingPanel(team, oppTeam) {
         <tr><td>Designed</td><td class="num">${p.designed_carries}</td><td class="num">${fmt(p.designed_rush_yards, 0)}</td>${passStatCell(p, "designed_ypc", { label: "Designed Rush YPC" })}<td></td></tr>
         <tr><td>Scramble</td><td class="num">${p.scramble_carries}</td><td class="num">${fmt(p.scramble_rush_yards, 0)}</td>${passStatCell(p, "scramble_ypc", { label: "Scramble YPC" })}<td></td></tr>
       `;
-      return `<div class="player-name-row"><span class="player-name">${p.name}</span></div>
+      return `<div class="player-name-row"><span class="player-name player-click" data-entry="${encodeDataAttr({ team, name: p.name, oppTeam })}">${p.name}</span></div>
         <table class="data-table scramble-table qb-rushing-combined-table">
           <tbody>
             <tr class="qb-rushing-group-header"><th>Split</th><th class="num">Scr%</th><th class="num">Opp Allow%</th><th class="num">Opp Yds</th><th class="edge-hdr">ADV</th></tr>
@@ -1905,26 +1482,6 @@ function availableMarketsFor(awayTeam, homeTeam) {
 // books is on the user, not this tool (same reasoning the anytime-TD modal
 // already states). Position, not team code, in parens -- the row's own
 // team-color border/tint already says which team.
-// A single O/U market row is really TWO potential plays (Over and Under),
-// so it gets two checkboxes, not one -- built from the same shape both
-// the team-header market table and the player-only "All Props" modal use,
-// so checking a line in either place shows checked in the other too (same
-// id scheme). Week is baked into the id since a market's current line is
-// only ever this week's -- an old saved play for the same player/market
-// from a prior week shouldn't collide with (or show as checked for) this
-// week's line.
-function propOuEntries(marketKey, marketLabel, team, name, line, overOdds, underOdds, matchup) {
-  const base = { week: scheduleWeek, matchup, category: marketLabel, team };
-  return {
-    over: { ...base, id: `${scheduleWeek}_${marketKey}_${team}_${name}_over`, description: `${name} Over ${fmt(line, 1)}`, odds: fmtOddsSigned(overOdds) },
-    under: { ...base, id: `${scheduleWeek}_${marketKey}_${team}_${name}_under`, description: `${name} Under ${fmt(line, 1)}`, odds: fmtOddsSigned(underOdds) },
-  };
-}
-function ouCheckboxCell(oddsDisplay, entry) {
-  const checked = isPossiblePlay(entry.id) ? " checked" : "";
-  return `${oddsDisplay} <label class="pp-check-inline" title="Add to Possible Plays"><input type="checkbox" class="pp-toggle" data-entry="${encodeDataAttr(entry)}"${checked}></label>`;
-}
-
 function renderPropsMarketTable(awayTeam, homeTeam, market) {
   const marketLabel = (DATA.player_prop_market_labels || {})[market] || market;
   const marketData = (DATA.player_prop_markets || {})[market] || {};
@@ -1941,7 +1498,7 @@ function renderPropsMarketTable(awayTeam, homeTeam, market) {
       const rowStyle = `border-left:4px solid rgb(${rgb.join(",")}); background:rgba(${rgb.join(",")},0.07);`;
       const { over, under } = propOuEntries(market, marketLabel, p.team, p.name, p.line, p.over_odds, p.under_odds, matchup);
       return `<tr style="${rowStyle}">
-        <td>${teamLogoMini(p.team)} ${p.name} <span class="muted-label">(${p.position || "?"})</span></td>
+        <td>${teamLogoMini(p.team)} ${playerClick(p.team, p.name)} <span class="muted-label">(${p.position || "?"})</span></td>
         <td class="num props-line">${fmt(p.line, 1)}</td>
         <td class="num">${ouCheckboxCell(fmtOddsSigned(p.over_odds), over)}</td>
         <td class="num">${ouCheckboxCell(fmtOddsSigned(p.under_odds), under)}</td>
@@ -1977,218 +1534,15 @@ let propsModalTeams = null;
 function openPropsModal(awayTeam, homeTeam) {
   ensurePropsModal();
   propsModalTeams = { away: awayTeam, home: homeTeam };
-  playerModalState = null;
   document.getElementById("props-modal-content").innerHTML = renderPropsModalContent(awayTeam, homeTeam);
   document.getElementById("props-modal").hidden = false;
 }
 
-// The inverse of the team-header modal: every market THIS ONE player has a
-// posted line for, instead of every player in one market. Scans the same
-// DATA.player_prop_markets catalog by name (SGO player props carry no
-// gsis_id to join on, same limitation build_roster_position_lookup already
-// works around) -- a handful of players won't match across name-format
-// quirks, same known/accepted limitation as roster_teams elsewhere.
-function playerPropsAcrossMarkets(team, name) {
-  const labels = DATA.player_prop_market_labels || {};
-  const markets = DATA.player_prop_markets || {};
-  const rows = [];
-  for (const stat of Object.keys(labels)) {
-    const found = ((markets[stat] || {})[team] || []).find((p) => normName(p.name) === normName(name));
-    if (found) rows.push({ marketKey: stat, market: labels[stat], ...found });
-  }
-  return rows;
-}
 
-// Odds view: every line for this player, the Summary model's projection
-// and lean for each, Over/Under into Possible Plays, and a button that puts
-// the line on the Summary card's Prop Picks rail.
-function renderPlayerMarketsModalContent(team, name, oppTeam) {
-  const rows = playerPropsAcrossMarkets(team, name);
-  const position = rows.length ? rows[0].position : null;
-  const heading = `<h3>${summaryHeadshot(team, name, 34)} ${name} <span class="muted-label">(${position || "?"} &middot; ${team})</span> &mdash; All Props</h3>`;
-  if (!rows.length) {
-    return `${heading}<p class="no-data-note">No prop lines posted for this player yet.</p>`;
-  }
-  const game = (DATA.schedule || []).find((g) => g.week === scheduleWeek && (g.away === team || g.home === team));
-  const matchup = game ? `${game.away} @ ${game.home}` : team;
-  // Model numbers and summary picks are for the game selected up top.
-  const ctx = propsSummaryContext();
-  const inGame = oppTeam && [ctx.away, ctx.home].includes(team) && [ctx.away, ctx.home].includes(oppTeam);
-  const model = {};
-  if (inGame) {
-    propTeamLines(team, oppTeam, ctx.week, ctx.game)
-      .filter((r) => normName(r.name) === normName(name))
-      .forEach((r) => (model[r.marketKey] = r));
-  }
-  const chosen = new Set(inGame ? loadPropsSummaryPicks(ctx.gameKey)[team] || [] : []);
-  const full = chosen.size >= PROPS_SUMMARY_MAX_PICKS;
-  const body = rows
-    .map((r) => {
-      const { over, under } = propOuEntries(r.marketKey, r.market, team, r.name, r.line, r.over_odds, r.under_odds, matchup);
-      const m = model[r.marketKey];
-      let add = `<span class="muted">--</span>`;
-      if (m) {
-        const key = propPickKey(m);
-        const on = chosen.has(key);
-        const disabled = !on && full ? ` disabled title="${PROPS_SUMMARY_MAX_PICKS} per team max"` : "";
-        add = `<button type="button" class="ps-add-btn${on ? " ps-add-on" : ""}" data-team="${team}" data-key="${encodeDataAttr(key)}"${disabled}>${on ? "&#10003; On summary" : "+ Summary"}</button>`;
-      }
-      return `<tr><td>${r.market}</td><td class="num props-line">${fmt(r.line, 1)}</td><td class="num">${ouCheckboxCell(fmtOddsSigned(r.over_odds), over)}</td><td class="num">${ouCheckboxCell(fmtOddsSigned(r.under_odds), under)}</td><td class="num">${add}</td></tr>`;
-    })
-    .join("");
-  const note = inGame
-    ? `<p class="no-data-note">+ Summary adds the line to the card's Prop Picks (${chosen.size}/${PROPS_SUMMARY_MAX_PICKS} for ${team}).</p>`
-    : "";
-  return `${heading}${note}
-    <table class="data-table player-odds-table props-market-table">
-      <thead><tr><th>Market</th><th class="num">Line</th><th class="num">Over</th><th class="num">Under</th><th class="num">Summary</th></tr></thead>
-      <tbody>${body}</tbody>
-    </table>`;
-}
 
-// Which player modal is open and whether it's showing the odds view or the
-// game log -- a small toggle bar re-renders just the body in place, same
-// "stay open, swap content" pattern as the market-select dropdown above.
-let playerModalState = null;
-
-// One stat-type table (Passing/Rushing/Receiving), header + rows straight
-// down -- separate tables instead of one row cramming all three together,
-// so each stat gets its own labeled column and a QB's passing line doesn't
-// need to squeeze next to two columns of "--" for a position that never
-// touches the ball as a rusher/receiver most weeks.
-function renderGameLogSection(title, headers, rows, rowFn) {
-  const headHtml = headers.map((h, i) => `<th${i >= 2 ? ' class="num"' : ""}>${h}</th>`).join("");
-  const body = rows
-    .map((r) => {
-      const cells = rowFn(r);
-      return `<tr>${cells.map((c, i) => `<td${i >= 2 ? ' class="num"' : ""}>${c}</td>`).join("")}</tr>`;
-    })
-    .join("");
-  return `<div class="game-log-section">
-    <h4 class="game-log-section-title">${title}</h4>
-    <table class="data-table player-odds-table game-log-table">
-      <thead><tr>${headHtml}</tr></thead>
-      <tbody>${body}</tbody>
-    </table>
-  </div>`;
-}
-
-function renderPlayerGameLogContent(team, name) {
-  const rows = ((DATA.player_game_logs || {})[team] || {})[name] || [];
-  const heading = `<h3>${name} <span class="muted-label">(${team})</span> &mdash; Game Log</h3>`;
-  if (!rows.length) {
-    return `${heading}<p class="no-data-note">No game logs recorded for this player yet.</p>`;
-  }
-
-  // Passing only for QBs -- a position, not "did they ever throw one pass"
-  // (a wildcat/trick-play completion shouldn't earn a skill player a
-  // Passing section). Position comes from the same player_props row this
-  // modal's own Odds view is keyed against.
-  const position = (DATA.player_props[team] || []).find((p) => p.name === name)?.position;
-  const weekCell = (r) => [r.week, `${teamLogoMini(r.opp)} ${r.opp}`];
-
-  const sections = [];
-  if (position === "QB") {
-    const passRows = rows.filter((r) => r.pass_att > 0);
-    if (passRows.length) {
-      sections.push(
-        renderGameLogSection("Passing", ["Wk", "Opp", "Att", "Cmp", "Yds", "TD", "INT"], passRows, (r) => [
-          ...weekCell(r),
-          r.pass_att,
-          r.completions,
-          fmt(r.pass_yards, 0),
-          r.pass_td,
-          r.interceptions,
-        ])
-      );
-    }
-  }
-  const rushRows = rows.filter((r) => r.carries > 0);
-  if (rushRows.length) {
-    sections.push(
-      renderGameLogSection("Rushing", ["Wk", "Opp", "Car", "Yds", "TD"], rushRows, (r) => [
-        ...weekCell(r),
-        r.carries,
-        fmt(r.rush_yards, 0),
-        r.rush_td,
-      ])
-    );
-  }
-  const recRows = rows.filter((r) => r.targets > 0);
-  if (recRows.length) {
-    sections.push(
-      renderGameLogSection("Receiving", ["Wk", "Opp", "Tgt", "Rec", "Yds", "TD"], recRows, (r) => [
-        ...weekCell(r),
-        r.targets,
-        r.receptions,
-        fmt(r.rec_yards, 0),
-        r.rec_td,
-      ])
-    );
-  }
-
-  if (!sections.length) {
-    return `${heading}<p class="no-data-note">No qualifying stat lines recorded for this player yet.</p>`;
-  }
-  return `${heading}${sections.join("")}`;
-}
-
-function renderPlayerModalShell() {
-  const { team, name, oppTeam, view } = playerModalState;
-  let bodyHtml;
-  // Sportsbook spellings ("Brian Robinson") vs roster names ("Brian
-  // Robinson Jr.") -- the stat views look the player up by roster name.
-  const statName = propGameLogs(team, name)?.name || name;
-  if (view === "gamelog") bodyHtml = renderPlayerGameLogContent(team, statName);
-  else if (view === "rushlanes") bodyHtml = renderPlayerRushLanesContent(team, statName, oppTeam);
-  else bodyHtml = renderPlayerMarketsModalContent(team, name, oppTeam);
-  return `<div class="player-modal-toggle">
-      <button type="button" class="player-modal-toggle-btn${view === "odds" ? " active" : ""}" data-view="odds">Odds</button>
-      <button type="button" class="player-modal-toggle-btn${view === "gamelog" ? " active" : ""}" data-view="gamelog">Game Log</button>
-      <button type="button" class="player-modal-toggle-btn${view === "rushlanes" ? " active" : ""}" data-view="rushlanes">Rush Lanes</button>
-    </div>
-    <div id="player-modal-body">${bodyHtml}</div>`;
-}
-
-function openPlayerMarketsModal(team, name, oppTeam) {
-  ensurePropsModal();
-  propsModalTeams = null; // no market dropdown in this view -- keeps the OTHER change handler from acting on stale state
-  playerModalState = { team, name, oppTeam, view: "odds" };
-  document.getElementById("props-modal-content").innerHTML = renderPlayerModalShell();
-  document.getElementById("props-modal").hidden = false;
-}
-
-// "+ Summary" in the player popup: add/remove that line on the Summary
-// card's Prop Picks rail (same per-game picks the Pick props list edits).
-document.addEventListener("click", (e) => {
-  const addBtn = e.target.closest(".ps-add-btn");
-  if (!addBtn || !playerModalState) return;
-  const { gameKey, away, home } = propsSummaryContext();
-  const picks = loadPropsSummaryPicks(gameKey);
-  const list = new Set(picks[addBtn.dataset.team] || []);
-  const key = decodeDataAttr(addBtn.dataset.key);
-  if (list.has(key)) list.delete(key);
-  else if (list.size < PROPS_SUMMARY_MAX_PICKS) list.add(key);
-  picks[addBtn.dataset.team] = [...list];
-  savePropsSummaryPicks(gameKey, picks);
-  document.getElementById("props-modal-content").innerHTML = renderPlayerModalShell();
-  if (currentPropsView === "summary") renderPropsSummaryCard(away, home);
-});
 
 document.addEventListener("click", (e) => {
-  const toggleBtn = e.target.closest(".player-modal-toggle-btn");
-  if (!toggleBtn || !playerModalState) return;
-  playerModalState.view = toggleBtn.dataset.view;
-  document.getElementById("props-modal-content").innerHTML = renderPlayerModalShell();
-});
-
-document.addEventListener("click", (e) => {
-  const playerEl = e.target.closest(".player-click");
-  if (playerEl) {
-    const { team, name, oppTeam } = decodeDataAttr(playerEl.dataset.entry);
-    openPlayerMarketsModal(team, name, oppTeam);
-    return;
-  }
+  // Player names/photos open the shared player card (player-card.js).
   const btn = e.target.closest(".props-team-click");
   if (!btn) return;
   const away = document.getElementById("away-select").value;

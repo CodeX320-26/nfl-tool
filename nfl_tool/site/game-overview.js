@@ -1205,11 +1205,11 @@ function renderBoxScoreTeamContent(gameId, team) {
   const cats = ((DATA.player_box_scores || {})[gameId] || {})[team] || {};
   const tables = [
     boxScoreTable("Passing", ["Player", "C/ATT", "Yds", "TD", "INT"], cats.passing, (p) =>
-      `<tr><td>${p.name}</td><td class="num">${p.cmp}/${p.att}</td><td class="num">${fmt(p.yards, 0)}</td><td class="num">${p.td}</td><td class="num">${p.int}</td></tr>`),
+      `<tr><td>${playerClick(team, p.name)}</td><td class="num">${p.cmp}/${p.att}</td><td class="num">${fmt(p.yards, 0)}</td><td class="num">${p.td}</td><td class="num">${p.int}</td></tr>`),
     boxScoreTable("Rushing", ["Player", "Car", "Yds", "TD"], cats.rushing, (p) =>
-      `<tr><td>${p.name}</td><td class="num">${p.carries}</td><td class="num">${fmt(p.yards, 0)}</td><td class="num">${p.td}</td></tr>`),
+      `<tr><td>${playerClick(team, p.name)}</td><td class="num">${p.carries}</td><td class="num">${fmt(p.yards, 0)}</td><td class="num">${p.td}</td></tr>`),
     boxScoreTable("Receiving", ["Player", "Tgt", "Rec", "Yds", "TD"], cats.receiving, (p) =>
-      `<tr><td>${p.name}</td><td class="num">${p.targets}</td><td class="num">${p.receptions}</td><td class="num">${fmt(p.yards, 0)}</td><td class="num">${p.td}</td></tr>`),
+      `<tr><td>${playerClick(team, p.name)}</td><td class="num">${p.targets}</td><td class="num">${p.receptions}</td><td class="num">${fmt(p.yards, 0)}</td><td class="num">${p.td}</td></tr>`),
     // Tkl shown as "solo-assist" (e.g. "6-2"), same convention a
     // broadcast box score uses -- see compute_player_box_scores for
     // exactly what counts as solo vs assist.
@@ -1327,7 +1327,7 @@ function renderInjuryPanel(team, week) {
     .filter((g) => groups[g].length > 0)
     .map((g) => {
       const badges = groups[g]
-        .map((p) => `<span class="injury-badge ${statusClass(p.status)}">${p.full_name} (${p.position}) &mdash; ${statusAbbr(p.status)} ${starterTag(p.snap_share)}</span>`)
+        .map((p) => `<span class="injury-badge ${statusClass(p.status)}">${SKILL_POSITIONS.has(p.position) ? playerClick(team, p.full_name) : p.full_name} (${p.position}) &mdash; ${statusAbbr(p.status)} ${starterTag(p.snap_share)}</span>`)
         .join("");
       return `<div class="injury-group"><span class="injury-group-label">${groupLabel[g]}</span><div class="injury-badges">${badges}</div></div>`;
     })
