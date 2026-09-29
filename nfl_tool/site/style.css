@@ -3064,3 +3064,11 @@ html.local-dev .update-odds-link { display: inline-flex; }
 /* Zone popup: the who-got-targeted column gets real room */
 .pass-zone-modal-layout > .pass-zone-modal-col:not(.pass-zone-modal-col-rank):not(.pass-zone-modal-col-plays) { flex: 1.3 1 0; min-width: 480px; }
 .pass-zone-modal-col-rank .pass-zone-rank-table td:nth-child(2) { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pz-def-table th { font-size: 0.6rem; }
+.pz-blurb { margin: 8px 0 2px; padding: 7px 10px; border-radius: 8px; font-size: 0.84rem; background: var(--table-head); border-left: 3px solid var(--border-strong); }
+.pz-blurb b { font-family: var(--font-display); font-size: 0.98rem; letter-spacing: 0.03em; text-transform: uppercase; }
+.pz-blurb-good { background: rgba(var(--good-rgb), 0.12); border-left-color: rgb(var(--good-rgb)); }
+.pz-blurb-good b { color: var(--good-text); }
+.pz-blurb-bad { background: rgba(var(--bad-rgb), 0.1); border-left-color: rgb(var(--bad-rgb)); }
+.pz-blurb-bad b { color: var(--bad-text); }
+.pz-note { margin: 4px 0 0; font-size: 0.68rem; font-style: italic; color: var(--muted); }

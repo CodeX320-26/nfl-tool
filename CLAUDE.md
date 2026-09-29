@@ -261,8 +261,13 @@ context. It is the only copy that travels with the repo.
     - summary tiles: throws, catches/%, yards per catch, YAC share, EPA per throw, 20+ plays;
     - league rank by volume;
     - who got targeted, most first, with catch %, YAC/rec and longest;
-    - on offense, "OPP Defense Here" with a Soft spot / Average / Holds up verdict from
-      `ztDefenseSoftness`, the same shrunk measure Zone Targets uses (raw EPA stays uncolored);
+    - on offense, **"OPP Defense Here"**:
+      - Throws faced/game, Comp %, Yards/throw, YAC/catch and EPA/throw allowed, each next to the
+        league average.
+      - Colored from the defense's side vs the league, using values shrunk by 8 prior throws (4 for YAC).
+      - A one-line **Top X% / Bottom X% / Neutral matchup** blurb and a Soft spot / Average / Holds up
+        pill. Both come from the league ranking of `ztDefenseSoftness` (thirds, or the same 0.5 line
+        Zone Targets uses), so they always agree with each other and with the Zone Targets chips;
     - every throw grouped by player, newest first, with opponent, air yards, YAC and EPA.
   - QB grid cells show comp/att plus yards · YAC.
 - Player Props page extras:

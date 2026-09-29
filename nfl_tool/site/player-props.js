@@ -868,28 +868,96 @@ function renderPassZoneDefenseBlock(opponent, zoneKey) {
     .sort((a, b) => b.z.attempts / b.gp - a.z.attempts / a.gp)
     .findIndex((r) => r.t === opponent) + 1;
   const epa = zone.epa_sum / zone.attempts;
+
+  // League context for this zone: every defense's numbers here, rates
+  // pulled toward the league rate with PZ_DEF_PRIOR throws so a 2-throw
+  // sample can't paint a cell. Colors are the DEFENSE's point of view
+  // (green = gives up less than the league), like every allowed stat.
+  const PZ_DEF_PRIOR = 8;
+  const league = DATA.teams
+    .map((t) => {
+      const z = (DATA.pass_shot_charts[t] || {}).def?.zones?.[zoneKey];
+      if (!z || !z.attempts) return null;
+      const yy = zoneYards(z);
+      return { t, att: z.attempts, comp: z.completions, yds: yy.yds, yac: yy.yac, epa: z.epa_sum, gp: DATA.team_stats[t]?.games_played || 1 };
+    })
+    .filter(Boolean);
+  const sum = (k) => league.reduce((s, r) => s + r[k], 0);
+  const L = { att: sum("att"), comp: sum("comp"), yds: sum("yds"), yac: sum("yac"), epa: sum("epa") };
+  const shrink = (num, den, lNum, lDen, prior = PZ_DEF_PRIOR) => (num + prior * (lNum / (lDen || 1))) / (den + prior);
+  const metrics = {
+    vol: (r) => r.att / r.gp,
+    comp: (r) => shrink(r.comp, r.att, L.comp, L.att),
+    ypt: (r) => shrink(r.yds, r.att, L.yds, L.att),
+    yacpc: (r) => shrink(r.yac, r.comp, L.yac, L.comp, 4),
+    epa: (r) => shrink(r.epa, r.att, L.epa, L.att),
+  };
+  const me = league.find((r) => r.t === opponent);
+  const cellAttr = (key) => {
+    if (!me) return ' class="num"';
+    const z = zScore(metrics[key](me), league.map(metrics[key]), true);
+    return ` class="num ${tierFromZ(z)}"${alphaAttrFromZ(z)}`;
+  };
+  const lgAvg = {
+    vol: league.length ? sum("att") / league.reduce((s, r) => s + r.gp, 0) : 0,
+    comp: L.att ? L.comp / L.att : 0,
+    ypt: L.att ? L.yds / L.att : 0,
+    yacpc: L.comp ? L.yac / L.comp : 0,
+    epa: L.att ? L.epa / L.att : 0,
+  };
+  const sign = (v) => `${v >= 0 ? "+" : ""}${fmt(v, 2)}`;
   // Verdict from the same sample-shrunk softness Zone Targets uses (half the
   // zone's own numbers pulled toward league average, half the opponent-
   // adjusted depth band), so a 2-throw fluke can't read "soft" -- and the
   // raw EPA below stays uncolored so the box never argues with itself.
-  const soft = typeof ztDefenseSoftness === "function" ? (ztDefenseSoftness()[opponent] || {})[zoneKey] : null;
-  const verdict =
-    soft === null || soft === undefined
-      ? ""
-      : soft >= 0.5
-      ? `<span class="pz-verdict pz-verdict-soft">Soft spot</span>`
-      : soft <= -0.5
-      ? `<span class="pz-verdict pz-verdict-firm">Holds up</span>`
-      : `<span class="pz-verdict">Average</span>`;
+  // (The pill and the one-line blurb below come from the same league
+  // ranking of that softness, so they always agree.)
+  let verdict = "";
+  // One-line read: where this defense's softness here ranks league-wide,
+  // from the offense's side (1st-softest = best matchup).
+  let blurb = "";
+  if (typeof ztDefenseSoftness === "function") {
+    const all = ztDefenseSoftness();
+    const ranked = Object.entries(all)
+      .map(([t, zones]) => ({ t, v: zones[zoneKey] }))
+      .filter((r) => r.v !== null && r.v !== undefined)
+      .sort((a, b) => b.v - a.v);
+    const pos = ranked.findIndex((r) => r.t === opponent);
+    if (pos >= 0) {
+      const n = ranked.length;
+      const place = pos + 1;
+      const where = zoneLabel(zoneKey).toLowerCase();
+      // Soft/firm by league third OR by the same 0.5 softness line Zone
+      // Targets uses for its zone chips, so the two never disagree.
+      const v = ranked[pos].v;
+      const isSoft = place <= Math.ceil(n / 3) || v >= 0.5;
+      const isFirm = !isSoft && (place > n - Math.ceil(n / 3) || v <= -0.5);
+      if (isSoft) {
+        verdict = `<span class="pz-verdict pz-verdict-soft">Soft spot</span>`;
+        blurb =`<p class="pz-blurb pz-blurb-good"><b>Top ${Math.max(1, Math.round((place / n) * 100))}% matchup</b> &mdash; ${opponent} is the ${ordinal(place)}-softest ${where} defense.</p>`;
+      } else if (isFirm) {
+        const fromBottom = n - place + 1;
+        verdict = `<span class="pz-verdict pz-verdict-firm">Holds up</span>`;
+        blurb =`<p class="pz-blurb pz-blurb-bad"><b>Bottom ${Math.max(1, Math.round((fromBottom / n) * 100))}% matchup</b> &mdash; ${opponent} is the ${ordinal(fromBottom)}-toughest ${where} defense.</p>`;
+      } else {
+        verdict = `<span class="pz-verdict">Average</span>`;
+        blurb = `<p class="pz-blurb"><b>Neutral matchup</b> &mdash; ${opponent} ranks ${ordinal(place)} of ${n} in ${where} softness.</p>`;
+      }
+    }
+  }
   return `<h4 class="pass-zone-modal-subhead">${teamLogoMini(opponent)} ${opponent} Defense Here ${verdict}</h4>
-    <table class="data-table player-odds-table pass-zone-summary-table">
+    <table class="data-table player-odds-table pass-zone-summary-table pz-def-table">
+      <thead><tr><th></th><th class="num">${opponent}</th><th class="num">League avg</th></tr></thead>
       <tbody>
-        <tr><td>Throws faced / game</td><td class="num">${fmt(zone.attempts / g, 1)} <span class="muted-label">(${ordinal(rank)} most)</span></td></tr>
-        <tr><td>Completions allowed</td><td class="num">${zone.completions}/${zone.attempts} <span class="muted-label">(${Math.round((zone.completions / zone.attempts) * 100)}%)</span></td></tr>
-        <tr><td>Yards allowed (YAC)</td><td class="num">${fmt(yds, 0)} <span class="muted-label">(${fmt(yac, 0)} after catch)</span></td></tr>
-        <tr><td>EPA / throw allowed</td><td class="num">${epa >= 0 ? "+" : ""}${fmt(epa, 2)} <span class="muted-label">(${zone.attempts} throws)</span></td></tr>
+        <tr><td>Throws faced / game</td><td${cellAttr("vol")}>${fmt(zone.attempts / g, 1)} <span class="muted-label">(${ordinal(rank)} most)</span></td><td class="num muted-label">${fmt(lgAvg.vol, 1)}</td></tr>
+        <tr><td>Completion % allowed</td><td${cellAttr("comp")}>${Math.round((zone.completions / zone.attempts) * 100)}% <span class="muted-label">(${zone.completions}/${zone.attempts})</span></td><td class="num muted-label">${Math.round(lgAvg.comp * 100)}%</td></tr>
+        <tr><td>Yards / throw allowed</td><td${cellAttr("ypt")}>${fmt(yds / zone.attempts, 1)}</td><td class="num muted-label">${fmt(lgAvg.ypt, 1)}</td></tr>
+        <tr><td>YAC / catch allowed</td><td${cellAttr("yacpc")}>${zone.completions ? fmt(yac / zone.completions, 1) : "--"}</td><td class="num muted-label">${fmt(lgAvg.yacpc, 1)}</td></tr>
+        <tr><td>EPA / throw allowed</td><td${cellAttr("epa")}>${sign(epa)}</td><td class="num muted-label">${sign(lgAvg.epa)}</td></tr>
       </tbody>
-    </table>`;
+    </table>
+    ${blurb}
+    <p class="pz-note">Colors vs the league from ${opponent}'s side (green = allows less), sample-adjusted for ${zone.attempts} throw${zone.attempts === 1 ? "" : "s"}.</p>`;
 }
 function ordinal(n) {
   const s = ["th", "st", "nd", "rd"];
