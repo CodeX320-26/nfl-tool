@@ -62,6 +62,16 @@ context. It is the only copy that travels with the repo.
   - `sync.js`: **member profiles**. It mirrors saved plays, picks, notes, summary rails and manual Outs to the logged-in Discord member's profile (`/api/state`, Cloudflare D1), so they follow them to any device. (Replaced the owner-only Firebase sync on 2026-09-28.)
   - `teams.js`: team names, colors and logo URLs.
   - `style.css`: dark/light theme tokens and all page styles.
+    - **Phone layout (added 2026-09-29):** one `@media (max-width: 760px)` block at the very end of
+      style.css holds every phone-only rule, so desktop stays pixel-identical (verified by diffing
+      1440px screenshots before/after). Nothing is hidden on phones: wide sections scroll sideways
+      inside their own box with the first (name) column pinned, side-by-side columns stack,
+      Target Zones cards go two across, and the tab menu tightens (edge fade under 380px).
+      New wide tables/grids should live inside `.stat-columns > section` (or get `min-width: 0;
+      overflow-x: auto` in that block) so they don't widen the page on phones.
+    - The Summary cards are fixed 1160px images; on phones `zoomSummaryCardForPhone` (common.js,
+      same 760px breakpoint) shrinks the card to fit, and `saveSummaryImage` lifts the zoom while
+      capturing, so saved PNGs are identical on every device.
 
 ### Hosting (moving to Cloudflare, started 2026-09-28)
 

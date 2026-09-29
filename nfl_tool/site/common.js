@@ -1181,6 +1181,7 @@ function fitSummaryCard() {
   const card = document.getElementById("summary-card");
   const inner = card?.querySelector(".sc-inner");
   if (!inner) return;
+  card.style.zoom = "";
   inner.style.transform = "";
   inner.style.width = "";
   const scale = Math.min(1, card.clientHeight / inner.scrollHeight);
@@ -1188,7 +1189,34 @@ function fitSummaryCard() {
     inner.style.transform = `scale(${scale})`;
     inner.style.width = `${100 / scale}%`;
   }
+  zoomSummaryCardForPhone();
 }
+
+// Phones only (same 760px breakpoint as the mobile block at the end of
+// style.css): the Summary card is a fixed 1160px video-template image, so
+// shrink the whole card to the screen width as a preview. Desktop never gets
+// a zoom. saveSummaryImage lifts the zoom while capturing, so the saved PNG
+// is identical on every device.
+const PHONE_QUERY = window.matchMedia("(max-width: 760px)");
+function zoomSummaryCardForPhone() {
+  const card = document.getElementById("summary-card");
+  if (!card) return;
+  if (!PHONE_QUERY.matches) { card.style.zoom = ""; return; }
+  // Width of whatever box the card sits in (it can be nested in padded
+  // panels); if that box is hidden right now, fall back to the page width.
+  const box = card.parentElement;
+  const cs = box ? getComputedStyle(box) : null;
+  let avail = box ? box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) : 0;
+  if (!(avail > 0)) avail = document.documentElement.clientWidth - 32;
+  card.style.zoom = String(Math.min(1, Math.max(0.2, (avail - 2) / card.offsetWidth)));
+  // Re-fit when that box changes size, e.g. its tab going from hidden to shown.
+  if (box && window.ResizeObserver && !box._summaryZoomObserved) {
+    box._summaryZoomObserved = true;
+    new ResizeObserver(() => zoomSummaryCardForPhone()).observe(box);
+  }
+}
+window.addEventListener("resize", zoomSummaryCardForPhone);
+PHONE_QUERY.addEventListener("change", zoomSummaryCardForPhone);
 
 // The exported PNG only uses fonts embedded into it -- html-to-image can't
 // read Google Fonts' cross-origin stylesheet itself, so fetch it, keep the
@@ -1225,6 +1253,8 @@ async function saveSummaryImage() {
   const card = document.getElementById("summary-card");
   btn.disabled = true;
   btn.textContent = "Saving...";
+  const phoneZoom = card.style.zoom;
+  card.style.zoom = "";
   try {
     if (!window.htmlToImage) {
       await new Promise((resolve, reject) => {
@@ -1251,6 +1281,7 @@ async function saveSummaryImage() {
   } catch (e) {
     btn.textContent = "Couldn't save -- screenshot instead";
   }
+  card.style.zoom = phoneZoom;
   setTimeout(() => {
     btn.disabled = false;
     btn.textContent = "Save image";
