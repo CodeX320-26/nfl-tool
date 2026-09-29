@@ -728,6 +728,7 @@ function passZonePlayerSummary(plays) {
       g.yards += p.yards || 0;
       g.air += p.air_yards || 0;
       g.yac += p.yac || 0;
+      g.long = Math.max(g.long || 0, p.yards || 0);
     }
     g.epa += p.epa || 0;
     g.plays.push(p);
@@ -746,15 +747,17 @@ function renderPassZonePlayerSummaryTable(summary, team = null) {
         <td>${g.position}</td>
         <td class="num">${g.targets}</td>
         <td class="num">${g.rec}</td>
+        <td class="num">${g.targets ? Math.round((g.rec / g.targets) * 100) : 0}%</td>
         <td class="num">${g.yards}</td>
-        <td class="num">${g.air}</td>
         <td class="num">${g.yac}</td>
+        <td class="num">${g.rec ? fmt(g.yac / g.rec, 1) : "--"}</td>
+        <td class="num">${g.rec ? g.long : "--"}</td>
         <td class="num ${epaCls}">${epaSign}${g.epa.toFixed(1)}</td>
       </tr>`;
     })
     .join("");
   return `<table class="data-table player-odds-table pass-zone-summary-table">
-    <thead><tr><th>Player</th><th>Pos</th><th class="num">Tgt</th><th class="num">Rec</th><th class="num">Yds</th><th class="num">Air</th><th class="num">YAC</th><th class="num">EPA</th></tr></thead>
+    <thead><tr><th>Player</th><th>Pos</th><th class="num">Tgt</th><th class="num">Rec</th><th class="num">Catch%</th><th class="num">Yds</th><th class="num">YAC</th><th class="num">YAC/R</th><th class="num">Long</th><th class="num">EPA</th></tr></thead>
     <tbody>${body}</tbody>
   </table>`;
 }
@@ -796,30 +799,102 @@ function renderPassZonePositionTable(summary) {
 // into air (where it was caught -- the same depth this grid buckets by)
 // and yac, since a short completion that housed it on YAC is a very
 // different play than one that fell short of the sticks.
-function renderPassZonePlayList(summary, team = null) {
+// The other team in a given week's game (for the play list's Opp column).
+function weekOpponent(team, week) {
+  const g = (DATA.schedule || []).find((x) => x.week === week && (x.away === team || x.home === team));
+  return g ? (g.away === team ? g.home : g.away) : "";
+}
+
+// oppTeamOf(play): the team on the other side of that throw.
+function renderPassZonePlayList(summary, team = null, oppTeamOf = null) {
   return summary
     .map((g) => {
       const rows = g.plays
+        .slice()
+        .sort((a, b) => b.week - a.week)
         .map((p) => {
           const result = p.complete
-            ? `${p.yards}y <span class="muted-label">(${p.air_yards} air + ${p.yac ?? 0} yac)</span>`
+            ? `<b class="pz-play-yds">${p.yards} yds</b>`
             : p.defender
-            ? `Incomplete &mdash; broken up by ${p.defender}`
+            ? `Inc &mdash; PBU ${p.defender}`
             : "Incomplete";
           const epaCls = p.epa > 0 ? "tier-good" : p.epa < 0 ? "tier-bad" : "";
           const epaSign = p.epa >= 0 ? "+" : "";
-          return `<tr><td>Wk ${p.week}</td><td>${result}</td><td class="num ${epaCls}">${p.epa === null ? "--" : `${epaSign}${p.epa.toFixed(1)}`}</td></tr>`;
+          const opp = oppTeamOf ? oppTeamOf(p) : "";
+          return `<tr${p.complete ? "" : ' class="pz-play-inc"'}><td class="num">${p.week}</td><td>${opp ? `${teamLogoMini(opp, 14)} ${opp}` : ""}</td><td>${result}</td><td class="num">${p.air_yards ?? "--"}</td><td class="num">${p.complete ? p.yac ?? 0 : "--"}</td><td class="num ${epaCls}">${p.epa === null ? "--" : `${epaSign}${p.epa.toFixed(1)}`}</td></tr>`;
         })
         .join("");
       return `<div class="pass-zone-plays-player">
-        <div class="stat-column-title">${team ? playerClick(team, g.name) : g.name} <span class="muted-label">(${g.position} &middot; ${g.targets} tgt)</span></div>
-        <table class="data-table player-odds-table">
-          <thead><tr><th>Wk</th><th>Result</th><th class="num">EPA</th></tr></thead>
+        <div class="stat-column-title">${team ? playerClick(team, g.name) : g.name} <span class="muted-label">(${g.position} &middot; ${g.rec}/${g.targets})</span></div>
+        <table class="data-table player-odds-table pz-play-table">
+          <thead><tr><th class="num">Wk</th><th>Opp</th><th>Result</th><th class="num">Air</th><th class="num">YAC</th><th class="num">EPA</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>`;
     })
     .join("");
+}
+
+// Zone at a glance: volume, catch rate, yards, how much came after the
+// catch, efficiency, and big plays.
+function renderPassZoneSummaryTiles(plays) {
+  const att = plays.length;
+  const comp = plays.filter((p) => p.complete).length;
+  const yds = plays.reduce((s, p) => s + (p.complete ? p.yards || 0 : 0), 0);
+  const yac = plays.reduce((s, p) => s + (p.complete ? p.yac || 0 : 0), 0);
+  const epa = plays.reduce((s, p) => s + (p.epa || 0), 0);
+  const big = plays.filter((p) => p.complete && (p.yards || 0) >= 20).length;
+  const tile = (label, value, sub = "") => `<div class="pz-tile"><span>${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
+  return `<div class="pz-tiles">
+    ${tile("Throws", att)}
+    ${tile("Catches", comp, att ? `${Math.round((comp / att) * 100)}%` : "")}
+    ${tile("Yards", fmt(yds, 0), comp ? `${fmt(yds / comp, 1)} / catch` : "")}
+    ${tile("YAC", fmt(yac, 0), yds > 0 ? `${Math.round((yac / yds) * 100)}% of yds` : "")}
+    ${tile("EPA / throw", att ? `${epa / att >= 0 ? "+" : ""}${fmt(epa / att, 2)}` : "--")}
+    ${tile("20+ yd plays", big)}
+  </div>`;
+}
+
+// Offense side: what THIS WEEK'S defense allows in the same zone, so the
+// read is two-sided (who gets it here, and does this defense give it up).
+function renderPassZoneDefenseBlock(opponent, zoneKey) {
+  const zone = (DATA.pass_shot_charts[opponent] || {}).def?.zones?.[zoneKey];
+  if (!zone || !zone.attempts) return `<h4 class="pass-zone-modal-subhead">${teamLogoMini(opponent)} ${opponent} Defense Here</h4><p class="no-data-note">No throws against them here yet.</p>`;
+  const g = DATA.team_stats[opponent]?.games_played || 1;
+  const { yds, yac } = zoneYards(zone);
+  const rank = DATA.teams
+    .map((t) => ({ t, z: (DATA.pass_shot_charts[t] || {}).def?.zones?.[zoneKey], gp: DATA.team_stats[t]?.games_played || 1 }))
+    .filter((r) => r.z && r.z.attempts)
+    .sort((a, b) => b.z.attempts / b.gp - a.z.attempts / a.gp)
+    .findIndex((r) => r.t === opponent) + 1;
+  const epa = zone.epa_sum / zone.attempts;
+  // Verdict from the same sample-shrunk softness Zone Targets uses (half the
+  // zone's own numbers pulled toward league average, half the opponent-
+  // adjusted depth band), so a 2-throw fluke can't read "soft" -- and the
+  // raw EPA below stays uncolored so the box never argues with itself.
+  const soft = typeof ztDefenseSoftness === "function" ? (ztDefenseSoftness()[opponent] || {})[zoneKey] : null;
+  const verdict =
+    soft === null || soft === undefined
+      ? ""
+      : soft >= 0.5
+      ? `<span class="pz-verdict pz-verdict-soft">Soft spot</span>`
+      : soft <= -0.5
+      ? `<span class="pz-verdict pz-verdict-firm">Holds up</span>`
+      : `<span class="pz-verdict">Average</span>`;
+  return `<h4 class="pass-zone-modal-subhead">${teamLogoMini(opponent)} ${opponent} Defense Here ${verdict}</h4>
+    <table class="data-table player-odds-table pass-zone-summary-table">
+      <tbody>
+        <tr><td>Throws faced / game</td><td class="num">${fmt(zone.attempts / g, 1)} <span class="muted-label">(${ordinal(rank)} most)</span></td></tr>
+        <tr><td>Completions allowed</td><td class="num">${zone.completions}/${zone.attempts} <span class="muted-label">(${Math.round((zone.completions / zone.attempts) * 100)}%)</span></td></tr>
+        <tr><td>Yards allowed (YAC)</td><td class="num">${fmt(yds, 0)} <span class="muted-label">(${fmt(yac, 0)} after catch)</span></td></tr>
+        <tr><td>EPA / throw allowed</td><td class="num">${epa >= 0 ? "+" : ""}${fmt(epa, 2)} <span class="muted-label">(${zone.attempts} throws)</span></td></tr>
+      </tbody>
+    </table>`;
+}
+function ordinal(n) {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
 // On the defense side, this week's actual opponent's offense in this
@@ -840,45 +915,54 @@ function renderPassZoneOpponentBlock(opponent, zoneKey) {
 // Everything in one wide view -- league rank, the who-to-target summary,
 // and the plays themselves side by side, instead of a narrow box that
 // made you toggle between them to hold two numbers in your head.
-function renderPassZoneModalContent(team, side, zoneKey, opponent) {
+// receiver (optional): only that pass-catcher's throws in the zone -- what
+// a receiver grid cell opens.
+function renderPassZoneModalContent(team, side, zoneKey, opponent, receiver = null) {
   const zone = (DATA.pass_shot_charts[team] || {})[side]?.zones?.[zoneKey];
-  const plays = (zone && zone.plays) || [];
+  let plays = (zone && zone.plays) || [];
+  if (receiver) plays = plays.filter((p) => normName(p.receiver || "") === normName(receiver));
   const sideLabel = side === "off" ? "Offense" : "Defense Allowed";
-  const heading = `${teamLogoMini(team)} ${team} &mdash; ${zoneLabel(zoneKey)} ${sideLabel}`;
+  const who = receiver ? `${playerClick(team, receiver)} &mdash; ` : `${teamLogoMini(team)} ${team} &mdash; `;
+  const heading = `${who}${zoneLabel(zoneKey)} ${receiver ? "Targets" : sideLabel}`;
   const summary = passZonePlayerSummary(plays);
+  // Opponent of each throw: the defense (offense view) or the offense
+  // (defense view) that team played that week.
+  const oppOf = (p) => weekOpponent(team, p.week);
   const summaryBlock = !plays.length
     ? `<p class="no-data-note">No attempts in this zone yet.</p>`
     : side === "def"
     ? `<h4 class="pass-zone-modal-subhead">By Position</h4>${renderPassZonePositionTable(summary)}
        <h4 class="pass-zone-modal-subhead">By Player</h4>${renderPassZonePlayerSummaryTable(summary)}
        ${opponent ? renderPassZoneOpponentBlock(opponent, zoneKey) : ""}`
-    : `<h4 class="pass-zone-modal-subhead">Who's Getting Targeted</h4>${renderPassZonePlayerSummaryTable(summary, team)}`;
+    : `${receiver ? "" : `<h4 class="pass-zone-modal-subhead">Who's Getting Targeted <span class="muted-label">(most targets first)</span></h4>${renderPassZonePlayerSummaryTable(summary, team)}`}
+       ${opponent ? renderPassZoneDefenseBlock(opponent, zoneKey) : ""}`;
   return `<h3>${heading}</h3>
+    ${plays.length ? renderPassZoneSummaryTiles(plays) : ""}
     <div class="pass-zone-modal-layout">
       <div class="pass-zone-modal-col pass-zone-modal-col-rank">
-        <h4 class="pass-zone-modal-subhead">League Rank <span class="muted-label">(by volume)</span></h4>
+        <h4 class="pass-zone-modal-subhead">League Rank <span class="muted-label">(team volume)</span></h4>
         ${renderPassZoneRankTable(team, side, zoneKey)}
       </div>
       <div class="pass-zone-modal-col">
         ${summaryBlock}
       </div>
       <div class="pass-zone-modal-col pass-zone-modal-col-plays">
-        ${plays.length ? `<h4 class="pass-zone-modal-subhead">Every Play</h4><div class="pass-zone-plays-wrap">${renderPassZonePlayList(summary, side === "off" ? team : null)}</div>` : ""}
+        ${plays.length ? `<h4 class="pass-zone-modal-subhead">Every Throw <span class="muted-label">(by player, newest first)</span></h4><div class="pass-zone-plays-wrap">${renderPassZonePlayList(summary, side === "off" ? team : null, oppOf)}</div>` : ""}
       </div>
     </div>`;
 }
 
-function openPassZoneRankModal(team, side, zoneKey, opponent) {
+function openPassZoneRankModal(team, side, zoneKey, opponent, receiver = null) {
   ensurePassZoneModal();
-  document.getElementById("pass-zone-modal-content").innerHTML = renderPassZoneModalContent(team, side, zoneKey, opponent);
+  document.getElementById("pass-zone-modal-content").innerHTML = renderPassZoneModalContent(team, side, zoneKey, opponent, receiver);
   document.getElementById("pass-zone-modal").hidden = false;
 }
 
 document.addEventListener("click", (e) => {
   const cell = e.target.closest(".pass-zone-rank-click");
   if (!cell) return;
-  const { team, side, zoneKey, opponent } = decodeDataAttr(cell.dataset.entry);
-  openPassZoneRankModal(team, side, zoneKey, opponent);
+  const { team, side, zoneKey, opponent, receiver } = decodeDataAttr(cell.dataset.entry);
+  openPassZoneRankModal(team, side, zoneKey, opponent, receiver);
 });
 
 function zoneLabel(zoneKey) {
@@ -993,7 +1077,7 @@ function renderPlayerZoneMiniCard(team, name, player, oppTeam) {
         <span class="pass-zone-player-pos">${player.position || "?"} &middot; ${totalTgt} tgt</span>
       </div>
     </div>
-    ${renderPlayerZoneHeatGrid(player.zones, oppTeam)}
+    ${renderPlayerZoneHeatGrid(player.zones, oppTeam, { team, name })}
   </div>`;
 }
 
@@ -1040,7 +1124,21 @@ function mainPasser(team) {
     .sort((a, b) => b.pass_att - a.pass_att)[0] || null;
 }
 
-function renderQbZoneHeatGrid(chart, oppTeam) {
+// Yards and YAC for one zone's completions (from its play list).
+function zoneYards(zone) {
+  const plays = (zone && zone.plays) || [];
+  let yds = 0;
+  let yac = 0;
+  plays.forEach((p) => {
+    if (p.complete) {
+      yds += p.yards || 0;
+      yac += p.yac || 0;
+    }
+  });
+  return { yds, yac };
+}
+
+function renderQbZoneHeatGrid(chart, oppTeam, team) {
   let maxAtt = 0;
   PASS_ZONE_ROWS.forEach((r) =>
     PASS_ZONE_COLS.forEach((c) => {
@@ -1057,10 +1155,13 @@ function renderQbZoneHeatGrid(chart, oppTeam) {
       const style = att
         ? ` style="background: rgba(var(--accent-rgb), ${(PLAYER_ZONE_HEAT_MIN_ALPHA + (att / maxAtt) * (PLAYER_ZONE_HEAT_MAX_ALPHA - PLAYER_ZONE_HEAT_MIN_ALPHA)).toFixed(2)})"`
         : "";
-      const display = att ? `${comp}/${att}` : "--";
+      const { yds, yac } = zoneYards(zone);
+      const display = att ? `<b>${comp}/${att}</b><small>${fmt(yds, 0)} yds &middot; ${fmt(yac, 0)} YAC</small>` : "--";
       const tier = att && oppTeam ? defenseZoneTier(oppTeam, zk) : "";
       const exploitCls = tier === "tier-bad" ? " pass-zone-heat-cell-exploit-bad" : tier === "tier-mid" ? " pass-zone-heat-cell-exploit-mid" : "";
-      return `<td class="num pass-zone-heat-cell${exploitCls}"${style}>${display}</td>`;
+      // Click a zone: every throw there -- who it went to, the result, air + YAC.
+      const click = att && team ? ` pass-zone-rank-click" data-entry="${encodeDataAttr({ team, side: "off", zoneKey: zk, opponent: oppTeam })}` : "";
+      return `<td class="num pass-zone-heat-cell pass-zone-heat-cell-qb${exploitCls}${click}"${style}>${display}</td>`;
     }).join("");
     return `<tr><th class="pass-zone-row-label-qb">${r.short}</th>${cells}</tr>`;
   }).join("");
@@ -1087,7 +1188,8 @@ function renderQbZoneMiniCard(team, qb, chart, oppTeam) {
         <span class="pass-zone-player-pos pass-zone-player-pos-qb">QB &middot; ${chart.pass_attempts} att</span>
       </div>
     </div>
-    ${renderQbZoneHeatGrid(chart, oppTeam)}
+    ${renderQbZoneHeatGrid(chart, oppTeam, team)}
+    <p class="pass-zone-qb-hint">Click a zone for every throw there.</p>
   </div>`;
 }
 

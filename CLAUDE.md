@@ -254,6 +254,17 @@ context. It is the only copy that travels with the repo.
   - The 4 depth columns sit under a boxed "Target depth" group label. Their colors compare each
     player to every pass-catcher in the league, so leave them as-is.
 - Schedule strip (top of every page): finished games show each team's score under its logo (winner bold), not the date.
+- **Zone popup** (`renderPassZoneModalContent`):
+  - Opened by clicking a cell in any team grid, the QB grid, or a receiver grid. A receiver grid
+    opens the popup filtered to that player (`receiver` in the payload).
+  - It shows:
+    - summary tiles: throws, catches/%, yards per catch, YAC share, EPA per throw, 20+ plays;
+    - league rank by volume;
+    - who got targeted, most first, with catch %, YAC/rec and longest;
+    - on offense, "OPP Defense Here" with a Soft spot / Average / Holds up verdict from
+      `ztDefenseSoftness`, the same shrunk measure Zone Targets uses (raw EPA stays uncolored);
+    - every throw grouped by player, newest first, with opponent, air yards, YAC and EPA.
+  - QB grid cells show comp/att plus yards · YAC.
 - Player Props page extras:
   - The **Pick props** list is grouped Passing / Rushing / Receiving / Other, then by player.
   - Each player has an **Out?** switch for late news the injury report misses.

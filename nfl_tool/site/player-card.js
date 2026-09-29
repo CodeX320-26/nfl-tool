@@ -394,7 +394,10 @@ function defenseZoneTier(oppTeam, zoneKey) {
   return tierFromZ(passZoneCellZ(chart, oppTeam, "def", zoneKey));
 }
 
-function renderPlayerZoneHeatGrid(zones, oppTeam) {
+// ctx {team, name} (optional): each zone opens that player's throws there
+// (the Player Props zone popup -- only where that page's code is loaded).
+function renderPlayerZoneHeatGrid(zones, oppTeam, ctx = null) {
+  const clickable = ctx && typeof openPassZoneRankModal === "function";
   let maxTargets = 0;
   PASS_ZONE_ROWS.forEach((r) =>
     PASS_ZONE_COLS.forEach((c) => {
@@ -417,7 +420,8 @@ function renderPlayerZoneHeatGrid(zones, oppTeam) {
       // meaningless signal, not an insight.
       const tier = targets && oppTeam ? defenseZoneTier(oppTeam, zk) : "";
       const exploitCls = tier === "tier-bad" ? " pass-zone-heat-cell-exploit-bad" : tier === "tier-mid" ? " pass-zone-heat-cell-exploit-mid" : "";
-      return `<td class="num pass-zone-heat-cell${exploitCls}"${style}>${display}</td>`;
+      const click = clickable && targets ? ` pass-zone-rank-click" data-entry="${encodeDataAttr({ team: ctx.team, side: "off", zoneKey: zk, opponent: oppTeam, receiver: ctx.name })}` : "";
+      return `<td class="num pass-zone-heat-cell${exploitCls}${click}"${style}>${display}</td>`;
     }).join("");
     return `<tr><th class="pass-zone-row-label-mini">${r.short}</th>${cells}</tr>`;
   }).join("");
@@ -711,7 +715,7 @@ function pcCatchZones(team, name, oppTeam) {
   return `<div class="pc-lane-section">
     <div class="pc-log-title">Catch zones${oppTeam ? ` <span class="pc-vs">vs ${teamLogoMini(oppTeam, 16)} ${oppTeam} pass D</span>` : ""}</div>
     <p class="no-data-note">Catches / targets by depth and side (${total} targets). Outlined = a soft spot in ${oppTeam || "the opponent"}'s pass defense (red = soft, yellow = average).</p>
-    <div class="pc-zone-wrap">${renderPlayerZoneHeatGrid(hit.v.zones, oppTeam)}</div>
+    <div class="pc-zone-wrap">${renderPlayerZoneHeatGrid(hit.v.zones, oppTeam, { team, name: hit.name })}</div>
   </div>`;
 }
 function pcRushLanes(team, name, oppTeam) {
