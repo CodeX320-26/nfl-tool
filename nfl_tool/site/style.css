@@ -3024,7 +3024,11 @@ html.local-dev .update-odds-link { display: inline-flex; }
 .qb-tile.tier-mid { background-color: rgba(var(--mid-rgb), calc(var(--tier-a, 0.14) + 0.12)); border-color: rgba(var(--mid-rgb), 0.4); }
 .qb-tile.tier-bad { background-color: rgba(var(--bad-rgb), calc(var(--tier-a, 0.16) + 0.14)); border-color: rgba(var(--bad-rgb), 0.45); }
 .qb-tile:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
-.qb-lines { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.qb-lines { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; height: 30px; }
+.qb-lines-chips { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; gap: 5px; overflow: hidden; white-space: nowrap; -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+.qb-lines-chips .qb-line { flex: 0 0 auto; }
+.qb-line-none { font-size: 0.78rem; font-style: italic; color: var(--muted); }
+.qb-line-hint { flex: 0 0 auto; white-space: nowrap; }
 .qb-line { padding: 3px 9px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border); font-size: 0.76rem; font-weight: 700; color: var(--muted); }
 .qb-line b { color: var(--text); font-family: var(--font-display); font-size: 0.92rem; }
 .qb-line-hint { margin-left: auto; font-size: 0.76rem; font-weight: 700; color: var(--accent); }

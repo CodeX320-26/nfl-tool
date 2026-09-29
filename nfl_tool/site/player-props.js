@@ -1443,13 +1443,16 @@ function qbRedZoneTable(team, oppTeam) {
   </table>`;
 }
 
+// Always exactly one line tall (chips that don't fit are cut off, "All
+// lines" stays pinned right) and always present, so the two teams' cards
+// line up box for box even when only one QB has lines posted.
 function qbLinesStrip(p, team) {
-  const rows = playerPropsAcrossMarkets(team, p.name);
-  if (!rows.length) return "";
-  return `<div class="qb-lines">${rows
-    .slice(0, 8)
-    .map((r) => `<span class="qb-line">${r.market} <b>${fmt(r.line, 1)}</b></span>`)
-    .join("")}<span class="qb-line-hint">${playerClick(team, p.name, "All lines &rsaquo;")}</span></div>`;
+  // Passing markets first -- they're the QB lines people look for.
+  const rows = playerPropsAcrossMarkets(team, p.name).sort((a, b) => b.marketKey.startsWith("passing") - a.marketKey.startsWith("passing"));
+  const chips = rows.length
+    ? rows.map((r) => `<span class="qb-line">${r.market} <b>${fmt(r.line, 1)}</b></span>`).join("")
+    : `<span class="qb-line-none">No lines posted yet this week</span>`;
+  return `<div class="qb-lines"><div class="qb-lines-chips">${chips}</div><span class="qb-line-hint">${playerClick(team, p.name, rows.length ? "All lines &rsaquo;" : "Player card &rsaquo;")}</span></div>`;
 }
 
 function qbRecentWeeks(p, team) {
