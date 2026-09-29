@@ -2997,3 +2997,14 @@ html.local-dev .update-odds-link { display: inline-flex; }
 .pass-zone-player-banner.player-click { cursor: pointer; }
 .pass-zone-player-banner.player-click:hover .pass-zone-player-name { text-decoration: underline; }
 .sc-key .player-click, .gs-inj .player-click { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Receiving table: team-relative shading on the core stats (inline, see
+   renderReceivingTeamTable) and the depth columns boxed as their own group
+   (their colors compare each player to the league, not his teammates). */
+.props-rec-table tr.rec-group-row th { padding: 0 2px 2px; background: transparent; }
+.props-rec-table th.rec-depth-group { border: 1px solid var(--border-strong); border-bottom: none; border-radius: 8px 8px 0 0; font-size: 0.6rem; letter-spacing: 0.08em; color: var(--muted); }
+.props-rec-table th.rec-depth, .props-rec-table td.rec-depth { box-shadow: inset 0 0 0 1px var(--border-strong) !important; }
+.props-rec-table th.rec-depth { border-radius: 0; }
+.props-rec-table td.rec-depth.tier-good { box-shadow: inset 0 0 0 1px rgba(var(--good-rgb), 0.55) !important; }
+.props-rec-table td.rec-depth.tier-bad { box-shadow: inset 0 0 0 1px rgba(var(--bad-rgb), 0.55) !important; }
+.props-rec-table td.rec-depth.tier-mid { box-shadow: inset 0 0 0 1px rgba(var(--mid-rgb), 0.55) !important; }

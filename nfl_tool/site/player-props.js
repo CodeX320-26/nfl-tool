@@ -138,12 +138,30 @@ function renderReceivingTeamTable(team, oppTeam) {
     const arrow = active ? (receivingSort.dir === "desc" ? " ▼" : " ▲") : "";
     return `<th class="${cls} receiving-sort-click${active ? " active" : ""}" data-key="${key}">${label}${arrow}</th>`;
   };
+  // Very light shading against his OWN teammates in this table (not the
+  // league): percentile rank within the team, green above the middle, red
+  // below, never stronger than a faint wash. Layered as a background-image
+  // so the tile's own base color stays underneath.
+  const teamPools = {};
+  RECEIVING_STAT_COLS.forEach((c) => (teamPools[c.key] = rows.map((p) => p[c.key]).filter((v) => v !== null && v !== undefined).sort((a, b) => a - b)));
+  const teamShade = (key, val) => {
+    const pool = teamPools[key];
+    if (pool.length < 3 || pool[0] === pool[pool.length - 1]) return "";
+    const below = pool.filter((v) => v < val).length;
+    const equal = pool.filter((v) => v === val).length;
+    const q = (below + (equal - 1) / 2) / (pool.length - 1); // 0 = team low, 1 = team high
+    const d = Math.abs(q - 0.5) * 2;
+    if (d < 0.2) return "";
+    const rgb = q > 0.5 ? "var(--good-rgb)" : "var(--bad-rgb)";
+    const a = (0.05 + 0.13 * d).toFixed(3);
+    return ` style="background-image:linear-gradient(rgba(${rgb},${a}),rgba(${rgb},${a}))"`;
+  };
   const statCell = (p, col) => {
     const val = p[col.key];
     if (val === null || val === undefined) return `<td class="num">--</td>`;
     const display = col.percent ? `${Math.round(val * 100)}%` : fmt(val, col.digits ?? 1);
     const payload = { statKey: col.key, label: col.label, percent: !!col.percent, digits: col.digits, invert: !!col.invert };
-    return `<td class="num receiving-col-rank-click" data-entry="${encodeDataAttr(payload)}">${display}</td>`;
+    return `<td class="num receiving-col-rank-click" data-entry="${encodeDataAttr(payload)}"${teamShade(col.key, val)}>${display}</td>`;
   };
 
   const body = rows
@@ -151,11 +169,11 @@ function renderReceivingTeamTable(team, oppTeam) {
       const zones = ((DATA.player_pass_zones[p.team] || {})[p.name] || {}).zones;
       const distCells = RECEIVING_DIST_COLS.map((r) => {
         const share = playerZoneDepthShare(zones, r.key);
-        if (share === null) return `<td class="num">--</td>`;
+        if (share === null) return `<td class="num rec-depth">--</td>`;
         const pool = playerZoneDepthSharePool(r.key);
         const cls = percentileTier(share, pool, false);
         const alpha = tierAlphaAttr(share, pool, false);
-        return `<td class="num ${cls}"${alpha}>${Math.round(share * 100)}%</td>`;
+        return `<td class="num rec-depth ${cls}"${alpha}>${Math.round(share * 100)}%</td>`;
       }).join("");
       return `<tr>
         <td><span class="player-name player-click" data-entry="${encodeDataAttr({ team: p.team, name: p.name, oppTeam })}">${p.name}</span></td>
@@ -168,11 +186,14 @@ function renderReceivingTeamTable(team, oppTeam) {
 
   return `${teamBannerHeader(team, true)}
     <table class="data-table props-rec-table">
-      <thead><tr>
+      <colgroup>${[130, 32, 40, 40, 48, 40, 40, 40, 40, 34, 40, 34, 34].map((w) => `<col style="width:${w}px">`).join("")}</colgroup>
+      <thead>
+      <tr class="rec-group-row"><th colspan="${2 + RECEIVING_STAT_COLS.length}"></th><th colspan="${RECEIVING_DIST_COLS.length}" class="rec-depth-group" title="Share of HIS targets at each depth, shaded vs every pass-catcher in the league">Target depth</th></tr>
+      <tr>
         ${sortHeader("name", "Player", "lb-player")}
         ${sortHeader("position", "Pos", "lb-pos")}
         ${RECEIVING_STAT_COLS.map((c) => sortHeader(c.key, c.label, "num")).join("")}
-        ${RECEIVING_DIST_COLS.map((c) => sortHeader(c.key, c.label, "num")).join("")}
+        ${RECEIVING_DIST_COLS.map((c) => sortHeader(c.key, c.label, "num rec-depth")).join("")}
       </tr></thead>
       <tbody>${body}</tbody>
     </table>`;

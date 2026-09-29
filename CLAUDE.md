@@ -240,6 +240,11 @@ context. It is the only copy that travels with the repo.
     - Team Grades use `openPairedGradeModal`; Red Zone's Trips/TDs/FGs/Avg columns appear on both halves.
   - New UI should reuse these patterns rather than add a new look.
 - Player Props pass-zone grids (Pass D Allowed / Passing Offense) use the summary-card look: rounded zone tiles, big share numbers, header/row shares as big red→green numbers with fill bars (no small % tags), stat tiles underneath. The offense per-player mini grids sit 3 cards per row with uniform row heights.
+- **Receiving table:**
+  - The 7 core columns get a very light green/red wash ranked against the player's own teammates
+    in that table.
+  - The 4 depth columns sit under a boxed "Target depth" group label. Their colors compare each
+    player to every pass-catcher in the league, so leave them as-is.
 - Schedule strip (top of every page): finished games show each team's score under its logo (winner bold), not the date.
 - Player Props page extras:
   - The **Pick props** list is grouped Passing / Rushing / Receiving / Other, then by player.
