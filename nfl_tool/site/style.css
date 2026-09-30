@@ -1904,6 +1904,26 @@ footer a { color: var(--accent); }
 .pick-save-all-btn:hover:not(:disabled) { opacity: 0.9; }
 .pick-save-all-btn:disabled { opacity: 0.4; cursor: default; }
 
+/* Your Record week filter (checkbox chips) */
+.pick-week-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.wk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+.wk-chip input { margin: 0; accent-color: var(--accent); cursor: pointer; }
+.wk-chip:hover { color: var(--text); border-color: var(--accent); }
+.wk-chip:has(input:checked) { color: var(--accent); border-color: var(--accent); background: rgba(var(--accent-rgb), 0.12); }
+.pick-week-showing { margin: 2px 0 0; font-size: 0.78rem; font-weight: 700; color: var(--muted); }
 .pick-matrix-table { margin-top: 6px; table-layout: fixed; width: 374px; }
 .pick-matrix-table th, .pick-matrix-table td { text-align: center; font-size: 0.76rem; padding: 3px 4px; line-height: 1.25; }
 .pick-matrix-table th { font-size: 0.66rem; }

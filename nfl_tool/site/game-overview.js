@@ -1489,9 +1489,62 @@ function renderPickMatrix(picks) {
   </table>`;
 }
 
+// Week filter for Your Record: checkbox chips (All weeks + one per week that
+// has picks). Nothing checked = all weeks. The choice is a per-device view
+// preference, so it lives in localStorage only (not synced to the profile).
+const PICK_WEEKS_KEY = "nfl-tool.picks.weekFilter";
+function loadPickWeekFilter() {
+  try {
+    const v = JSON.parse(localStorage.getItem(PICK_WEEKS_KEY));
+    return Array.isArray(v) ? v.map(Number) : [];
+  } catch (e) {
+    return [];
+  }
+}
+function savePickWeekFilter(weeks) {
+  try {
+    localStorage.setItem(PICK_WEEKS_KEY, JSON.stringify(weeks));
+  } catch (e) {
+    // View preference only -- fine if it doesn't persist.
+  }
+}
+function pickWeek(pick, gamesById) {
+  return pick.week ?? gamesById[pick.game_id]?.week ?? null;
+}
+function renderPickWeekFilter(weeks, selected, shownCount) {
+  if (weeks.length < 2) return "";
+  const chip = (value, label, checked) =>
+    `<label class="wk-chip"><input type="checkbox" data-week="${value}"${checked ? " checked" : ""}>${label}</label>`;
+  const showing = selected.length ? selected.map((w) => `Wk ${w}`).join(" + ") : "All weeks";
+  return `<div class="pick-week-filter">
+      ${chip("all", "All weeks", !selected.length)}
+      ${weeks.map((w) => chip(w, `Wk ${w}`, selected.includes(w))).join("")}
+    </div>
+    <p class="pick-week-showing">Showing ${showing} &middot; ${shownCount} pick${shownCount === 1 ? "" : "s"}</p>`;
+}
+document.addEventListener("change", (e) => {
+  const box = e.target.closest(".pick-week-filter input[type=checkbox]");
+  if (!box) return;
+  if (box.dataset.week === "all") {
+    savePickWeekFilter([]);
+  } else {
+    const week = Number(box.dataset.week);
+    const current = new Set(loadPickWeekFilter());
+    if (box.checked) current.add(week);
+    else current.delete(week);
+    savePickWeekFilter([...current].sort((a, b) => a - b));
+  }
+  renderPickSummary();
+});
+
 function renderPickSummary() {
-  const picks = regradeAllPicks(DATA.schedule);
-  const recent = picks
+  const allPicks = regradeAllPicks(DATA.schedule);
+  const gamesById = Object.fromEntries((DATA.schedule || []).map((g) => [g.game_id, g]));
+  const weeks = [...new Set(allPicks.map((p) => pickWeek(p, gamesById)).filter((w) => w != null))].sort((a, b) => a - b);
+  // Drop saved weeks that no longer have picks; none left = all weeks.
+  const selected = loadPickWeekFilter().filter((w) => weeks.includes(w));
+  const picks = selected.length ? allPicks.filter((p) => selected.includes(pickWeek(p, gamesById))) : allPicks;
+  const recent = allPicks
     .slice()
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, 8)
@@ -1502,6 +1555,7 @@ function renderPickSummary() {
     .join("");
   document.getElementById("picks-record").innerHTML = `
     <h3>Your Record</h3>
+    ${renderPickWeekFilter(weeks, selected, picks.length)}
     ${picks.length ? `<p class="no-data-note">Units assume 1u per pick at the price saved when you made it (Novig's price when it had one).</p>` : ""}
     ${renderPickMatrix(picks) || `<p class="no-data-note">No picks saved yet.</p>`}
   `;
