@@ -1512,7 +1512,7 @@ function pickWeek(pick, gamesById) {
   return pick.week ?? gamesById[pick.game_id]?.week ?? null;
 }
 function renderPickWeekFilter(weeks, selected, shownCount) {
-  if (weeks.length < 2) return "";
+  if (!weeks.length) return "";
   const chip = (value, label, checked) =>
     `<label class="wk-chip"><input type="checkbox" data-week="${value}"${checked ? " checked" : ""}>${label}</label>`;
   const showing = selected.length ? selected.map((w) => `Wk ${w}`).join(" + ") : "All weeks";

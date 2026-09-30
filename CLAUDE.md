@@ -187,7 +187,7 @@ context. It is the only copy that travels with the repo.
 - **Pick Tracker** grades each pick on the price saved at pick time, which is Novig's when
   available.
   - **Your Record week filter (2026-09-30):** checkbox chips above the record, "All weeks" plus one
-    chip per week that has picks (shows once picks span 2+ weeks). Check any mix of weeks to see
+    chip per week that has picks (shows whenever there are picks, even one week, so it's discoverable). Check any mix of weeks to see
     just those; none checked = all weeks. Recent Picks stays unfiltered. The selection is a
     per-device view preference in localStorage (`nfl-tool.picks.weekFilter`), not synced to the
     profile. Old picks without a `week` fall back to their game's week in the schedule.
