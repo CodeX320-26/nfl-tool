@@ -255,6 +255,10 @@ context. It is the only copy that travels with the repo.
     each holding its stat table plus scheme and Team Grades. Grade letters are the same size as
     the numbers, and Heavy/Light Box values stay on one line.
   - Game Previews order: Injuries, Odds, **Recent Games**, General Stats & Scheme, Pick Tracker.
+  - Injuries come from nflverse's injuries file, keyed by week. Teams file their first practice
+    report Wednesday afternoon (Thursday-game teams earlier), so Mon-Wed the current week is
+    empty; the panel then shows the team's most recent earlier report, labeled "No Week N report
+    yet ... Showing the Week N-1 final report" (2026-09-30), instead of a blank.
     The Raw Stats / vs Opponents toggle sits in the General Stats header, with a copy on the
     Summary toolbar because the card's matchups use it too.
   - Recent Games runs Week 1 first, with opponent logos, the closing spread and total from the

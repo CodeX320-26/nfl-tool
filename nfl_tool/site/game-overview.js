@@ -1314,9 +1314,22 @@ function starterTag(snapShare) {
 }
 
 function renderInjuryPanel(team, week) {
-  const list = (DATA.injuries[team] && DATA.injuries[team][String(week)]) || [];
+  const byWeek = DATA.injuries[team] || {};
+  let list = byWeek[String(week)] || [];
+  let note = "";
+  // Early in the week (before Wednesday's first practice report) this
+  // week's report is empty -- show the team's most recent earlier report,
+  // labeled, instead of a blank panel.
   if (list.length === 0) {
-    return `<h3>${team}</h3><p class="no-data-note">No one listed on the injury report.</p>`;
+    const prior = Object.keys(byWeek)
+      .map(Number)
+      .filter((w) => w < week && (byWeek[String(w)] || []).length)
+      .sort((a, b) => b - a)[0];
+    if (prior === undefined) {
+      return `<h3>${team}</h3><p class="no-data-note">No one listed on the injury report.</p>`;
+    }
+    list = byWeek[String(prior)];
+    note = `<p class="no-data-note injury-fallback-note">No Week ${week} report yet (first one posts Wednesday afternoon). Showing the Week ${prior} final report.</p>`;
   }
   const groups = { OFF: [], DEF: [], ST: [] };
   list.forEach((p) => {
@@ -1332,7 +1345,7 @@ function renderInjuryPanel(team, week) {
       return `<div class="injury-group"><span class="injury-group-label">${groupLabel[g]}</span><div class="injury-badges">${badges}</div></div>`;
     })
     .join("");
-  return `<h3>${team}</h3>${sections}`;
+  return `<h3>${team}</h3>${note}${sections}`;
 }
 
 // ---- pick tracker ----
