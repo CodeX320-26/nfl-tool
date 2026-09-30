@@ -1791,11 +1791,8 @@ footer a { color: var(--accent); }
 .recent-game-row { cursor: pointer; }
 .recent-game-row:hover td { background: rgba(var(--accent-rgb), 0.08); }
 
-/* 1100px was sized for a table that used to stretch full-width -- now
-   that box-score-table hugs its own (much narrower) content below, the
-   modal itself is capped down to match instead of leaving a wide empty
-   margin around four stacked, skinny stat tables. */
-#box-score-modal .modal-box { max-width: 700px; width: 92vw; }
+/* Sized for the two-up .box-score-grid below (two stat tables side by side). */
+#box-score-modal .modal-box { max-width: 820px; width: 92vw; }
 .box-score-team-toggle { display: flex; gap: 8px; margin: 8px 0 14px; }
 .box-score-team-toggle .box-score-team-btn {
   padding: 5px 12px;
@@ -1810,8 +1807,23 @@ footer a { color: var(--accent); }
 }
 .box-score-team-toggle .box-score-team-btn:hover { color: var(--text); border-color: var(--accent); }
 .box-score-team-toggle .box-score-team-btn.active { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
-.box-score-table { width: auto; margin-top: 14px; font-size: 0.78rem; }
-.box-score-table:first-of-type { margin-top: 0; }
+/* Two-up grid (Passing | Rushing, then Receiving | Defense), each table
+   filling its half: the old single column of content-width tables left
+   the right half of the modal empty (user, 2026-09-30). Name column takes
+   the slack; stat columns stay snug on the right. One column on phones. */
+.box-score-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+  align-items: start;
+}
+.box-score-table { width: 100%; margin: 0; font-size: 0.8rem; }
+.box-score-table th.num, .box-score-table td.num { width: 1%; min-width: 34px; white-space: nowrap; padding-left: 7px; padding-right: 7px; }
+.box-score-table td:first-child { white-space: nowrap; }
+.box-score-table thead tr + tr th:first-child { text-align: left; padding-left: 6px; }
+@media (max-width: 760px) {
+  .box-score-grid { grid-template-columns: minmax(0, 1fr); }
+}
 .box-score-cat-hdr {
   background: rgba(var(--accent-rgb), 0.16) !important;
   text-align: left !important;

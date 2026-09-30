@@ -1218,7 +1218,7 @@ function renderBoxScoreTeamContent(gameId, team) {
   ]
     .filter(Boolean)
     .join("");
-  return tables || `<p class="no-data-note">No box score data for this team.</p>`;
+  return tables ? `<div class="box-score-grid">${tables}</div>` : `<p class="no-data-note">No box score data for this team.</p>`;
 }
 
 function ensureBoxScoreModal() {

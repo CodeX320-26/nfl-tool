@@ -258,6 +258,9 @@ context. It is the only copy that travels with the repo.
     each holding its stat table plus scheme and Team Grades. Grade letters are the same size as
     the numbers, and Heavy/Light Box values stay on one line.
   - Game Previews order: Injuries, Odds, **Recent Games**, General Stats & Scheme, Pick Tracker.
+  - Box score popup (click a Recent Games row): `.box-score-grid` lays the tables out two-up,
+    Passing | Rushing then Receiving | Defense, each filling its half (820px modal); one column
+    on phones. The old single column of content-width tables left the right half empty.
   - Injuries come from nflverse's injuries file, keyed by week. Teams file their first practice
     report Wednesday afternoon (Thursday-game teams earlier), so Mon-Wed the current week is
     empty; the panel then shows the team's most recent earlier report, labeled "No Week N report
