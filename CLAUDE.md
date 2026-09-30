@@ -262,6 +262,14 @@ context. It is the only copy that travels with the repo.
     report Wednesday afternoon (Thursday-game teams earlier), so Mon-Wed the current week is
     empty; the panel then shows the team's most recent earlier report, labeled "No Week N report
     yet ... Showing the Week N-1 final report" (2026-09-30), instead of a blank.
+  - **Live source for the upcoming week (2026-09-30):** nflverse republishes the official report
+    hours late, and the user needs Wednesday info for preview videos. `fetch_nflcom_injuries`
+    (build_stats.py) reads the league's own page, `nfl.com/injuries/league/{season}/reg{week}`,
+    and `merge_live_injuries` swaps in NFL.com's rows for every team that has filed for the
+    current week. Past weeks stay on nflverse. If the fetch or parse fails, the build keeps
+    nflverse and logs why. Verified: Week 3 on NFL.com matched nflverse 301/301 players, 100% on
+    game and practice status. NFL.com codes AZ/LAR are mapped to ARI/LA. A rebuild (6-hour cron,
+    or the Update Odds button) is still what pulls a newly filed report onto the site.
     The Raw Stats / vs Opponents toggle sits in the General Stats header, with a copy on the
     Summary toolbar because the card's matchups use it too.
   - Recent Games runs Week 1 first, with opponent logos, the closing spread and total from the

@@ -43,6 +43,9 @@ PBP_URL = "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_
 ROSTER_URL = "https://github.com/nflverse/nflverse-data/releases/download/weekly_rosters/roster_weekly_{season}.csv.gz"
 SCHEDULE_URL = "https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv"
 INJURIES_URL = "https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_{season}.csv"
+# Official league injury report page (see fetch_nflcom_injuries) -- live
+# source for the upcoming week, layered over nflverse's file.
+NFLCOM_INJURIES_URL = "https://www.nfl.com/injuries/league/{season}/reg{week}"
 # Third-party charting (FTN Fantasy, distributed via nflverse) -- box count/
 # blitzers/pass rushers per play. Unlike the NFL's own official
 # participation charting (no longer read by this pipeline at all -- its one
@@ -464,6 +467,76 @@ def load_injuries(data_dir: Path, season: int) -> pd.DataFrame:
     df = pd.read_csv(path, low_memory=False)
     df["team"] = df["team"].map(normalize_team)
     return df[["team", "week", "position", "full_name", "report_status", "practice_status"]]
+
+
+def fetch_nflcom_injuries(season: int, week: int):
+    """The league's own injury report page for one regular-season week --
+    the source nflverse republishes from, but live: a team's Wednesday
+    practice report shows here as soon as it's filed, while nflverse's
+    file can lag by hours (user needs Wednesday info for preview videos).
+    Returns a DataFrame shaped like load_injuries' output, or None if the
+    page can't be fetched/parsed (the build then just keeps nflverse)."""
+    import html as html_lib
+    import re
+
+    url = NFLCOM_INJURIES_URL.format(season=season, week=week)
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            page = resp.read().decode("utf-8", "replace")
+    except Exception as e:  # noqa: BLE001 -- any failure means "use nflverse only"
+        print(f"  NFL.com injuries: fetch failed ({e}); using nflverse only", file=sys.stderr)
+        return None
+
+    def text(cell):
+        return html_lib.unescape(re.sub(r"<[^>]+>", " ", cell)).strip()
+
+    rows = []
+    # One "unit" per game: a matchup strip naming both clubs, then one
+    # table per club headed by its nickname ("Steelers").
+    for unit in page.split("nfl-o-injury-report__unit")[1:]:
+        abbrs = re.findall(r'team-abbreviation">\s*([A-Z]{2,3})\s*<', unit)
+        names = re.findall(r'team-fullname"[^>]*>\s*([^<]+?)\s*<', unit)
+        # NFL.com writes Arizona "AZ" and the Rams "LAR"; the site uses nflverse's codes.
+        abbrs = [{"AZ": "ARI", "LAR": "LA"}.get(a, a) for a in abbrs]
+        by_name = {n.strip(): a for n, a in zip(names, abbrs)}
+        for m in re.finditer(r'section-sub-title"><span>([^<]+)</span>.*?<tbody>(.*?)</tbody>', unit, re.S):
+            team = by_name.get(m.group(1).strip())
+            if not team:
+                continue
+            for tr in re.findall(r"<tr>(.*?)</tr>", m.group(2), re.S):
+                cells = [text(c) for c in re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S)]
+                if len(cells) < 5 or not cells[0]:
+                    continue
+                rows.append({
+                    "team": normalize_team(team),
+                    "week": week,
+                    "position": cells[1],
+                    "full_name": cells[0],
+                    "report_status": cells[4] or None,
+                    "practice_status": cells[3] or None,
+                })
+    if not rows:
+        print(f"  NFL.com injuries: no Week {week} reports filed yet", file=sys.stderr)
+        return None
+    df = pd.DataFrame(rows)
+    print(f"  NFL.com injuries: Week {week}, {df['team'].nunique()} teams, {len(df)} players", file=sys.stderr)
+    return df
+
+
+def merge_live_injuries(injuries_df: pd.DataFrame, season: int, week: int) -> pd.DataFrame:
+    """For the upcoming week, any team that has filed on NFL.com uses that
+    (fresher) report in place of nflverse's rows for that team/week. Past
+    weeks and teams NFL.com doesn't list yet stay on nflverse."""
+    live = fetch_nflcom_injuries(season, week)
+    if live is None:
+        return injuries_df
+    filed = set(live["team"])
+    keep = injuries_df[~((injuries_df["week"] == week) & (injuries_df["team"].isin(filed)))]
+    return pd.concat([keep, live[keep.columns]], ignore_index=True)
 
 
 def load_ftn_charting(data_dir: Path, season: int) -> pd.DataFrame:
@@ -4400,6 +4473,9 @@ def main():
     max_week = int(pbp["week"].max())
 
     current_week = compute_current_week(schedule)
+    # Live official reports for the upcoming week (Wednesday practice
+    # reports appear here hours before nflverse republishes them).
+    injuries_df = merge_live_injuries(injuries_df, args.season, current_week)
     injury_report = compute_injury_report(injuries_df, teams, player_snap_shares)
 
     # Player prop odds (anytime-TD, first-TD) for whatever week is currently
