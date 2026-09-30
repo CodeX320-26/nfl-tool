@@ -229,6 +229,9 @@ context. It is the only copy that travels with the repo.
 - The Game Previews Summary card:
   - Order: injuries strip; Lines + W&L vs the spread side by side; Ratings box; Matchups
     with A–F grades and Mismatch/Tough/Good vs Good/Bad vs Bad tags.
+  - The A–F grade boxes (`.gs-grade.tier-*`) use the same tinted fill + edge as the full
+    preview's Team Grades cells (A/B green, C yellow, D/F red, A and F strongest), per the user
+    2026-09-30. Keep the two in sync if either changes.
   - Right side: My Picks rail with the Novig ad.
   - "Scheme" is labeled "Blitz & Box" on the card.
 - **One look across the whole site (the summary-card look), set 2026-09-28.** It lives in the

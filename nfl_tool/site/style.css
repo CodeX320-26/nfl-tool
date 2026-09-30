@@ -2585,6 +2585,12 @@ footer { border-top-color: var(--border); }
 .gs-row { grid-template-columns: minmax(0, 1fr) 70px 20px 70px 118px; gap: 6px; font-size: 0.92rem; }
 .gs-grade, .gs-val, .gs-tag { height: 28px; }
 .gs-grade { font-size: 1.25rem; }
+/* Summary grades colored exactly like the full preview's Team Grades cells
+   (same fill + edge as .data-table td.tier-*); without these the plain
+   .gs-grade background above wins and only the letter gets colored. */
+.gs-grade.tier-good { background-color: rgba(var(--good-rgb), calc(var(--tier-a, 0.16) + 0.14)); border-color: transparent; box-shadow: inset 0 0 0 1px rgba(var(--good-rgb), 0.35); }
+.gs-grade.tier-mid { background-color: rgba(var(--mid-rgb), calc(var(--tier-a, 0.14) + 0.12)); border-color: transparent; box-shadow: inset 0 0 0 1px rgba(var(--mid-rgb), 0.3); }
+.gs-grade.tier-bad { background-color: rgba(var(--bad-rgb), calc(var(--tier-a, 0.16) + 0.14)); border-color: transparent; box-shadow: inset 0 0 0 1px rgba(var(--bad-rgb), 0.35); }
 .gs-val { font-size: 0.86rem; }
 .gs-tag { font-size: 0.68rem; }
 .gs-head-row { margin-bottom: 2px; }
