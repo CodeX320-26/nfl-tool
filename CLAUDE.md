@@ -192,6 +192,21 @@ context. It is the only copy that travels with the repo.
     per-device view preference in localStorage (`nfl-tool.picks.weekFilter`), not synced to the
     profile. Old picks without a `week` fall back to their game's week in the schedule.
 
+- **Offensive line / defensive front grades (`nfl_tool/line_grades.py`, 2026-10-01):** designed
+  with the user; in data.json as `line_grades[team].ol / .dl`, **not displayed yet** (placement
+  still to be decided with the user).
+  - OL = Pass Pro 55% (pressure vs 4-man rush .30, vs blitz .15, sack rate minus FTN QB-fault
+    sacks .25, pressure vs NGS time to throw .20, clean pocket .10) + Run Block 40% (NGS expected
+    rush yds/carry .35, stuff rate .20, 3rd/4th & <=2 run conversion .15, yds/carry vs box count
+    .15, designed-run success .15) + Discipline 5% (OL penalties/game via roster position).
+  - DL = the same metrics from the defense's side (Pass Rush 55%, Run D 45%, no discipline), so OL
+    grades read against the opponent's front (two-sided rule).
+  - Each metric: shrunk toward league by prior k, opponent-adjusted (play-weighted), z-scored;
+    groups re-standardized. Letter uses Team Grades' bands; plus a 0-100 score = league
+    percentile of z (user asked for both, color-coded): A 88+, B 66-87, C 35-65, D 12-34, F <12.
+  - Pressure = sack or QB hit (no public hurries). NGS comes from nflverse's combined
+    `ngs_passing/ngs_rushing.csv.gz` (per-season files don't exist for 2026), weeks >= 1 only.
+
 ## The user's preferences (hard-won — follow them)
 
 - **Summary cards:** direct attention and don't explain.

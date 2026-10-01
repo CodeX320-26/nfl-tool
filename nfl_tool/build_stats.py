@@ -39,6 +39,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from line_grades import compute_line_grades, load_ngs
+
 PBP_URL = "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_{season}.csv.gz"
 ROSTER_URL = "https://github.com/nflverse/nflverse-data/releases/download/weekly_rosters/roster_weekly_{season}.csv.gz"
 SCHEDULE_URL = "https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv"
@@ -4478,6 +4480,11 @@ def main():
     injuries_df = merge_live_injuries(injuries_df, args.season, current_week)
     injury_report = compute_injury_report(injuries_df, teams, player_snap_shares)
 
+    # Offensive line + defensive front grades (line_grades.py). Not shown on
+    # the site yet -- placement still to be decided with the user.
+    ngs_pass, ngs_rush = load_ngs(args.data_dir, season)
+    line_grades = compute_line_grades(pbp, ftn, ngs_pass, ngs_rush, pos_lookup, teams)
+
     # Player prop odds (anytime-TD, first-TD) for whatever week is currently
     # on deck -- requested_season since (like odds/injuries) this is about
     # the upcoming slate, not whatever season the pbp-based stats fell back to.
@@ -4632,6 +4639,7 @@ def main():
         "current_week": current_week,
         "recent_games": recent_games,
         "injuries": injury_report,
+        "line_grades": line_grades,
         "injuries_max_week": int(injuries_df["week"].max()) if len(injuries_df) else None,
         "player_td_odds": player_td_odds,
         "player_first_td_odds": player_first_td_odds,
