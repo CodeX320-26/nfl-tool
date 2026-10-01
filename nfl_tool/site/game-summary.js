@@ -13,7 +13,19 @@ try {
   // localStorage unavailable -- opens on the full preview.
 }
 const GS_EDGE_Z = TIER_Z_THRESHOLD; // same line as the page's green/red tiers
-const GS_EDGES_SHOWN = 6;
+const GS_EDGES_SHOWN = 8;
+// Matchup tagging (reworked with the user 2026-10-01). Both numbers are
+// "good for its own side" z-scores (offense: produces; defense: stops).
+// The GAP between them decides Mismatch/Tough, so a bad offense against an
+// average defense still flags -- requiring BOTH sides to be extreme hid real
+// edges (PIT bad vs blitz, CLE allowing sacks, PIT's red zone). Same-
+// direction pairs past GS_BOTH_Z read Good vs Good / Bad vs Bad.
+const GS_GAP_Z = 1.0;
+const GS_BOTH_Z = 0.4;
+// A defensive look counts once a defense shows it this often; how often only
+// scales how high the edge ranks (frequency = relevance, never a gate on
+// whether a matchup is real).
+const GS_MIN_LOOK_RATE = 0.12;
 const GS_INJURIES_SHOWN = 5;
 
 // ---- matchup tags ----
@@ -31,6 +43,20 @@ function gsTag(offGood, offBad, defGood, defBad) {
   if (offGood && defGood) return "strong";
   if (offBad && defBad) return "weak";
   return null;
+}
+function gsMatchupTag(offZ, defZ) {
+  if (offZ === null || offZ === undefined || defZ === null || defZ === undefined) return null;
+  if (offZ >= GS_BOTH_Z && defZ >= GS_BOTH_Z) return "strong";
+  if (offZ <= -GS_BOTH_Z && defZ <= -GS_BOTH_Z) return "weak";
+  const gap = offZ - defZ;
+  if (gap >= GS_GAP_Z) return "mismatch";
+  if (gap <= -GS_GAP_Z) return "tough";
+  return null;
+}
+// How strongly an edge should rank: the gap for Mismatch/Tough, how far both
+// sides lean for Good vs Good / Bad vs Bad.
+function gsEdgeStrength(offZ, defZ, tag) {
+  return tag === "strong" || tag === "weak" ? 0.6 * (Math.abs(offZ) + Math.abs(defZ)) : Math.abs(offZ - defZ);
 }
 function gsTagHtml(key) {
   return key ? `<span class="gs-tag ${GS_TAGS[key].cls}">${GS_TAGS[key].label}</span>` : `<span class="gs-tag gs-tag-even">Even</span>`;
@@ -59,9 +85,7 @@ function gsGradeRows(offTeam, defTeam) {
     const defZ = categoryZ(cat, defTeam, "def");
     const og = gradeForZ(offZ);
     const dg = gradeForZ(defZ);
-    const good = (g) => g === "A" || g === "B";
-    const bad = (g) => g === "D" || g === "F";
-    const tag = gsTag(good(og), bad(og), good(dg), bad(dg));
+    const tag = gsMatchupTag(offZ, defZ);
     return `<div class="gs-row"><span class="gs-row-label">${GS_CATEGORY_LABELS[cat.label] || cat.label}</span>${gsGradeBox(og)}<span class="gs-vs">vs</span>${gsGradeBox(dg)}${gsTagHtml(tag)}</div>`;
   }).join("");
 }
@@ -75,61 +99,90 @@ const GS_SCHEME_SHORT = {
   "Clean Pocket": "Clean pocket",
 };
 
-// Biggest General Stats + Scheme edges for this offense vs that defense.
-// Only rows where the two sides actually act on each other. Left out: pace
-// (plays/game isn't good or bad), quarter splits (noise at this size), the
-// red zone composite (has its own grade above), and penalty yards (each
-// unit's own flags -- the offense's holding calls don't depend on the
-// defense's pass interference, so the pair isn't a matchup).
-const GS_SKIP_ROWS = new Set(["Plays / Game", "Red Zone", "Penalty Yards"]);
+// Biggest General Stats + Scheme + Trenches edges for this offense vs that
+// defense, ranked by gsEdgeStrength. Left out: pace (plays/game isn't good
+// or bad), quarter splits (noise at this size) and the red zone composite
+// (it has its own grade row above). Turnovers are mostly random, so they
+// only show as good vs bad -- never Good vs Good / Bad vs Bad filler.
+const GS_SKIP_ROWS = new Set(["Plays / Game", "Red Zone"]);
+const GS_GOOD_VS_BAD_ONLY = new Set(["Turnovers"]);
+// Plain production rows are already summed up by the Passing/Rushing grades
+// above, so they rank a step below the specific situational edges.
+const GS_PRODUCTION_RANK = 0.75;
 function gsStatEdges(offTeam, defTeam) {
   const edges = [];
-  const fmtV = (v, r) => (v === null || v === undefined ? "--" : r.pct ? `${Math.round(v * 100)}%` : fmt(v, r.digits ?? 0));
+  // Small per-game counts (sacks, turnovers) get one decimal on the card --
+  // whole numbers turned 2.6 vs 3.4 into a confusing "3 vs 3".
+  const fmtV = (v, r) => {
+    if (v === null || v === undefined) return "--";
+    if (r.pct) return `${Math.round(v * 100)}%`;
+    if (r.digits === undefined && Math.abs(v) < 10) return fmt(v, 1);
+    return fmt(v, r.digits ?? 0);
+  };
   GENERAL_STAT_GROUPS.filter((g) => g.label !== "Scoring by Quarter").forEach((g) =>
     g.rows.forEach((r) => {
       if (r.composite || GS_SKIP_ROWS.has(r.label)) return;
       const offZ = gsStatZ(r.offKey, offTeam, r.offInvert);
       const defZ = gsStatZ(r.defKey, defTeam, r.defInvert);
-      if (offZ === null || defZ === null) return;
-      const tag = gsTag(offZ >= GS_EDGE_Z, offZ <= -GS_EDGE_Z, defZ >= GS_EDGE_Z, defZ <= -GS_EDGE_Z);
+      const tag = gsMatchupTag(offZ, defZ);
       if (!tag) return;
+      if (GS_GOOD_VS_BAD_ONLY.has(r.label)) {
+        const goodVsBad = (offZ >= GS_EDGE_Z && defZ <= -GS_EDGE_Z) || (offZ <= -GS_EDGE_Z && defZ >= GS_EDGE_Z);
+        if (!goodVsBad) return;
+      }
       edges.push({
         label: r.label,
         off: `<span class="gs-val ${gsZClass(offZ)}">${fmtV(tierValue(offTeam, r.offKey), r)}</span>`,
         def: `<span class="gs-val ${gsZClass(defZ)}">${fmtV(tierValue(defTeam, r.defKey), r)}</span>`,
         tag,
-        weight: Math.abs(offZ) + Math.abs(defZ),
+        weight: gsEdgeStrength(offZ, defZ, tag) * (g.label === "Production" ? GS_PRODUCTION_RANK : 1),
       });
     })
   );
-  // Scheme: only looks this defense actually uses a lot. The call reads
-  // BOTH sides of the look -- the offense's result against it AND the
-  // defense's own result when it shows it (matchupKind) -- so a defense that
-  // stacks the box 62% of the time but gets gashed doing it can't turn a
-  // weak offense split into "Tough". Frequency only decides relevance.
+  // Scheme: the offense's result against a look vs the defense's own result
+  // when it shows that look (two-sided). How often the defense shows it
+  // scales the ranking only.
   SCHEME_GROUPS.forEach((group) =>
     group.rows.forEach((r) => {
       const tend = DATA.team_stats[defTeam][r.tendKey];
-      if (tend === null || tend === undefined || tend < SCHEME_ADV_MIN_TENDENCY) return;
-      const freqZ = gsStatZ(r.tendKey, defTeam, false);
+      if (tend === null || tend === undefined || tend < GS_MIN_LOOK_RATE) return;
       const offZ = gsStatZ(r.perfKey, offTeam, false);
-      const defZ = gsStatZ(r.defSuccessKey, defTeam, false); // + = leaky
-      if (freqZ === null || freqZ < GS_EDGE_Z) return;
-      const tag = matchupKind(offZ, defZ, GS_EDGE_Z);
+      const leakZ = gsStatZ(r.defSuccessKey, defTeam, false); // + = leaky
+      if (offZ === null || leakZ === null) return;
+      const defZ = -leakZ; // good-for-the-defense orientation
+      const tag = gsMatchupTag(offZ, defZ);
       if (!tag) return;
       const perf = DATA.team_stats[offTeam][r.perfKey];
       const allowed = DATA.team_stats[defTeam][r.defSuccessKey];
       const txt = (v) => (group.pct ? `${Math.round(v * 100)}%` : `${fmt(v, 1)}`);
+      const relevance = Math.min(1.25, Math.max(0.7, 0.55 + tend)); // 15% look ~0.7x, 70%+ ~1.25x
       edges.push({
         label: `vs ${GS_SCHEME_SHORT[r.label] || r.label} <span class="gs-freq-tag" title="How often ${defTeam} shows this look">${Math.round(tend * 100)}%</span>`,
         off: `<span class="gs-val ${gsZClass(offZ)}">${txt(perf)}</span>`,
-        def: `<span class="gs-val ${gsZClass(-defZ)}" title="${defTeam} allows this when it shows the look">${txt(allowed)}</span>`,
+        def: `<span class="gs-val ${gsZClass(defZ)}" title="${defTeam} allows this when it shows the look">${txt(allowed)}</span>`,
         tag,
-        weight: Math.abs(offZ) + Math.abs(defZ) + 0.5 * freqZ,
+        weight: gsEdgeStrength(offZ, defZ, tag) * relevance,
         scheme: true,
       });
     })
   );
+  // Trenches parts: this line vs that front (overall already has a grade row).
+  if (DATA.line_grades) {
+    [["Pass pro vs rush", "pass_pro", "pass_rush"], ["Run block vs run D", "run_block", "run_defense"]].forEach(([label, og, dg]) => {
+      const oe = trenchesEntry(offTeam, "off", og);
+      const de = trenchesEntry(defTeam, "def", dg);
+      if (!oe || !de || oe.z === null || de.z === null) return;
+      const tag = gsMatchupTag(oe.z, de.z);
+      if (!tag) return;
+      edges.push({
+        label,
+        off: `<span class="gs-val ${gsZClass(oe.z)}">${oe.grade} ${oe.score}</span>`,
+        def: `<span class="gs-val ${gsZClass(de.z)}">${de.grade} ${de.score}</span>`,
+        tag,
+        weight: gsEdgeStrength(oe.z, de.z, tag),
+      });
+    });
+  }
   return edges.sort((a, b) => b.weight - a.weight).slice(0, GS_EDGES_SHOWN);
 }
 

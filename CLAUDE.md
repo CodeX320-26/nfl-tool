@@ -254,6 +254,21 @@ context. It is the only copy that travels with the repo.
   - The A–F grade boxes (`.gs-grade.tier-*`) use the same tinted fill + edge as the full
     preview's Team Grades cells (A/B green, C yellow, D/F red, A and F strongest), per the user
     2026-09-30. Keep the two in sync if either changes.
+  - **Tags + Key Stat Edges (reworked 2026-10-01 after the user found real edges missing on
+    PIT/CLE):** `gsMatchupTag(offZ, defZ)` in game-summary.js, both z's "good for its own side".
+    Gap (off − def) >= 1.0 = Mismatch, <= −1.0 = Tough, so a bad offense vs an AVERAGE defense
+    still flags (the old rule needed both sides past ±0.6 and hid PIT bad vs blitz, CLE sacks
+    allowed, PIT's red zone). Both past ±0.4 the same way = Good vs Good / Bad vs Bad. Grade rows
+    use the same tagger on their composite z.
+    - Edges ranked by gap (or how far both lean for same-direction tags); top 8 shown.
+    - Scheme looks count once the defense shows them >= 12% of the time; frequency only scales
+      rank (0.7x-1.25x), never gates (the old "above-average frequency" gate dropped PIT vs a
+      34% heavy box, the biggest edge in the game).
+    - Candidates: General Stats rows (Production rows ranked 0.75x, since the Passing/Rushing
+      grades already sum them), Penalty Yards (now included), scheme looks, and the Trenches
+      parts (Pass pro vs rush, Run block vs run D). Turnovers show only as good vs bad (mostly
+      random; never Bad vs Bad filler). Skipped: Plays/Game, quarter splits, the Red Zone
+      composite (it has its own grade row).
   - Right side: My Picks rail with the Novig ad.
   - "Scheme" is labeled "Blitz & Box" on the card.
 - **One look across the whole site (the summary-card look), set 2026-09-28.** It lives in the
