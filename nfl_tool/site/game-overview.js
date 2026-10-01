@@ -206,6 +206,10 @@ const SUMMARY_CATEGORIES = [
     ],
   },
   RED_ZONE_CATEGORY,
+  // Offensive line vs the opposing defensive front (build_stats.py ->
+  // line_grades.py). Offense side = this team's OL overall, defense side =
+  // the other team's front overall. Clicking opens the Trenches modal.
+  { label: "Trenches", trenches: true },
   {
     // Built from every row in SCHEME_GROUPS rather than a fixed list, so it
     // always reflects whatever the Scheme & Tendencies table above is
@@ -214,6 +218,40 @@ const SUMMARY_CATEGORIES = [
     scheme: true,
   },
 ];
+
+// ---- Trenches (offensive line / defensive front grades) ----
+// z/letter/0-100 score come precomputed from line_grades.py; letters use the
+// same bands as GRADE_BANDS below, so gradeForZ(z) matches the build's letter.
+function trenchesEntry(team, side, group) {
+  const t = (DATA.line_grades || {})[team];
+  return (t && t[side === "off" ? "ol" : "dl"] && t[side === "off" ? "ol" : "dl"][group]) || null;
+}
+function trenchesZ(team, side, group = "overall") {
+  const e = trenchesEntry(team, side, group);
+  return e && e.z !== null && e.z !== undefined ? e.z : null;
+}
+// Color for a 0-100 score, same cut points as the letters (A 88+, B 66-87,
+// C 35-65, D 12-34, F <12): green above, yellow middle, red below, deeper
+// toward the ends.
+function trenchesScoreStyle(score) {
+  if (score === null || score === undefined) return { cls: "", attr: "" };
+  let cls, t;
+  if (score >= 66) { cls = "tier-good"; t = (score - 66) / 33; }
+  else if (score >= 35) { cls = "tier-mid"; t = 0; }
+  else { cls = "tier-bad"; t = (35 - score) / 34; }
+  const alpha = TIER_ALPHA_MIN + (TIER_ALPHA_MAX - TIER_ALPHA_MIN) * Math.min(Math.max(t, 0), 1);
+  return { cls, attr: cls === "tier-mid" ? "" : ` style="--tier-a:${alpha.toFixed(2)}"` };
+}
+function trenchesCellInner(e) {
+  return e && e.grade ? `<b class="tr-letter">${e.grade}</b><span class="tr-score">${e.score}</span>` : "--";
+}
+
+// Which category's z for this team/side -- one place for the three kinds.
+function categoryZ(cat, team, side) {
+  if (cat.scheme) return schemeCompositeZ(team, side);
+  if (cat.trenches) return trenchesZ(team, side);
+  return compositeZ(side === "off" ? cat.off : cat.def, team);
+}
 
 // Weighted-average z-score across a list of {key, invert, weight} metrics
 // for one team. A metric this team has no value for (thin sample, stat
@@ -365,7 +403,7 @@ function openPairedGradeModal(cat, offTeam, defTeam) {
 function gradeRankRows(cat, side) {
   return teamsWithGames()
     .map((t) => {
-      const z = cat.scheme ? schemeCompositeZ(t, side) : compositeZ(side === "off" ? cat.off : cat.def, t);
+      const z = categoryZ(cat, t, side);
       return { team: t, z, grade: gradeForZ(z) };
     })
     .filter((r) => r.grade !== null)
@@ -388,7 +426,7 @@ function openGradeRankModal(cat, side, currentTeam) {
   ensureStatRankModal();
   const rows = teamsWithGames()
     .map((t) => {
-      const z = cat.scheme ? schemeCompositeZ(t, side) : compositeZ(side === "off" ? cat.off : cat.def, t);
+      const z = categoryZ(cat, t, side);
       return { team: t, z, grade: gradeForZ(z) };
     })
     .filter((r) => r.grade !== null)
@@ -436,14 +474,15 @@ document.addEventListener("click", (e) => {
   const both = [...cell.closest("tr").querySelectorAll(".grade-rank-click")].map((c) => decodeDataAttr(c.dataset.entry));
   const off = both.find((p) => p.side === "off");
   const def = both.find((p) => p.side === "def");
-  if (off && def) openPairedGradeModal(cat, off.team, def.team);
+  if (cat.trenches) openTrenchesModal(off ? off.team : team, def ? def.team : null);
+  else if (off && def) openPairedGradeModal(cat, off.team, def.team);
   else openGradeRankModal(cat, side, team);
 });
 
 function renderSummaryTable(offTeam, defTeam) {
   const rows = SUMMARY_CATEGORIES.map((cat) => {
-    const offZ = cat.scheme ? schemeCompositeZ(offTeam, "off") : compositeZ(cat.off, offTeam);
-    const defZ = cat.scheme ? schemeCompositeZ(defTeam, "def") : compositeZ(cat.def, defTeam);
+    const offZ = categoryZ(cat, offTeam, "off");
+    const defZ = categoryZ(cat, defTeam, "def");
     const offGrade = gradeForZ(offZ);
     const defGrade = gradeForZ(defZ);
     const advCell = summaryAdvCell(offZ, defZ, offTeam, defTeam);
@@ -456,6 +495,117 @@ function renderSummaryTable(offTeam, defTeam) {
     <tbody><tr><td class="section-group-label" colspan="4">Team Grades</td></tr>${rows}</tbody>
   </table>`;
 }
+
+// Trenches section (between Pass Rush and Team Grades): this offense's line
+// vs the other team's front, part by part. Discipline is offense-only (a
+// front has no matching number), so its DEF cell is left blank on purpose.
+const TRENCHES_ROWS = [
+  { label: "Pass Protection", off: "pass_pro", def: "pass_rush" },
+  { label: "Run Blocking", off: "run_block", def: "run_defense" },
+  { label: "Discipline", off: "discipline", def: null },
+  { label: "Overall", off: "overall", def: "overall", overall: true },
+];
+function renderTrenchesTable(offTeam, defTeam) {
+  if (!DATA.line_grades) return "";
+  const cell = (team, side, group) => {
+    if (!group) return `<td class="num trenches-cell trenches-blank"></td>`;
+    const e = trenchesEntry(team, side, group);
+    const { cls, attr } = trenchesScoreStyle(e && e.score);
+    const entry = encodeDataAttr({ off: offTeam, def: defTeam });
+    return `<td class="num grade-cell trenches-cell trenches-click ${cls}"${attr} data-entry="${entry}" title="See every team's line grades">${trenchesCellInner(e)}</td>`;
+  };
+  const rows = TRENCHES_ROWS.map((r) => {
+    const adv = r.def ? summaryAdvCell(trenchesZ(offTeam, "off", r.off), trenchesZ(defTeam, "def", r.def), offTeam, defTeam) : `<td class="edge-cell"></td>`;
+    return `<tr${r.overall ? ' class="trenches-overall"' : ""}><td>${r.label}</td>${cell(offTeam, "off", r.off)}${cell(defTeam, "def", r.def)}${adv}</tr>`;
+  }).join("");
+  return `<table class="data-table summary-grade-table trenches-table">
+    <thead>${summaryTableHeader(offTeam, defTeam)}</thead>
+    <tbody><tr><td class="section-group-label" colspan="4">Trenches</td></tr>${rows}</tbody>
+  </table>`;
+}
+
+// ---- Trenches modal: every team's OL + defensive front grades, same
+// layout as the draft the user signed off on (2026-10-01). ----
+const TRENCHES_METRIC_FMT = {
+  pressure_4man: "pct", pressure_blitz: "pct", sack_rate: "pct", clean_pocket: "pct", stuff_rate: "pct",
+  short_yardage: "pct", rush_success: "pct", pressure_vs_ttt: "ttt", xry_per_carry: "yds", ypc_vs_box: "pm", ol_penalties: "pg",
+};
+function trenchesMetricText(key, v) {
+  if (v === null || v === undefined) return "--";
+  switch (TRENCHES_METRIC_FMT[key]) {
+    case "pct": return `${(v * 100).toFixed(1)}%`;
+    case "ttt": return `QB holds ${v.toFixed(2)}s`;
+    case "yds": return `${v.toFixed(2)} yds`;
+    case "pm": return `${v >= 0 ? "+" : ""}${v.toFixed(2)} yds`;
+    case "pg": return `${v.toFixed(1)}/game`;
+    default: return String(v);
+  }
+}
+function trenchesTip(team, side, group) {
+  const t = DATA.line_grades[team];
+  const block = t && t[side === "off" ? "ol" : "dl"];
+  if (!block || group === "overall") return "";
+  return Object.entries(block.metrics)
+    .filter(([, m]) => m.group === group)
+    .map(([k, m]) => `${m.label}: ${trenchesMetricText(k, m.value)} -> ${m.score ?? "--"}`)
+    .join("\n");
+}
+function ensureTrenchesModal() {
+  if (document.getElementById("trenches-modal")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "trenches-modal";
+  overlay.className = "modal-overlay";
+  overlay.hidden = true;
+  overlay.innerHTML = `<div class="modal-box trenches-modal-box">
+    <button type="button" class="modal-close" aria-label="Close">&times;</button>
+    <div id="trenches-modal-content"></div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const close = () => (overlay.hidden = true);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  overlay.querySelector(".modal-close").addEventListener("click", close);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+}
+function openTrenchesModal(offTeam, defTeam) {
+  if (!DATA.line_grades) return;
+  ensureTrenchesModal();
+  const teams = Object.keys(DATA.line_grades).sort(
+    (a, b) => (DATA.line_grades[b].ol.overall.z ?? -9) - (DATA.line_grades[a].ol.overall.z ?? -9)
+  );
+  const gcell = (team, side, group) => {
+    const e = trenchesEntry(team, side, group);
+    const { cls, attr } = trenchesScoreStyle(e && e.score);
+    const tip = trenchesTip(team, side, group);
+    return `<td class="num grade-cell trenches-cell ${cls}"${attr}${tip ? ` title="${tip.replace(/"/g, "&quot;")}"` : ""}>${trenchesCellInner(e)}</td>`;
+  };
+  const body = teams.map((t, i) => {
+    const cur = t === offTeam || t === defTeam ? ' class="stat-rank-current"' : "";
+    return `<tr${cur}><td class="tr-rank">${i + 1}</td><td class="tr-team">${teamLogoMini(t)} ${TEAM_NAMES[t] || t}</td>
+      ${gcell(t, "off", "overall")}${gcell(t, "off", "pass_pro")}${gcell(t, "off", "run_block")}${gcell(t, "off", "discipline")}
+      <td class="tr-sep"></td>${gcell(t, "def", "overall")}${gcell(t, "def", "pass_rush")}${gcell(t, "def", "run_defense")}</tr>`;
+  }).join("");
+  const legend = [[95, "A 88+"], [75, "B 66–87"], [50, "C 35–65"], [25, "D 12–34"], [5, "F <12"]]
+    .map(([s, l]) => { const { cls, attr } = trenchesScoreStyle(s); return `<span class="tr-legend-chip ${cls}"${attr}>${l}</span>`; })
+    .join("");
+  document.getElementById("trenches-modal-content").innerHTML = `
+    <h3>Trenches &mdash; Offensive Line &amp; Defensive Front Grades</h3>
+    <p class="no-data-note">Letter + 0&ndash;100 score (league percentile; 50 = average). Opponent-adjusted and pulled toward average while samples are small. Hover any grade for the stats behind it. Pressure = sack or QB hit; sacks the QB caused don't count against the line.</p>
+    <div class="tr-legend">${legend}</div>
+    <div class="trenches-rank-wrap"><table class="data-table trenches-rank-table">
+      <thead>
+        <tr><th></th><th></th><th class="tr-group" colspan="4">Offensive Line</th><th></th><th class="tr-group" colspan="3">Defensive Front</th></tr>
+        <tr><th>#</th><th>Team</th><th>Overall</th><th>Pass Pro</th><th>Run Block</th><th>Discipline</th><th></th><th>Overall</th><th>Pass Rush</th><th>Run D</th></tr>
+      </thead>
+      <tbody>${body}</tbody>
+    </table></div>`;
+  document.getElementById("trenches-modal").hidden = false;
+}
+document.addEventListener("click", (e) => {
+  const cell = e.target.closest(".trenches-click");
+  if (!cell) return;
+  const { off, def } = decodeDataAttr(cell.dataset.entry);
+  openTrenchesModal(off, def);
+});
 
 
 const MARKETS = [
@@ -1774,6 +1924,8 @@ function render() {
   document.getElementById("col-home-scheme").innerHTML = renderSchemeTable(home, away);
   document.getElementById("col-away-recent").innerHTML = renderRecentGamesPanel(away);
   document.getElementById("col-home-recent").innerHTML = renderRecentGamesPanel(home);
+  document.getElementById("col-away-trenches").innerHTML = renderTrenchesTable(away, home);
+  document.getElementById("col-home-trenches").innerHTML = renderTrenchesTable(home, away);
   document.getElementById("col-away-summary").innerHTML = renderSummaryTable(away, home);
   document.getElementById("col-home-summary").innerHTML = renderSummaryTable(home, away);
 

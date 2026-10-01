@@ -3147,6 +3147,28 @@ html.local-dev .update-odds-link { display: inline-flex; }
 main { max-width: 1840px; }
 .pzm-table td.pzm-label { white-space: nowrap; }
 
+/* ---- Trenches (OL / defensive front grades): letter + 0-100 score ---- */
+.trenches-cell { white-space: nowrap; }
+.trenches-cell .tr-letter { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; margin-right: 5px; }
+.trenches-cell .tr-score { font-size: 0.86rem; font-weight: 700; opacity: 0.9; }
+.trenches-click { cursor: pointer; }
+.trenches-click:hover { filter: brightness(1.15); }
+.trenches-blank { background: transparent !important; box-shadow: none !important; }
+.trenches-table .trenches-overall td:first-child { font-weight: 800; }
+.trenches-table .trenches-overall td { border-top: 2px solid var(--border-strong); }
+#trenches-modal .modal-box { width: 92vw; max-width: 880px; }
+.tr-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 12px; }
+.tr-legend-chip { padding: 3px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 800; }
+.trenches-rank-wrap { max-width: 100%; overflow-x: auto; }
+.trenches-rank-table { width: auto; font-size: 0.86rem; }
+.trenches-rank-table th { text-align: center; }
+.trenches-rank-table th.tr-group { color: var(--accent); font-size: 0.72rem; letter-spacing: 0.08em; }
+.trenches-rank-table td.tr-rank { color: var(--muted); text-align: right; background: transparent; }
+.trenches-rank-table td.tr-team { font-weight: 700; white-space: nowrap; min-width: 170px; }
+.trenches-rank-table td.tr-sep { width: 10px; background: transparent !important; }
+.trenches-rank-table td.trenches-cell { min-width: 64px; text-align: center; cursor: help; }
+.trenches-rank-table tr.stat-rank-current td.tr-team { color: var(--accent); }
+
 /* ====================================================================
    PHONES ONLY (<= 760px wide). Everything in this block is ignored on
    tablets and desktop, so the desktop layout is untouched. Same 760px

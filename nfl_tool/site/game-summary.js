@@ -55,8 +55,8 @@ const GS_CATEGORY_LABELS = { Scheme: "Blitz & Box" };
 // Team grades, offense vs the other defense.
 function gsGradeRows(offTeam, defTeam) {
   return SUMMARY_CATEGORIES.map((cat) => {
-    const offZ = cat.scheme ? schemeCompositeZ(offTeam, "off") : compositeZ(cat.off, offTeam);
-    const defZ = cat.scheme ? schemeCompositeZ(defTeam, "def") : compositeZ(cat.def, defTeam);
+    const offZ = categoryZ(cat, offTeam, "off");
+    const defZ = categoryZ(cat, defTeam, "def");
     const og = gradeForZ(offZ);
     const dg = gradeForZ(defZ);
     const good = (g) => g === "A" || g === "B";

@@ -193,8 +193,15 @@ context. It is the only copy that travels with the repo.
     profile. Old picks without a `week` fall back to their game's week in the schedule.
 
 - **Offensive line / defensive front grades (`nfl_tool/line_grades.py`, 2026-10-01):** designed
-  with the user; in data.json as `line_grades[team].ol / .dl`, **not displayed yet** (placement
-  still to be decided with the user).
+  with the user; in data.json as `line_grades[team].ol / .dl`.
+  - **Where it shows (2026-10-01):** a "Trenches" row under Red Zone in Team Grades (OL overall
+    vs the other team's front overall) and on the Game Previews Summary card (same row, same
+    tags); and a Trenches section in each Game Previews panel between Pass Rush and Team Grades
+    (Pass Protection, Run Blocking, Discipline, Overall; letter + 0-100 score, colored by score;
+    the defense's Discipline cell is intentionally blank). Any Trenches grade opens the Trenches
+    modal: all 32 teams, OL + defensive front, same layout as the draft the user approved, with
+    hover breakdowns and the two teams highlighted. `categoryZ(cat, team, side)` in
+    game-overview.js is the one switch for scheme / trenches / composite grades.
   - OL = Pass Pro 55% (pressure vs 4-man rush .30, vs blitz .15, sack rate minus FTN QB-fault
     sacks .25, pressure vs NGS time to throw .20, clean pocket .10) + Run Block 40% (NGS expected
     rush yds/carry .35, stuff rate .20, 3rd/4th & <=2 run conversion .15, yds/carry vs box count
