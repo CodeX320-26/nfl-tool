@@ -270,6 +270,13 @@ context. It is the only copy that travels with the repo.
     up `FIRST_TD_RZ_PRIOR` RZ looks / `FIRST_TD_XTD_PRIOR` xTD, so 3-5 end-zone looks or one
     goal-line game can't top a team. TEN went from Ayomanor 9.4% (9 targets), Ward 7.7% to
     Pollard 9.0% (45 touches, 8 RZ), Ayomanor 6.6%, Ward 5.1%.
+  - **"Soft D" targets (2026-10-02, NE @ BUF):** a clearly soft defense (model z >= 1.0) flags even
+    when the offense hasn't produced there (offense floor relaxed to −1.5 instead of −0.3). BUF had
+    allowed 5 RB TDs (3rd most) while NE's backs had 1 against SEA/PIT/JAX. These are marked
+    `defLed`: dashed chip + red "SOFT D" tag + tooltip, never shown as "strong", and both numbers
+    stay in the row. Only for `MODEL_SOFT_METRICS` (QB/RB/WR/TE, rush/pass, <=10 yds; the longer
+    buckets and First TD swing on 2-3 plays) and at most `MODEL_SOFT_MAX` = 2 per team side,
+    softest first. Week 4: 12 across 32 sides.
   - **No DST anywhere on the TD Summary card (user 2026-10-02):** defensive/return TDs are random
     and not bet, so `summarySeasonColumn` filters DST targets (First TD position targets already
     skipped DST). The TD Data page itself keeps its DST rows.

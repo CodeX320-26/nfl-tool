@@ -244,18 +244,32 @@ function modelSideZ(team, side, metric) {
   if (adj === null) return { z: null };
   return { z: xtd === null ? adj : 0.5 * adj + 0.5 * xtd, adj, xtd };
 }
-function modelEntry(label, off, def) {
+// "Soft D" (user 2026-10-02, NE @ BUF): a clearly soft defense (z >= 1.0)
+// flags even when this offense hasn't produced there -- BUF had allowed 5
+// RB TDs (3rd most) while NE's backs had 1 after facing SEA/PIT/JAX. Offense
+// floor drops to MODEL_SOFT_OFF_FLOOR so a truly absent unit still won't
+// flag; the chip is marked defense-led (dashed) so it never reads as a
+// confirmed two-sided edge, and the row still shows both numbers.
+const MODEL_SOFT_OFF_FLOOR = -1.5;
+// Soft D only where defensive TD counts carry real volume (positions,
+// rush/pass, <=10 yds) -- 11-20 / 21-40 / 41+ and First TD swing on 2-3 plays.
+// At most MODEL_SOFT_MAX per team side, softest defenses first.
+const MODEL_SOFT_METRICS = new Set(["QB", "RB", "WR", "TE", "rush", "pass", "10_or_less"]);
+const MODEL_SOFT_MAX = 2;
+function modelEntry(label, off, def, allowSoft = false) {
   if (off.z === null || def.z === null) return null;
-  if (def.z < MODEL_TARGET_DEF_FLOOR || off.z < MODEL_TARGET_OFF_FLOOR) return null;
+  if (def.z < MODEL_TARGET_DEF_FLOOR) return null;
+  const softSpot = allowSoft && def.z >= MODEL_TARGET_SOLO_Z && off.z >= MODEL_SOFT_OFF_FLOOR;
+  if (off.z < MODEL_TARGET_OFF_FLOOR && !softSpot) return null;
   const score = 0.5 * def.z + 0.5 * off.z;
   const solo = def.z >= MODEL_TARGET_SOLO_Z || off.z >= MODEL_TARGET_SOLO_Z;
   if (score < MODEL_TARGET_MIN_SCORE && !solo) return null;
   const due = off.xtd !== undefined && off.xtd !== null && off.xtd - off.adj >= MODEL_DUE_GAP && off.xtd >= 0.3;
-  return { label, score, due };
+  return { label, score, due, defLed: off.z < MODEL_TARGET_OFF_FLOOR, defZ: def.z };
 }
 function modelTargetGroups(offTeam, defTeam) {
   const pair = (metric, label) => {
-    const e = modelEntry(label, modelSideZ(offTeam, "off", metric), modelSideZ(defTeam, "def", metric));
+    const e = modelEntry(label, modelSideZ(offTeam, "off", metric), modelSideZ(defTeam, "def", metric), MODEL_SOFT_METRICS.has(metric));
     return e && { ...e, metric };
   };
   const stat = (key) => (t) => DATA.team_stats[t][key];
@@ -269,11 +283,16 @@ function modelTargetGroups(offTeam, defTeam) {
   // Volume target first; if a bucket didn't qualify on volume, a strong
   // shared concentration can still carry it.
   const distance = LENGTH_BUCKETS.map(({ key, label }) => pair(key, label) || shareTargetEntry(offTeam, defTeam, key, label));
-  return [
+  const groups = [
     { title: "Type", items: clean([pair("pass", "Pass TD"), pair("rush", "Rush TD"), first]) },
     { title: "Position", items: clean(POSITIONS.map((pos) => pair(pos, pos))) },
     { title: "Distance", items: clean([...distance, rz]) },
   ];
+  const keepSoft = new Set(
+    groups.flatMap((g) => g.items).filter((i) => i.defLed && i.label !== "DST")
+      .sort((a, b) => b.defZ - a.defZ).slice(0, MODEL_SOFT_MAX)
+  );
+  return groups.map((g) => ({ ...g, items: g.items.filter((i) => !i.defLed || keepSoft.has(i)) }));
 }
 
 function targetGroups(offTeam, defTeam) {
@@ -1202,9 +1221,13 @@ function summarySeasonColumn(offTeam, defTeam, week) {
           n += 1;
           if (i.metric) link(keyPlayersForTarget(i.metric, pool, offTeam, defTeam, week), n, "good");
           const [oc, dc] = i.metric ? summaryTargetCells(i.metric, offTeam, defTeam) : ["<td></td>", "<td></td>"];
-          const strong = i.score >= TARGET_STRONG_SCORE;
+          const strong = i.score >= TARGET_STRONG_SCORE && !i.defLed;
           const due = i.due ? `<span class="target-due">&#9650;</span>` : "";
-          return `<tr><td>${numBadge(n)}<span class="target-chip${strong ? " target-chip-strong" : ""}">${i.label}${due}</span></td>${oc}${dc}<td class="sc-unit">${i.metric ? summaryTargetUnit(i.metric) : ""}</td></tr>`;
+          const soft = i.defLed
+            ? ` title="${defTeam} is a soft spot here; ${offTeam} hasn't produced it yet (schedule-adjusted)"`
+            : "";
+          const softTag = i.defLed ? `<span class="target-soft-tag">soft D</span>` : "";
+          return `<tr><td>${numBadge(n)}<span class="target-chip${strong ? " target-chip-strong" : ""}${i.defLed ? " target-chip-soft" : ""}"${soft}>${i.label}${due}${softTag}</span></td>${oc}${dc}<td class="sc-unit">${i.metric ? summaryTargetUnit(i.metric) : ""}</td></tr>`;
         })
         .join("")
     : `<tr><td colspan="4" class="target-none">No targets this week</td></tr>`;

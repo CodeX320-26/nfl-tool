@@ -950,6 +950,9 @@ footer a { color: var(--accent); }
 .target-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .target-chip { padding: 2px 9px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; border: 1px solid rgba(var(--good-rgb), 0.6); color: var(--good-text); background: rgba(var(--good-rgb), 0.08); }
 .target-chip-strong { background: var(--good); border-color: var(--good); color: var(--on-accent); }
+/* Defense-led target: the defense is clearly soft, the offense hasn't shown it yet */
+.target-chip-soft { border-style: dashed; }
+.target-soft-tag { margin-left: 5px; padding: 0 5px; border-radius: 4px; font-size: 0.72em; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; background: rgba(var(--bad-rgb), 0.18); color: var(--bad-text); }
 .target-none { color: var(--muted); font-size: 0.8rem; }
 .target-legend { display: flex; gap: 6px; margin-top: 8px; justify-content: flex-end; }
 .target-legend .target-chip { font-size: 0.66rem; padding: 1px 7px; }
