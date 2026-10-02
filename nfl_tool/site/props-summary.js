@@ -1130,6 +1130,12 @@ document.addEventListener("change", (e) => {
 const ZT_ZONE_PRIOR = 8;
 const ZT_MIN_TARGETS = 5;
 const ZT_MATCH_MIN = 0.3;
+// Downfield path to Rec Yds: a high-volume receiver (opportunity percentile
+// >= ZT_DOWNFIELD_OPP) sending ZT_DOWNFIELD_SHARE+ of his targets into
+// intermediate/deep zones that are clearly soft (>= ZT_DOWNFIELD_SOFT).
+const ZT_DOWNFIELD_SHARE = 0.4;
+const ZT_DOWNFIELD_SOFT = 0.8;
+const ZT_DOWNFIELD_OPP = 0.6;
 const ZT_OPP_MIN = 0.35;
 const ZT_SHOWN = 4;
 const ZT_DEPTH_METRIC = { screen: "yds_short", short: "yds_short", intermediate: "yds_int", deep: "yds_deep" };
@@ -1244,12 +1250,23 @@ function zoneTargets(offTeam, defTeam, week) {
     const snapVals = snapEntry ? Object.entries(snapEntry.w).sort((a, b) => b[0] - a[0]).map(([, v]) => v) : [];
     const snap = snapVals.length ? (snapVals[0] + (snapVals[1] ?? snapVals[0])) / 2 : 0.5;
     const opp = 0.7 * ztPercentile(tpg, ztTargetPool(pos)) + 0.3 * Math.min(1, snap);
-    if (match < ZT_MATCH_MIN || opp < ZT_OPP_MIN) return;
+    // Downfield exception (user 2026-10-02, Lamb vs HOU): half his targets
+    // short where HOU is tough, half downfield where HOU is very soft -- the
+    // blend averaged to 0.19 and dropped him before the deep markets were
+    // even looked at.
+    if (opp < ZT_OPP_MIN) return;
+    const downfield = deepShare >= ZT_DOWNFIELD_SHARE && mDeep >= ZT_DOWNFIELD_SOFT && opp >= ZT_DOWNFIELD_OPP;
+    // The blended fit still filters lukewarm matches; the one exception is a
+    // strong downfield fit, which tough short zones shouldn't cancel out.
+    if (match < ZT_MATCH_MIN && !downfield) return;
     const markets = [];
     if (tpg >= 4 && shortShare >= 0.4 && mShort >= ZT_MATCH_MIN) markets.push("receiving_receptions");
     if (deepShare >= 0.3 && mDeep >= ZT_MATCH_MIN + 0.1 && (explDef?.rk || 32) <= 16) markets.push("receiving_longestReception");
-    if (match >= ZT_MATCH_MIN + 0.05 && opp >= 0.5) markets.push("receiving_yards");
+    if ((match >= ZT_MATCH_MIN + 0.05 && opp >= 0.5) || downfield) markets.push("receiving_yards");
     if (!markets.length) return;
+    // Rank on the stronger of the overall fit and the downfield fit, so tough
+    // short zones can't bury a strong deep matchup.
+    const effMatch = Math.max(match, mDeep * Math.min(1, deepShare / 0.5));
     const props = ((DATA.player_props || {})[offTeam] || []).find((p) => normName(p.name) === normName(name));
     out.push({
       team: offTeam,
@@ -1262,7 +1279,7 @@ function zoneTargets(offTeam, defTeam, week) {
       markets,
       yac: props && props.yac_per_rec !== null && props.yac_per_rec >= (pos === "WR" ? 5 : pos === "TE" ? 5.5 : 8),
       softZones: softZones.sort((a, b) => b.share * b.v - a.share * a.v).slice(0, 2),
-      score: 0.5 * opp + 0.5 * Math.min(1, match / 1.2),
+      score: 0.5 * opp + 0.5 * Math.min(1, effMatch / 1.2),
     });
   });
   return out.sort((a, b) => b.score - a.score).slice(0, ZT_SHOWN);

@@ -180,6 +180,13 @@ context. It is the only copy that travels with the repo.
     `propBaselineGames`.
   - **Never surface a backup off one fill-in game.**
 - **Zone Targets** (`zoneTargets` / `renderZoneTargets` in props-summary.js): pass catchers whose targets land where the defense is soft.
+  - **Downfield exception (2026-10-02, Lamb vs HOU):** a player's zone fit is a target-weighted
+    blend, so a receiver split half short (where the D is tough) and half downfield (where it's
+    very soft) averaged out under `ZT_MATCH_MIN` and was dropped before the deep markets ran
+    (Lamb: 0.19 blended, +1.08 downfield, HOU 5th-most explosive passes). A strong downfield fit
+    (>= 40% of targets intermediate/deep, those zones >= +0.8 soft, opportunity percentile >= 0.6)
+    now bypasses the blended cut, adds Rec Yds, and ranks on max(blend, downfield fit). The
+    blended cut still filters everything else; Week 4 changed only Lamb (28 -> 29 targets).
   - **Zone softness** is 50% the zone's own completion % and EPA allowed (shrunk with 8 prior attempts) plus how often it's attacked, and 50% the opponent-adjusted depth band from `prop_matchup_model`.
   - **Player opportunity:** lineup-aware targets per game as a percentile at his position (70%) plus recent snap share (30%).
   - **Markets:** Receptions (volume into soft short zones), Long Rec (10+ yd share into soft zones, defense gives up 20+ plays), Rec Yds (overall match plus volume); YAC is a bonus tag.
