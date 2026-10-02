@@ -193,6 +193,11 @@ const MODEL_TARGET_MIN_SCORE = 0.6;
 const MODEL_TARGET_DEF_FLOOR = -0.5;
 const MODEL_TARGET_OFF_FLOOR = -0.3;
 const MODEL_DUE_GAP = 0.75; // usage z this far above TD z = "due"
+// One clearly extreme side carries a target on its own when the other side
+// isn't clearly against it (user 2026-10-02: IND allowing 70% of its TDs,
+// 2.3/game, from <=10 yds averaged out below the bar against a near-average
+// WAS offense and never showed). Same floors as above still apply.
+const MODEL_TARGET_SOLO_Z = 1.0;
 
 function modelZ(team, side, metric, field) {
   const model = DATA.td_matchup_model;
@@ -211,7 +216,8 @@ function modelEntry(label, off, def) {
   if (off.z === null || def.z === null) return null;
   if (def.z < MODEL_TARGET_DEF_FLOOR || off.z < MODEL_TARGET_OFF_FLOOR) return null;
   const score = 0.5 * def.z + 0.5 * off.z;
-  if (score < MODEL_TARGET_MIN_SCORE) return null;
+  const solo = def.z >= MODEL_TARGET_SOLO_Z || off.z >= MODEL_TARGET_SOLO_Z;
+  if (score < MODEL_TARGET_MIN_SCORE && !solo) return null;
   const due = off.xtd !== undefined && off.xtd !== null && off.xtd - off.adj >= MODEL_DUE_GAP && off.xtd >= 0.3;
   return { label, score, due };
 }
@@ -1024,12 +1030,19 @@ function summaryTargetCells(metric, offTeam, defTeam) {
     ];
   }
   if (POSITIONS.includes(metric)) return bucket("off_position_td", "def_position_td_allowed", metric);
-  if (LENGTH_BUCKETS.some((b) => b.key === metric)) return bucket("td_by_length", "td_by_length_allowed", metric);
+  if (LENGTH_BUCKETS.some((b) => b.key === metric)) {
+    // Per game plus share of all TDs (scored / allowed) -- the share is the
+    // "how" a defense gives up TDs, which the per-game number alone hides.
+    const share = (dict, total, team) => (team[total] ? ` <small class="sc-share">${Math.round(((team[dict][metric] || 0) / team[total]) * 100)}%</small>` : "");
+    const [oc, dc] = bucket("td_by_length", "td_by_length_allowed", metric);
+    return [oc.replace("</td>", `${share("td_by_length", "total_td", o)}</td>`), dc.replace("</td>", `${share("td_by_length_allowed", "total_td_allowed", d)}</td>`)];
+  }
   return [cell("--", ""), cell("--", "")];
 }
 function summaryTargetUnit(metric) {
   if (metric === "first") return "scored 1st";
   if (metric === "rz") return "RZ TD rate";
+  if (LENGTH_BUCKETS.some((b) => b.key === metric)) return "TDs/g · % of TDs";
   return "TDs / game";
 }
 

@@ -3147,6 +3147,9 @@ html.local-dev .update-odds-link { display: inline-flex; }
 main { max-width: 1840px; }
 .pzm-table td.pzm-label { white-space: nowrap; }
 
+/* TD summary: share-of-TDs next to per-game on distance targets */
+.sc-share { font-size: 0.72em; font-weight: 700; opacity: 0.8; margin-left: 3px; }
+
 /* ---- Trenches (OL / defensive front grades): letter + 0-100 score ---- */
 .trenches-cell { white-space: nowrap; }
 .trenches-cell .tr-letter { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; margin-right: 5px; }
