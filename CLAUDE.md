@@ -277,6 +277,13 @@ context. It is the only copy that travels with the repo.
     stay in the row. Only for `MODEL_SOFT_METRICS` (QB/RB/WR/TE, rush/pass, <=10 yds; the longer
     buckets and First TD swing on 2-3 plays) and at most `MODEL_SOFT_MAX` = 2 per team side,
     softest first. Week 4: 12 across 32 sides.
+  - **"Weak spot" matchup tag (2026-10-02, NE D):** `defenseWeakSpot` (app.js): for a defense that's
+    good at stopping TDs overall (TD/g allowed z >= 0.4, 4+ TDs allowed), the skill position whose
+    share of TDs allowed is clearly above that position's league share (z >= 0.75, 2+ TDs). It
+    reads like "while NE is solid overall, if it has a weakness it's WRs". Shown regardless of
+    the offense's usage (the user wants the tendency visible), but the line prints the offense's
+    own share of TDs at that position, so both sides are on the card. Key players: that
+    position's top usage players. Week 4: 9 tags across 32 sides.
   - **No DST anywhere on the TD Summary card (user 2026-10-02):** defensive/return TDs are random
     and not bet, so `summarySeasonColumn` filters DST targets (First TD position targets already
     skipped DST). The TD Data page itself keeps its DST rows.

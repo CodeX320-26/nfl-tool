@@ -345,6 +345,43 @@ function tagNum(v, d = 1) {
   return v === null || v === undefined ? "--" : String(Number(Number(v).toFixed(d)));
 }
 
+// League-average share of TDs (scored or allowed) that go to one position,
+// among teams with enough TDs for a share to mean anything.
+const WEAK_SPOT_MIN_TDS = 4;
+function positionShareLeague(side, pos) {
+  const dict = side === "off" ? "off_position_td" : "def_position_td_allowed";
+  const total = side === "off" ? "total_td" : "total_td_allowed";
+  const vals = teamsWithGames()
+    .map((t) => DATA.team_stats[t])
+    .filter((s) => s[total] >= WEAK_SPOT_MIN_TDS)
+    .map((s) => (s[dict][pos] || 0) / s[total]);
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+// A strong TD defense's relative weak spot: overall TD/g allowed clearly
+// better than average (z >= 0.4), and one skill position's share of the
+// TDs it allows clearly above that position's league share (z >= 0.75,
+// 2+ TDs). Null otherwise -- a bad defense's holes are already targets.
+function defenseWeakSpot(defTeam) {
+  const d = DATA.team_stats[defTeam];
+  if (!d || d.total_td_allowed < WEAK_SPOT_MIN_TDS) return null;
+  const overall = statZ("total_td_allowed_per_g", true)(defTeam);
+  if (overall === null || overall < 0.4) return null;
+  let best = null;
+  ["QB", "RB", "WR", "TE"].forEach((pos) => {
+    const count = d.def_position_td_allowed[pos] || 0;
+    if (count < 2) return;
+    const shareOf = (t) => {
+      const s = DATA.team_stats[t];
+      return s.total_td_allowed >= WEAK_SPOT_MIN_TDS ? (s.def_position_td_allowed[pos] || 0) / s.total_td_allowed : null;
+    };
+    const pool = teamsWithGames().map(shareOf).filter((v) => v !== null);
+    const share = count / d.total_td_allowed;
+    const z = zScore(share, pool, false);
+    if (z !== null && z >= 0.75 && (!best || z > best.z)) best = { pos, share, z, league: positionShareLeague("def", pos) };
+  });
+  return best;
+}
+
 function matchupTags(offTeam, defTeam) {
   const o = DATA.team_stats[offTeam];
   const d = DATA.team_stats[defTeam];
@@ -475,6 +512,23 @@ function matchupTags(offTeam, defTeam) {
     if (ok(hz) && hz >= 0.6 && lookCall("ypc_vs_heavy_box", "def_ypc_allowed_heavy_box").dir > 0) {
       add("good", "Beats stacked box", `${defTeam} 7+ box ${tagPct(d.box_heavy_rate)} (lg ${tagPct(tagLeague("box_heavy_rate"))}) · ${offTeam} ${tagNum(o.ypc_vs_heavy_box)} YPC vs 7+ · ${defTeam} allows ${tagNum(d.def_ypc_allowed_heavy_box)}`);
     }
+  }
+
+  // Weak spot (user 2026-10-02, NE D): a defense that's solid at stopping
+  // TDs overall, but one position scores an outsized share of what it does
+  // allow -- "if NE has a weakness, it's WRs". Reads both sides: the text
+  // also shows how much this offense scores through that position.
+  // Shown regardless of how much this offense uses that position (the user
+  // wants the defense's tendency visible); the offense's own share is printed
+  // right in the line so the reader sees both sides.
+  const weak = defenseWeakSpot(defTeam);
+  if (weak) {
+    const offShare = o.total_td ? (o.off_position_td[weak.pos] || 0) / o.total_td : null;
+    add(
+      "good",
+      `Weak spot: ${weak.pos}`,
+      `${defTeam} allows ${tagNum(d.total_td_allowed_per_g)} TD/g (lg ${tagNum(tagLeague("total_td_allowed_per_g"))}) · ${weak.pos}s score ${tagPct(weak.share)} of them (lg ${tagPct(weak.league)}) · ${offTeam} ${weak.pos}s: ${tagPct(offShare)} of its TDs (lg ${tagPct(positionShareLeague("off", weak.pos))})`
+    );
   }
 
   return tags.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "good" ? -1 : 1));
@@ -1176,6 +1230,10 @@ function keyPlayersForTag(label, pool, team) {
   const qb = () => keyTop(pool.filter((p) => p.position === "QB"), (p) => p.pass_att, 1, 10);
   if (["RZ leak", "RZ wall", "RZ volume", "Few RZ trips"].includes(label)) return keyTop(pool, rzUse, 2, 2);
   if (label === "RZ pass edge") return keyTop(pool, (p) => p.rz_targets, 2, 1);
+  if (label.startsWith("Weak spot: ")) {
+    const pos = label.slice("Weak spot: ".length);
+    return keyTop(pool.filter((p) => p.position === pos), (p) => p.touches + 3 * (p.rz_targets + p.rz_carries), 2, 3);
+  }
   if (label === "Goal-line run edge") return keyTop(pool, (p) => p.rz_carries, 2, 2);
   if (label === "Big-play pass" || label === "Limits big passes") return keyTop(pool, (p) => p.deep_targets, 2, 2);
   if (label === "Big-play run" || label === "Limits big runs") return keyTop(pool, (p) => p.explosive_rushes, 2, 1);
