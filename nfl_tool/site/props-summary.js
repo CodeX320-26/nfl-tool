@@ -704,6 +704,7 @@ const PROP_TT_BLOCK_LOW = 18.5; // no passing/receiving target at or under this 
 const PROP_TT_BLOCK_HIGH = 25.5; // no passing/receiving fade at or over it
 const PROP_DOG_BLOCK = 7; // no RB rushing target as a 7+ point underdog (fade as a 7+ favorite)
 const PROP_TARGETS_SHOWN = 6;
+const PROP_LONG_MARKETS = new Set(["passing_longestCompletion", "receiving_longestReception"]);
 const PROP_FADES_SHOWN = 4;
 const PROP_PACKAGES = [
   { pos: "QB", name: "QB", markets: [
@@ -770,7 +771,13 @@ function propPackages(offTeam, defTeam, game, lines) {
     // cancel out (MIA vs MIN: Long Rec +0.81, Completions -0.81 -> nothing
     // shown). A package can now list a Target and a Fade on DIFFERENT markets.
     [1, -1].forEach((dir) => {
-    const candidates = markets.filter((m) => Math.sign(m.lean) === dir && clean(m, dir));
+    // Long-play markets skip the low-implied-total block (user 2026-10-02,
+    // MIA vs MIN): a low total means trailing, and trailing teams take more
+    // deep shots; a leading defense sitting in a soft shell also gives up
+    // catch-and-run long plays. Yards/receptions targets stay blocked.
+    const lowBlock = dir > 0 && pkg.script !== "run" && tt !== null && tt <= PROP_TT_BLOCK_LOW;
+    const allowed = (m) => !lowBlock || PROP_LONG_MARKETS.has(m.mk);
+    const candidates = markets.filter((m) => Math.sign(m.lean) === dir && clean(m, dir) && allowed(m));
     if (!candidates.length) return;
     const top = candidates.slice().sort((a, b) => Math.abs(b.lean) - Math.abs(a.lean))[0];
     const best = Math.abs(top.lean);
@@ -782,10 +789,9 @@ function propPackages(offTeam, defTeam, game, lines) {
       if (dir > 0 && fav <= -PROP_DOG_BLOCK) return;
       if (dir < 0 && fav >= PROP_DOG_BLOCK) return;
     } else if (tt !== null) {
-      if (dir > 0 && tt <= PROP_TT_BLOCK_LOW) return;
       if (dir < 0 && tt >= PROP_TT_BLOCK_HIGH) return;
     }
-    const shown = markets.filter((m) => Math.sign(m.lean) === dir && Math.abs(m.lean) >= PROP_MARKET_MIN && clean(m, dir)).sort((a, b) => Math.abs(b.lean) - Math.abs(a.lean));
+    const shown = markets.filter((m) => Math.sign(m.lean) === dir && Math.abs(m.lean) >= PROP_MARKET_MIN && clean(m, dir) && allowed(m)).sort((a, b) => Math.abs(b.lean) - Math.abs(a.lean));
     if (!shown.length) return;
     // Reason tags: the defense stat and the offense stat that push hardest.
     const parts = shown.flatMap((m) => m.parts);

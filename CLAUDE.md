@@ -195,7 +195,10 @@ context. It is the only copy that travels with the repo.
   nothing). Now each direction is judged on its own markets: a package can show a Target and a
   Fade on DIFFERENT markets (card splits by `dir`). The betting-market blocks (implied total
   <= 18.5 no targets / >= 25.5 no fades; 7+ point spread for RB rushing) are unchanged and
-  intentional. An audit of Week 4 after the fix: 0 strong clean markets cut except by those blocks.
+  intentional. Exception (user 2026-10-02): **Long Comp / Long Rec targets ignore the low-total block**
+  (`PROP_LONG_MARKETS`): a low total means trailing, trailing teams take more deep shots, and a
+  leading defense in a soft shell gives up catch-and-run long plays. Yards/receptions targets stay
+  blocked at low totals; fades at high totals unchanged. An audit of Week 4 after the fix: 0 strong clean markets cut except by those blocks.
 - **Audit habit (the user asked how to be sure nothing else is gapping the algorithm):** any rule
   that blends parts into one score and then cuts on it can hide one strong part. Before shipping
   a new selection rule, list every candidate with its parts for a real week and check that no
