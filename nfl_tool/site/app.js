@@ -900,10 +900,14 @@ const FIRST_TD_SHARE_FLATTEN = 0.9;
 // (PHI's "QB TDs allowed" z of +2.8 on one or two plays was a x1.77 boost).
 const FIRST_TD_DEF_K = 0.2;
 const FIRST_TD_DEF_MIN_TDS = 3;
-// QBs only score first when they actually run: weight x min(1, carries per
-// game / FIRST_TD_QB_RUNNER)^1.5. A pocket passer's scrambles plus one goal-
-// line sneak can't read like a running QB (Stafford, ~2.7 car/g, was 4-7%).
+// QBs only score first when they actually run: weight x mobility^1.5, where
+// mobility = the higher of carries/g ÷ FIRST_TD_QB_RUNNER and rush yds/g ÷
+// FIRST_TD_QB_RUN_YDS (capped at 1). Yards count too (user 2026-10-02): Purdy
+// runs only 3.3x/g but for 31 yds/g (7th among QBs) -- a real threat that
+// carries alone missed. A pocket passer's scrambles plus one goal-line sneak
+// still can't read like a running QB (Stafford was 4-7%).
 const FIRST_TD_QB_RUNNER = 6;
+const FIRST_TD_QB_RUN_YDS = 30;
 // Expected-TD units of early-window usage a team needs before its own
 // early split outweighs the full-game split.
 const FIRST_TD_EARLY_PRIOR = 0.3;
@@ -1021,7 +1025,13 @@ function firstTdPlayerTargets(offTeam, defTeam, teamChance, week) {
       FIRST_TD_W.xtd * fullShare +
       FIRST_TD_W.early * earlyShare;
     const games = DATA.team_stats[offTeam]?.games_played || 1;
-    const qbRun = p.position === "QB" ? Math.pow(Math.min(1, (p.carries || 0) / games / FIRST_TD_QB_RUNNER), 1.5) : 1;
+    let qbRun = 1;
+    if (p.position === "QB") {
+      const prop = ((DATA.player_props || {})[offTeam] || []).find((x) => normName(x.name) === normName(p.name));
+      const ydsPg = prop && prop.rush_yards_per_g != null ? prop.rush_yards_per_g : 0;
+      const mobility = Math.min(1, Math.max((p.carries || 0) / games / FIRST_TD_QB_RUNNER, ydsPg / FIRST_TD_QB_RUN_YDS));
+      qbRun = Math.pow(mobility, 1.5);
+    }
     return { p, w: Math.pow(share, FIRST_TD_SHARE_FLATTEN) * Math.exp(FIRST_TD_DEF_K * defPosZ[p.position]) * qbRun };
   });
   const wSum = raw.reduce((s, r) => s + r.w, 0) || 1;

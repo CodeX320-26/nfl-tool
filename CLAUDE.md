@@ -298,7 +298,7 @@ context. It is the only copy that travels with the repo.
       `FIRST_TD_SHARE_FLATTEN` 0.65 -> 0.9 (the strong flatten inflated fringe players and squeezed
       RB1s); opponent position factor capped at z ±1 and only with `FIRST_TD_DEF_MIN_TDS` = 3+ TDs
       allowed to that position (PHI's QB-allowed z +2.8 on 1-2 plays was a x1.77 boost); QBs
-      x min(1, carries/g ÷ 6)^1.5 (`FIRST_TD_QB_RUNNER`). Result: Stafford 6.6% -> 1.4%, pocket QBs
+      x mobility^1.5, mobility = min(1, max(carries/g ÷ 6, rush yds/g ÷ 30)) (`FIRST_TD_QB_RUNNER`, `FIRST_TD_QB_RUN_YDS`; yards added at the user's request so Purdy, 3.3 car/g but 31 yds/g, counts as mobile: 1.1% -> 2.6%). Result: Stafford 6.6% -> 1.4%, pocket QBs
       0.3-1.4%, Allen 12.3%; model position totals RB 43 / WR 36 / TE 16 / QB 4.5 vs actual 39 / 37 /
       17 / 6.5. Calibration check: sum the model's first-TD % by position across a full slate and
       compare with the season's actual first-TD scorers by position.
