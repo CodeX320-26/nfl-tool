@@ -1354,7 +1354,20 @@ function lineupSnapIndex(team) {
   }
   return lineupSnapIndex.cache[team];
 }
+// On IR / released / retired per the latest roster (build_stats.py
+// compute_roster_out). IR players never appear on injury reports, so this is
+// the only way the site knows a season-ending injury.
+function rosterOut(team, name) {
+  if (!rosterOut.cache) {
+    rosterOut.cache = {};
+    Object.entries(DATA.roster_out || {}).forEach(([t, list]) =>
+      list.forEach((p) => (rosterOut.cache[`${t}|${normName(p.name)}`] = p.status))
+    );
+  }
+  return rosterOut.cache[`${team}|${normName(name)}`] || null;
+}
 function lineupOutOn(team, name, week) {
+  if (rosterOut(team, name)) return true;
   const list = ((DATA.injuries || {})[team] || {})[String(week)] || [];
   const hit = list.find((i) => normName(i.full_name) === normName(name));
   return !!hit && /out|doubtful|reserve|injured|suspend/i.test(hit.report_status || "");

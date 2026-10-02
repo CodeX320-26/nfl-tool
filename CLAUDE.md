@@ -373,6 +373,13 @@ context. It is the only copy that travels with the repo.
     report Wednesday afternoon (Thursday-game teams earlier), so Mon-Wed the current week is
     empty; the panel then shows the team's most recent earlier report, labeled "No Week N report
     yet ... Showing the Week N-1 final report" (2026-09-30), instead of a blank.
+  - **Roster status (2026-10-02):** players on reserve/IR never appear on weekly injury reports
+    (teams only report active players), so an IR'd starter kept showing (Achane, Week 4; also
+    Etienne, A.J. Brown, Pierce, Reed, Dart: 21 skill players with usage). `compute_roster_out`
+    (build_stats.py) reads each team's latest weekly roster `status` (RES = IR/reserve, RET, CUT,
+    EXE) into data.json `roster_out`. `rosterOut()` (common.js) feeds `lineupOutOn`, `propInjuries`
+    and `firstTdInjuryStatus`, so these players count as Out everywhere and their backups get
+    full lineup weight. DEV (practice squad) is NOT treated as out.
   - **Live source for the upcoming week (2026-09-30):** nflverse republishes the official report
     hours late, and the user needs Wednesday info for preview videos. `fetch_nflcom_injuries`
     (build_stats.py) reads the league's own page, `nfl.com/injuries/league/{season}/reg{week}`,

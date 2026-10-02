@@ -976,6 +976,8 @@ function firstTdInjuryStatus(team, week) {
     const tag = /out|doubtful|reserve|injured/.test(r) ? "out" : r === "questionable" ? "Q" : /did not/i.test(i.practice_status || "") ? "DNP" : null;
     if (tag) out[normName(i.full_name)] = tag;
   });
+  // On IR / released per the roster (IR players never appear on the report).
+  ((DATA.roster_out || {})[team] || []).forEach((p) => (out[normName(p.name)] = "out"));
   return out;
 }
 

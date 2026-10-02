@@ -167,6 +167,8 @@ function propInjuries(team, week) {
     const tag = /out|doubtful|reserve|injured|suspend/.test(r) ? "out" : r === "questionable" ? "Q" : null;
     if (tag) out[normName(i.full_name)] = { tag, name: i.full_name };
   });
+  // On IR / released per the roster (never on the injury report).
+  Object.values((DATA.roster_out || {})[team] || []).forEach((p) => (out[normName(p.name)] = { tag: "out", name: p.name, roster: p.status }));
   // Players you marked Out yourself (late news the injury report doesn't
   // have yet -- e.g. a QB benched the day of the game).
   loadManualOuts(week).forEach((k) => {

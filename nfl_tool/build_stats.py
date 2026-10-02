@@ -456,7 +456,30 @@ def load_rosters(data_dir: Path, season: int, force: bool = False) -> pd.DataFra
     df["team"] = df["team"].map(normalize_team)
     # Keep one row per (gsis_id, week); prefer the most complete position value.
     df = df.dropna(subset=["gsis_id"])
-    return df[["season", "week", "team", "gsis_id", "position", "full_name", "headshot_url"]]
+    cols = ["season", "week", "team", "gsis_id", "position", "full_name", "headshot_url"]
+    if "status" in df.columns:
+        cols.append("status")
+    return df[cols]
+
+
+# Roster statuses that mean "not playing" no matter what the injury report
+# says. Players on reserve/IR never appear on weekly injury reports at all
+# (teams only report active players), so without this an IR'd starter --
+# Achane, Week 4 2026 -- kept showing as a key player / First TD pick.
+ROSTER_OUT_STATUSES = {"RES": "IR / reserve", "RET": "retired", "CUT": "released", "EXE": "exempt"}
+
+
+def compute_roster_out(rosters: pd.DataFrame) -> dict:
+    """{team: [{name, status}]} from each team's latest roster week."""
+    if "status" not in rosters.columns or rosters.empty:
+        return {}
+    out = {}
+    for team, g in rosters.groupby("team"):
+        latest = g[g["week"] == g["week"].max()]
+        rows = latest[latest["status"].isin(ROSTER_OUT_STATUSES)]
+        if len(rows):
+            out[team] = [{"name": r.full_name, "status": ROSTER_OUT_STATUSES[r.status]} for r in rows.itertuples(index=False)]
+    return out
 
 
 def load_injuries(data_dir: Path, season: int) -> pd.DataFrame:
@@ -4479,6 +4502,7 @@ def main():
     # reports appear here hours before nflverse republishes them).
     injuries_df = merge_live_injuries(injuries_df, args.season, current_week)
     injury_report = compute_injury_report(injuries_df, teams, player_snap_shares)
+    roster_out = compute_roster_out(load_rosters(args.data_dir, args.season, force=True))
 
     # Offensive line + defensive front grades (line_grades.py). Not shown on
     # the site yet -- placement still to be decided with the user.
@@ -4639,6 +4663,7 @@ def main():
         "current_week": current_week,
         "recent_games": recent_games,
         "injuries": injury_report,
+        "roster_out": roster_out,
         "line_grades": line_grades,
         "injuries_max_week": int(injuries_df["week"].max()) if len(injuries_df) else None,
         "player_td_odds": player_td_odds,
