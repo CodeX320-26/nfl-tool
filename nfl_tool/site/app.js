@@ -891,10 +891,19 @@ const FIRST_TD_HOME_EDGE = 0.08;
 // lopsidedly than it wins. Blended 50/50 with the stat model.
 const FIRST_TD_MARKET_WEIGHT = 0.5;
 const FIRST_TD_MARKET_SLOPE = 0.4; // first-TD % moves 0.4 per 1.0 of win %
-// Raw usage shares pile onto one goal-line back; real first-TD shares are
-// flatter (anyone can score on the opening drive), so shares are raised to
-// this power and renormalized.
-const FIRST_TD_SHARE_FLATTEN = 0.65;
+// Mild flattening only (was 0.65 until 2026-10-02): the strong version
+// inflated fringe players -- Stafford's ~6% raw share became 16% of LA's
+// first-TD chance (6.6% absolute) while RB1 Kyren Williams got squeezed.
+const FIRST_TD_SHARE_FLATTEN = 0.9;
+// Opponent position factor exp(FIRST_TD_DEF_K * z), z capped at +/-1 and only
+// when the defense has allowed FIRST_TD_DEF_MIN_TDS+ TDs to that position
+// (PHI's "QB TDs allowed" z of +2.8 on one or two plays was a x1.77 boost).
+const FIRST_TD_DEF_K = 0.2;
+const FIRST_TD_DEF_MIN_TDS = 3;
+// QBs only score first when they actually run: weight x min(1, carries per
+// game / FIRST_TD_QB_RUNNER)^1.5. A pocket passer's scrambles plus one goal-
+// line sneak can't read like a running QB (Stafford, ~2.7 car/g, was 4-7%).
+const FIRST_TD_QB_RUNNER = 6;
 // Expected-TD units of early-window usage a team needs before its own
 // early split outweighs the full-game split.
 const FIRST_TD_EARLY_PRIOR = 0.3;
@@ -969,7 +978,9 @@ function firstTdInjuryStatus(team, week) {
 // Player share of the team's first-TD chance: full-field usage (targets +
 // carries), red zone opportunities (RZ targets + carries), expected TDs
 // from where the touches happen, and the same before the first TD.
-const FIRST_TD_W = { touches: 0.3, rz: 0.25, xtd: 0.25, early: 0.2 };
+// Expected TDs and red zone looks lead: they already price WHERE a touch
+// happens, so a midfield QB scramble can't count like a red zone target.
+const FIRST_TD_W = { touches: 0.15, rz: 0.3, xtd: 0.4, early: 0.15 };
 // Small-sample pull toward the player's overall usage share: red zone
 // opportunities and expected TDs are a handful of plays early in a season,
 // so each starts at the touch share and earns its own number as the team's
@@ -990,7 +1001,11 @@ function firstTdPlayerTargets(offTeam, defTeam, teamChance, week) {
   const totals = { early: sum("early_xtd_pg"), xtd: sum("xtd_pg"), touches: sum("touches"), rz: players.reduce((s, p) => s + rzOpp(p), 0) || 1 };
   const defPosZ = {};
   const raw = players.map((p) => {
-    if (!(p.position in defPosZ)) defPosZ[p.position] = avgZ(modelSideZ(defTeam, "def", `first_${p.position}`).z, modelSideZ(defTeam, "def", p.position).z) || 0;
+    if (!(p.position in defPosZ)) {
+      const allowed = (DATA.team_stats[defTeam]?.def_position_td_allowed || {})[p.position] || 0;
+      const z = avgZ(modelSideZ(defTeam, "def", `first_${p.position}`).z, modelSideZ(defTeam, "def", p.position).z) || 0;
+      defPosZ[p.position] = allowed >= FIRST_TD_DEF_MIN_TDS ? Math.max(-1, Math.min(1, z)) : 0;
+    }
     const touchShare = p.touches / totals.touches;
     const fullShare = (p.xtd_pg + FIRST_TD_XTD_PRIOR * touchShare) / (totals.xtd + FIRST_TD_XTD_PRIOR);
     const rzShare = (rzOpp(p) + FIRST_TD_RZ_PRIOR * touchShare) / (totals.rz + FIRST_TD_RZ_PRIOR);
@@ -1005,7 +1020,9 @@ function firstTdPlayerTargets(offTeam, defTeam, teamChance, week) {
       FIRST_TD_W.rz * rzShare +
       FIRST_TD_W.xtd * fullShare +
       FIRST_TD_W.early * earlyShare;
-    return { p, w: Math.pow(share, FIRST_TD_SHARE_FLATTEN) * Math.exp(0.2 * defPosZ[p.position]) };
+    const games = DATA.team_stats[offTeam]?.games_played || 1;
+    const qbRun = p.position === "QB" ? Math.pow(Math.min(1, (p.carries || 0) / games / FIRST_TD_QB_RUNNER), 1.5) : 1;
+    return { p, w: Math.pow(share, FIRST_TD_SHARE_FLATTEN) * Math.exp(FIRST_TD_DEF_K * defPosZ[p.position]) * qbRun };
   });
   const wSum = raw.reduce((s, r) => s + r.w, 0) || 1;
   const odds = {};
