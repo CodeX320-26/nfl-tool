@@ -254,6 +254,9 @@ context. It is the only copy that travels with the repo.
     allowing 70% of its TDs (2.3/g) from <=10 yds averaged out vs a near-average WAS offense
     and never showed. This added ~7 targets across 32 team-sides in Week 4 (2.3 -> 2.5 per side).
     Distance target rows show per game plus share of all TDs ("2.33 · 70%", unit "TDs/g · % of TDs").
+  - **No DST anywhere on the TD Summary card (user 2026-10-02):** defensive/return TDs are random
+    and not bet, so `summarySeasonColumn` filters DST targets (First TD position targets already
+    skipped DST). The TD Data page itself keeps its DST rows.
 - The Game Previews Summary card:
   - Order: injuries strip; Lines + W&L vs the spread side by side; Ratings box; Matchups
     with A–F grades and Mismatch/Tough/Good vs Good/Bad vs Bad tags.

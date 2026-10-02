@@ -1132,7 +1132,11 @@ function summarySeasonColumn(offTeam, defTeam, week) {
       if (kind !== "warn") e.good = true;
     });
   let n = 0;
-  const items = targetGroups(offTeam, defTeam).flatMap((g) => g.items);
+  // No DST on the summary (user 2026-10-02): defensive/return TDs are random
+  // and nobody's betting them. The TD Data page itself still shows DST rows.
+  const items = targetGroups(offTeam, defTeam)
+    .flatMap((g) => g.items)
+    .filter((i) => i.metric !== "DST" && i.label !== "DST");
   const targetRows = items.length
     ? items
         .map((i) => {
