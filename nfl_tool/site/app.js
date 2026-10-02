@@ -198,6 +198,38 @@ const MODEL_DUE_GAP = 0.75; // usage z this far above TD z = "due"
 // 2.3/game, from <=10 yds averaged out below the bar against a near-average
 // WAS offense and never showed). Same floors as above still apply.
 const MODEL_TARGET_SOLO_Z = 1.0;
+// Distance CONCENTRATION (user 2026-10-02, TEN @ BAL): BAL allows 75% of its
+// TDs from <=10 yds and TEN scores 75% of its own there, but per-game volume
+// was ordinary on both sides so nothing showed. Share-of-TDs z's catch the
+// "how TDs happen in this matchup" signal: one side concentrated (z >= 0.75)
+// and the other leaning the same way (z >= 0), each with 4+ TDs of sample.
+const SHARE_TARGET_LEAD_Z = 0.75;
+const SHARE_TARGET_MIN_TDS = 4;
+function bucketShareZ(team, side, key) {
+  const dict = side === "off" ? "td_by_length" : "td_by_length_allowed";
+  const total = side === "off" ? "total_td" : "total_td_allowed";
+  const share = (t) => {
+    const s = DATA.team_stats[t];
+    return s[total] >= SHARE_TARGET_MIN_TDS ? (s[dict][key] || 0) / s[total] : null;
+  };
+  const v = share(team);
+  if (v === null) return null;
+  return zScore(v, teamsWithGames().map(share).filter((x) => x !== null), false);
+}
+function shareTargetEntry(offTeam, defTeam, key, label) {
+  const off = bucketShareZ(offTeam, "off", key);
+  const def = bucketShareZ(defTeam, "def", key);
+  if (off === null || def === null) return null;
+  const lead = (def >= SHARE_TARGET_LEAD_Z && off >= 0) || (off >= SHARE_TARGET_LEAD_Z && def >= 0);
+  return lead ? { label, score: 0.5 * off + 0.5 * def, metric: key, share: true } : null;
+}
+// This offense's chance to score the game's first TD, from the same model
+// the First TD section shows -- the "First TD" target must agree with it.
+function firstTdChanceFor(offTeam, defTeam) {
+  const game = (DATA.schedule || []).find((g) => g.status !== "final" && ((g.away === offTeam && g.home === defTeam) || (g.away === defTeam && g.home === offTeam)));
+  if (!game) return null;
+  return game.away === offTeam ? firstTdTeamChance(offTeam, defTeam) : 1 - firstTdTeamChance(defTeam, offTeam);
+}
 
 function modelZ(team, side, metric, field) {
   const model = DATA.td_matchup_model;
@@ -230,10 +262,17 @@ function modelTargetGroups(offTeam, defTeam) {
   const clean = (list) => list.filter(Boolean).sort((a, b) => b.score - a.score);
   const rzEntry = targetEntry("Red Zone", targetRateZ(offTeam, stat("rz_td_rate")), targetRateZ(defTeam, stat("rz_td_rate_allowed")));
   const rz = rzEntry && { ...rzEntry, metric: "rz" };
+  // First TD only for the side the First TD model also favors -- the card
+  // must not call TEN a First TD target while its First TD bar says BAL 60%.
+  const firstChance = firstTdChanceFor(offTeam, defTeam);
+  const first = firstChance === null || firstChance >= 0.5 ? pair("first", "First TD") : null;
+  // Volume target first; if a bucket didn't qualify on volume, a strong
+  // shared concentration can still carry it.
+  const distance = LENGTH_BUCKETS.map(({ key, label }) => pair(key, label) || shareTargetEntry(offTeam, defTeam, key, label));
   return [
-    { title: "Type", items: clean([pair("pass", "Pass TD"), pair("rush", "Rush TD"), pair("first", "First TD")]) },
+    { title: "Type", items: clean([pair("pass", "Pass TD"), pair("rush", "Rush TD"), first]) },
     { title: "Position", items: clean(POSITIONS.map((pos) => pair(pos, pos))) },
-    { title: "Distance", items: clean([...LENGTH_BUCKETS.map(({ key, label }) => pair(key, label)), rz]) },
+    { title: "Distance", items: clean([...distance, rz]) },
   ];
 }
 

@@ -254,6 +254,14 @@ context. It is the only copy that travels with the repo.
     allowing 70% of its TDs (2.3/g) from <=10 yds averaged out vs a near-average WAS offense
     and never showed. This added ~7 targets across 32 team-sides in Week 4 (2.3 -> 2.5 per side).
     Distance target rows show per game plus share of all TDs ("2.33 · 70%", unit "TDs/g · % of TDs").
+  - **Distance concentration (2026-10-02, TEN @ BAL):** BAL allows 75% of its TDs from <=10 yds
+    and TEN scores 75% of its own there, but per-game volume was ordinary on both sides, so the
+    volume model missed it. `shareTargetEntry` (app.js): if a bucket fails on volume, it can still
+    qualify on share-of-TDs z (one side >= 0.75, the other >= 0, each with 4+ TDs). It added 8
+    targets across 32 sides in Week 4.
+  - **First TD target must agree with the First TD section:** it only shows for an offense whose
+    `firstTdChanceFor` (same model as the First TD bar) is >= 50%. TEN was a "First TD" target
+    while the bar said BAL 60%; the user called that confusing. 0 conflicts across Week 4 after.
   - **No DST anywhere on the TD Summary card (user 2026-10-02):** defensive/return TDs are random
     and not bet, so `summarySeasonColumn` filters DST targets (First TD position targets already
     skipped DST). The TD Data page itself keeps its DST rows.
