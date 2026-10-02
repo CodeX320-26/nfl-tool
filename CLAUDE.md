@@ -262,6 +262,14 @@ context. It is the only copy that travels with the repo.
   - **First TD target must agree with the First TD section:** it only shows for an offense whose
     `firstTdChanceFor` (same model as the First TD bar) is >= 50%. TEN was a "First TD" target
     while the bar said BAL 60%; the user called that confusing. 0 conflicts across Week 4 after.
+  - **First TD player picks (`firstTdPlayerTargets`, reworked 2026-10-02):** the user wants the
+    whole offense's usage, not "who has scored before". Share of the team's first-TD chance =
+    `FIRST_TD_W`: 30% full-field touches (targets + carries), 25% red zone opportunities
+    (RZ targets + carries), 25% expected TDs, 20% early-game xTD. TDs scored carry 0 weight
+    (was 15%). RZ and xTD shares are pulled toward the player's touch share until the team piles
+    up `FIRST_TD_RZ_PRIOR` RZ looks / `FIRST_TD_XTD_PRIOR` xTD, so 3-5 end-zone looks or one
+    goal-line game can't top a team. TEN went from Ayomanor 9.4% (9 targets), Ward 7.7% to
+    Pollard 9.0% (45 touches, 8 RZ), Ayomanor 6.6%, Ward 5.1%.
   - **No DST anywhere on the TD Summary card (user 2026-10-02):** defensive/return TDs are random
     and not bet, so `summarySeasonColumn` filters DST targets (First TD position targets already
     skipped DST). The TD Data page itself keeps its DST rows.

@@ -893,6 +893,16 @@ function firstTdInjuryStatus(team, week) {
   return out;
 }
 
+// Player share of the team's first-TD chance: full-field usage (targets +
+// carries), red zone opportunities (RZ targets + carries), expected TDs
+// from where the touches happen, and the same before the first TD.
+const FIRST_TD_W = { touches: 0.3, rz: 0.25, xtd: 0.25, early: 0.2 };
+// Small-sample pull toward the player's overall usage share: red zone
+// opportunities and expected TDs are a handful of plays early in a season,
+// so each starts at the touch share and earns its own number as the team's
+// RZ looks (FIRST_TD_RZ_PRIOR plays) and xTD (FIRST_TD_XTD_PRIOR) pile up.
+const FIRST_TD_RZ_PRIOR = 12;
+const FIRST_TD_XTD_PRIOR = 1.0;
 function firstTdPlayerTargets(offTeam, defTeam, teamChance, week) {
   const injured = firstTdInjuryStatus(offTeam, week);
   // Lineup-weighted (see common.js lineupAdjustedXtd): a starter's game
@@ -903,15 +913,25 @@ function firstTdPlayerTargets(offTeam, defTeam, teamChance, week) {
   // who hasn't drawn goal-line looks yet still plays every snap and can
   // score first on any drive. (touches comes from lineupAdjustedXtd.)
   const sum = (k) => players.reduce((s, p) => s + (p[k] || 0), 0) || 1;
-  const totals = { early: sum("early_xtd_pg"), xtd: sum("xtd_pg"), tds: sum("tds"), touches: sum("touches") };
+  const rzOpp = (p) => (p.rz_targets || 0) + (p.rz_carries || 0);
+  const totals = { early: sum("early_xtd_pg"), xtd: sum("xtd_pg"), touches: sum("touches"), rz: players.reduce((s, p) => s + rzOpp(p), 0) || 1 };
   const defPosZ = {};
   const raw = players.map((p) => {
     if (!(p.position in defPosZ)) defPosZ[p.position] = avgZ(modelSideZ(defTeam, "def", `first_${p.position}`).z, modelSideZ(defTeam, "def", p.position).z) || 0;
-    const fullShare = p.xtd_pg / totals.xtd;
+    const touchShare = p.touches / totals.touches;
+    const fullShare = (p.xtd_pg + FIRST_TD_XTD_PRIOR * touchShare) / (totals.xtd + FIRST_TD_XTD_PRIOR);
+    const rzShare = (rzOpp(p) + FIRST_TD_RZ_PRIOR * touchShare) / (totals.rz + FIRST_TD_RZ_PRIOR);
     // A thin first-TD window (a team that's barely had the ball before the
     // first TD) leans on the full-game share instead of one lucky snap.
     const earlyShare = (p.early_xtd_pg + FIRST_TD_EARLY_PRIOR * fullShare) / (totals.early + FIRST_TD_EARLY_PRIOR);
-    const share = 0.3 * earlyShare + 0.35 * fullShare + 0.15 * (p.tds / totals.tds) + 0.2 * (p.touches / totals.touches);
+    // Whole-offense usage, not who has already scored (user 2026-10-02:
+    // Ayomanor at 9 targets and Ward off one goal-line game were topping TEN
+    // on a few end-zone looks). TDs scored carry no weight at all.
+    const share =
+      FIRST_TD_W.touches * touchShare +
+      FIRST_TD_W.rz * rzShare +
+      FIRST_TD_W.xtd * fullShare +
+      FIRST_TD_W.early * earlyShare;
     return { p, w: Math.pow(share, FIRST_TD_SHARE_FLATTEN) * Math.exp(0.2 * defPosZ[p.position]) };
   });
   const wSum = raw.reduce((s, r) => s + r.w, 0) || 1;
