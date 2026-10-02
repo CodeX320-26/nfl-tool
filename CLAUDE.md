@@ -187,6 +187,19 @@ context. It is the only copy that travels with the repo.
     (>= 40% of targets intermediate/deep, those zones >= +0.8 soft, opportunity percentile >= 0.6)
     now bypasses the blended cut, adds Rec Yds, and ranks on max(blend, downfield fit). The
     blended cut still filters everything else; Week 4 changed only Lamb (28 -> 29 targets).
+    Made two-way the same day after an audit: a strong SHORT fit (>= 40% short/screen, >= +0.8
+    soft) also bypasses the cut (Nico Collins vs DAL: short +1.18, deep tough, blend 0.24).
+- **Props Summary packages are scored per direction (audit 2026-10-02):** `propPackages` used to
+  average every market in a package into one lean, then cut below 0.1, so a strong Target market
+  and a strong Fade market cancelled out (MIA vs MIN: Long Rec +0.81 vs Completions −0.81 ->
+  nothing). Now each direction is judged on its own markets: a package can show a Target and a
+  Fade on DIFFERENT markets (card splits by `dir`). The betting-market blocks (implied total
+  <= 18.5 no targets / >= 25.5 no fades; 7+ point spread for RB rushing) are unchanged and
+  intentional. An audit of Week 4 after the fix: 0 strong clean markets cut except by those blocks.
+- **Audit habit (the user asked how to be sure nothing else is gapping the algorithm):** any rule
+  that blends parts into one score and then cuts on it can hide one strong part. Before shipping
+  a new selection rule, list every candidate with its parts for a real week and check that no
+  strong single part (zone, market, side) is dropped except by an intentional block.
   - **Zone softness** is 50% the zone's own completion % and EPA allowed (shrunk with 8 prior attempts) plus how often it's attacked, and 50% the opponent-adjusted depth band from `prop_matchup_model`.
   - **Player opportunity:** lineup-aware targets per game as a percentile at his position (70%) plus recent snap share (30%).
   - **Markets:** Receptions (volume into soft short zones), Long Rec (10+ yd share into soft zones, defense gives up 20+ plays), Rec Yds (overall match plus volume); YAC is a bonus tag.

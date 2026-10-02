@@ -765,15 +765,17 @@ function propPackages(offTeam, defTeam, game, lines) {
     // at it, or Fade when the offense is among the best -- an average of
     // the two would otherwise let one side hide the other.
     const clean = (m, dir) => m.parts.every((x) => x.o.lean * dir > -MATCHUP_CONTRA && x.d.lean * dir > -MATCHUP_CONTRA);
-    const candidates = markets.filter((m) => m.lean && clean(m, Math.sign(m.lean)));
+    // Each direction is judged on its own markets (audit 2026-10-02): the old
+    // package-wide average let a strong Target market and a strong Fade market
+    // cancel out (MIA vs MIN: Long Rec +0.81, Completions -0.81 -> nothing
+    // shown). A package can now list a Target and a Fade on DIFFERENT markets.
+    [1, -1].forEach((dir) => {
+    const candidates = markets.filter((m) => Math.sign(m.lean) === dir && clean(m, dir));
     if (!candidates.length) return;
-    // Direction from the clean market that leans hardest; the package needs
-    // that lean to be real and the rest not to point the other way.
-    const lean = markets.reduce((a, m) => a + m.lean, 0) / markets.length;
     const top = candidates.slice().sort((a, b) => Math.abs(b.lean) - Math.abs(a.lean))[0];
     const best = Math.abs(top.lean);
-    const dir = Math.sign(top.lean);
-    if (best < PROP_PACKAGE_MIN || lean * dir < 0.1) return;
+    const lean = top.lean;
+    if (best < PROP_PACKAGE_MIN) return;
     // The betting market has to agree. RB rushing follows game script (the
     // spread); everything else follows expected scoring (implied total).
     if (pkg.script === "run") {
@@ -831,6 +833,7 @@ function propPackages(offTeam, defTeam, game, lines) {
       lean: 0.6 * best + 0.4 * Math.abs(lean),
       dir,
       tt,
+    });
     });
   });
   return out;
@@ -1256,9 +1259,12 @@ function zoneTargets(offTeam, defTeam, week) {
     // even looked at.
     if (opp < ZT_OPP_MIN) return;
     const downfield = deepShare >= ZT_DOWNFIELD_SHARE && mDeep >= ZT_DOWNFIELD_SOFT && opp >= ZT_DOWNFIELD_OPP;
-    // The blended fit still filters lukewarm matches; the one exception is a
-    // strong downfield fit, which tough short zones shouldn't cancel out.
-    if (match < ZT_MATCH_MIN && !downfield) return;
+    // Mirror case (audit 2026-10-02, Nico Collins vs DAL: 40% short at +1.18
+    // soft, 60% deep where DAL is tough -> blend 0.24).
+    const shortGame = shortShare >= ZT_DOWNFIELD_SHARE && mShort >= ZT_DOWNFIELD_SOFT && opp >= ZT_DOWNFIELD_OPP;
+    // The blended fit still filters lukewarm matches; the exceptions are a
+    // strong fit at one depth, which the other depth shouldn't cancel out.
+    if (match < ZT_MATCH_MIN && !downfield && !shortGame) return;
     const markets = [];
     if (tpg >= 4 && shortShare >= 0.4 && mShort >= ZT_MATCH_MIN) markets.push("receiving_receptions");
     if (deepShare >= 0.3 && mDeep >= ZT_MATCH_MIN + 0.1 && (explDef?.rk || 32) <= 16) markets.push("receiving_longestReception");
@@ -1266,7 +1272,7 @@ function zoneTargets(offTeam, defTeam, week) {
     if (!markets.length) return;
     // Rank on the stronger of the overall fit and the downfield fit, so tough
     // short zones can't bury a strong deep matchup.
-    const effMatch = Math.max(match, mDeep * Math.min(1, deepShare / 0.5));
+    const effMatch = Math.max(match, mDeep * Math.min(1, deepShare / 0.5), mShort * Math.min(1, shortShare / 0.5));
     const props = ((DATA.player_props || {})[offTeam] || []).find((p) => normName(p.name) === normName(name));
     out.push({
       team: offTeam,
