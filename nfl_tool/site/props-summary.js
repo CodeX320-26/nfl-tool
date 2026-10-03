@@ -1006,7 +1006,7 @@ const PROP_TAG_GROUP = {
 function propTagAvg(list) {
   return list.length ? list.reduce((a, b) => a + b, 0) / list.length : null;
 }
-function renderPropTagModal(team, side, m) {
+function renderPropTagModal(team, side, m, next = null) {
   const model = propModel();
   const games = (model.games || []).filter((g) => g[side] === team).sort((a, b) => a.wk - b.wk);
   const cell = ((model.teams[team] || {})[side] || {})[m];
@@ -1049,6 +1049,22 @@ function renderPropTagModal(team, side, m) {
       <td>${flags.join("")}</td>
     </tr>`;
   });
+  // Up next: this card's opponent and what it usually gets / allows (all
+  // its games so far, none of them vs this team), to line up against the
+  // past opponents. Skipped once that game has been played (it's a row).
+  let nextRow = "";
+  if (next && next.opp && !games.some((g) => g[other] === next.opp && g.wk === next.week)) {
+    const nUsual = propTagAvg((model.games || []).filter((x) => x[other] === next.opp && x[side] !== team).map((x) => x.v[m] || 0));
+    nextRow = `<tr class="ps-tm-next">
+      <td class="num">${next.week || ""}</td>
+      <td class="ps-tm-vs">vs ${teamLogoMini(next.opp, 16)} ${next.opp}${side === "off" ? " D" : ""}</td>
+      <td><span class="ps-tm-next-tag">Up next</span></td>
+      <td></td>
+      <td class="num"><b>${f(nUsual)}</b></td>
+      <td></td>
+      <td></td>
+    </tr>`;
+  }
   const vals = games.map((g) => g.v[m] || 0);
   const usuals = games.map((g) => usualOf(g[other], g.g)).filter((u) => u !== null);
   const avgVal = propTagAvg(vals);
@@ -1075,11 +1091,12 @@ function renderPropTagModal(team, side, m) {
       <thead><tr><th class="num">Wk</th><th>Opponent</th><th>${whoHead}</th><th class="num">${valHead}</th><th class="num" title="${usualTip}">${usualHead}</th><th class="num" title="This game minus that usual">+/-</th><th></th></tr></thead>
       <tbody>${rows.join("")}
         <tr class="ps-tm-avg"><td></td><td>Avg</td><td></td><td class="num"><b>${f(avgVal)}</b></td><td class="num">${f(avgUsual)}</td><td class="num"><span class="ps-tm-diff ${tone(avgDiff, L)}">${avgDiff === null ? "--" : `${avgDiff > 0 ? "+" : ""}${f(avgDiff)}`}</span></td><td></td></tr>
+        ${nextRow}
       </tbody>
     </table>
     <p class="ps-tm-note">+/- = ${side === "off" ? `what ${team} got minus what that defense allows other teams` : `what that offense got vs ${team} minus what it gets vs other defenses`}. The rank uses an opponent-adjusted version of this, with each game measured against what that opponent usually does${passing ? "; bad-weather games (and backup-QB games, for a defense) count 30%" : ""}.</p>`;
 }
-function openPropTagModal(team, side, m) {
+function openPropTagModal(team, side, m, next = null) {
   let overlay = document.getElementById("ps-tag-modal");
   if (!overlay) {
     overlay = document.createElement("div");
@@ -1096,7 +1113,7 @@ function openPropTagModal(team, side, m) {
       if (e.key === "Escape") close();
     });
   }
-  document.getElementById("ps-tag-modal-content").innerHTML = renderPropTagModal(team, side, m);
+  document.getElementById("ps-tag-modal-content").innerHTML = renderPropTagModal(team, side, m, next);
   overlay.hidden = false;
 }
 
@@ -1304,7 +1321,8 @@ document.addEventListener("click", (e) => {
   const tagEl = e.target.closest(".ps-tag-click");
   if (tagEl) {
     const { team, side, m } = decodeDataAttr(tagEl.dataset.tag);
-    openPropTagModal(team, side, m);
+    const { away, home, week } = propsSummaryContext();
+    openPropTagModal(team, side, m, { opp: team === away ? home : away, week });
     return;
   }
   if (e.target.closest("#props-rail-btn")) {

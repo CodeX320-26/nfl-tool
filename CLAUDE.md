@@ -263,6 +263,11 @@ context. It is the only copy that travels with the repo.
     `v` counts, `gt` garbage part, `bq` backup QB, `wx` bad weather, `p` players with
     `pass [att,cmp,yds,td]`, `rec [tgt,rec,yds,20+,deep yds,deep tgt]`, `rush [car,yds,10+]`,
     roster position), the same counts the rank is built from. Usual = plain average, unweighted.
+    Columns spell out whose numbers they are ("vs BUF D | HOU TEs | That D allows other teams")
+    after the user misread an offense popup as the opponent's players.
+    An **Up next** row under Avg shows the card's opponent and only its usual (other cells
+    blank, per the user), so it lines up against past opponents; it's skipped once that game
+    is played.
   - **Hide Prop Picks toggle (2026-10-03):** a toolbar button (`#props-rail-btn`) drops the
     right rail so Target / Fade fill the card for bigger, easier-to-read video screenshots.
     `fitPropsSummaryCard` zooms `.sc-main` to the biggest size that still fits (max

@@ -2737,6 +2737,8 @@ footer { border-top-color: var(--border); }
 .ps-tm-bad { color: var(--bad-text); background: rgba(var(--bad-rgb), 0.12); border-color: rgba(var(--bad-rgb), 0.45); }
 .ps-tm-flag { display: inline-block; margin: 1px 4px 1px 0; padding: 0 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; color: var(--muted); background: var(--table-head); border: 1px dashed var(--border-strong); white-space: nowrap; cursor: help; }
 .ps-tm-avg td { font-weight: 800; }
+.ps-tm-next td { background: rgba(var(--accent-rgb), 0.08); border-top: 2px solid rgba(var(--accent-rgb), 0.45); }
+.ps-tm-next-tag { display: inline-block; padding: 1px 8px; border-radius: 5px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); background: rgba(var(--accent-rgb), 0.12); border: 1px solid rgba(var(--accent-rgb), 0.5); }
 .ps-tm-note { margin: 10px 0 0; font-size: 0.74rem; color: var(--muted); }
 /* Hide Prop Picks: Target / Fade take the whole card (props-summary.js zooms them to fill it) */
 .ps-card.ps-no-rail .sc-body { grid-template-columns: minmax(0, 1fr); }
