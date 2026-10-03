@@ -254,6 +254,15 @@ context. It is the only copy that travels with the repo.
     that unit.
   - No projections, "model edge" numbers or model-picked players anywhere. The user
     draws the conclusions and adds players to the Prop Picks rail themselves.
+  - **Clickable tags (2026-10-03):** every rank tag and garbage-time chip on a package opens a
+    game-by-game popup (`openPropTagModal(team, side, metric)`): each game's number, the players
+    behind it (playerClick), the opponent's usual in its OTHER games and +/- (colored from the
+    tagged unit's side), flags (weather, backup QB, garbage %), and an Avg row with a one-line
+    "offenses it faced got +X vs their usual" verdict. The user's ask: "did DAL just face running
+    QBs, or can anyone run on them?" Rows come from `prop_matchup_model.games` (per game side:
+    `v` counts, `gt` garbage part, `bq` backup QB, `wx` bad weather, `p` players with
+    `pass [att,cmp,yds,td]`, `rec [tgt,rec,yds,20+,deep yds,deep tgt]`, `rush [car,yds,10+]`,
+    roster position), the same counts the rank is built from. Usual = plain average, unweighted.
   - **Hide Prop Picks toggle (2026-10-03):** a toolbar button (`#props-rail-btn`) drops the
     right rail so Target / Fade fill the card for bigger, easier-to-read video screenshots.
     `fitPropsSummaryCard` zooms `.sc-main` to the biggest size that still fits (max

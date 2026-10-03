@@ -2401,6 +2401,8 @@ def compute_prop_matchup_model(pbp: pd.DataFrame, pos_lookup) -> dict:
     wxw = [PROP_CONTEXT_WEIGHT if bad_weather.get(g) else 1.0 for g in sides["game_id"]]
     sides["w_off"] = wxw
     sides["w_def"] = [w * (PROP_CONTEXT_WEIGHT if b else 1.0) for w, b in zip(wxw, backup)]
+    sides["backup"] = backup
+    sides["bad_wx"] = [bool(bad_weather.get(g)) for g in sides["game_id"]]
 
     k = OPP_ADJ_SHRINK_GAMES
     out: dict = {}
@@ -2486,7 +2488,50 @@ def compute_prop_matchup_model(pbp: pd.DataFrame, pos_lookup) -> dict:
                     shares.append(share)
             if side == "def" and shares:
                 gt_median[col] = round(float(pd.Series(shares).mean()), 3)
-    return {"league": league, "teams": out, "gt_median": gt_median}
+
+    # Game-by-game rows behind every number, for the Props Summary tag
+    # popups: each game's counts, the context flags that weight them, the
+    # garbage-time part, and the players who produced them.
+    weeks = pbp.groupby("game_id")["week"].first().to_dict()
+
+    def name_of(pid, week):
+        return pos_lookup(pid, week)[2] or pid
+
+    players: dict = {}
+
+    def add(key, pid, week, pos, field, vals):
+        # Roster position (bucketed), so a WR's trick-play pass stays a WR.
+        row = players.setdefault(key, {}).setdefault(pid, {"n": name_of(pid, week), "pos": pos_of(pid, week) or pos})
+        row[field] = vals
+
+    for (g, t, pid), grp in passes.groupby(["game_id", "posteam", "passer_player_id"]):
+        add((g, t), pid, weeks[g], "QB", "pass", [int(len(grp)), int(grp["complete_pass"].sum()), int(grp["cyds"].sum()), int(grp["pass_touchdown"].sum())])
+    rec = passes[passes["rpos"].isin(["WR", "TE", "RB"])]
+    for (g, t, pid, pos), grp in rec.groupby(["game_id", "posteam", "receiver_player_id", "rpos"]):
+        done = grp["complete_pass"] == 1
+        deep = grp["depth"] == "deep"
+        add((g, t), pid, weeks[g], pos, "rec", [
+            int(len(grp)), int(done.sum()), int(grp["cyds"].sum()),
+            int((done & (grp["yards_gained"] >= PROP_EXPLOSIVE_PASS_YARDS)).sum()),
+            int(grp.loc[deep, "cyds"].sum()), int(deep.sum()),
+        ])
+    run = rushes[rushes["rpos"].isin(["RB", "QB"])]
+    for (g, t, pid, pos), grp in run.groupby(["game_id", "posteam", "rusher_player_id", "rpos"]):
+        add((g, t), pid, weeks[g], pos, "rush", [int(len(grp)), int(grp["yards_gained"].sum()), int((grp["yards_gained"] >= EXPLOSIVE_RUSH_YARDS).sum())])
+
+    def num(v):
+        return int(v) if float(v).is_integer() else round(float(v), 1)
+
+    games_out = []
+    for rd in sides.to_dict("records"):
+        games_out.append({
+            "g": rd["game_id"], "wk": int(weeks.get(rd["game_id"], 0)), "off": rd["off"], "def": rd["def"],
+            "v": {c: num(rd[c]) for c in cols},
+            "gt": {c: num(rd[f"gt_{c}"]) for c in garbage_cols if rd[f"gt_{c}"]},
+            "bq": bool(rd["backup"]), "wx": bool(rd["bad_wx"]),
+            "p": list(players.get((rd["game_id"], rd["off"]), {}).values()),
+        })
+    return {"league": league, "teams": out, "gt_median": gt_median, "games": games_out}
 
 
 # ---- Game Previews: opponent-adjusted team stats (the Raw / vs Opponents

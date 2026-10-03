@@ -2721,6 +2721,22 @@ footer { border-top-color: var(--border); }
 
 .ps-pk-tags span { padding: 1px 7px; border-radius: 5px; font-size: 0.68rem; font-weight: 800; }
 :root[data-theme="light"] .ps-pk-tags span { color: var(--text) !important; }
+/* Clickable Props Summary tags -> game-by-game popup */
+.ps-pk-tags .ps-tag-click { cursor: pointer; }
+.ps-pk-tags .ps-tag-click:hover { filter: brightness(1.2); text-decoration: underline; text-underline-offset: 2px; }
+.ps-tm-box { max-width: 900px; width: 92vw; }
+.ps-tm-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 4px 0 12px; font-size: 0.86rem; color: var(--muted); }
+.ps-tm-summary b { color: var(--text); font-family: var(--font-display); font-size: 1rem; }
+.ps-tm-table td { vertical-align: middle; }
+.ps-tm-who { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.ps-tm-player { white-space: nowrap; font-size: 0.82rem; }
+.ps-tm-player b { color: var(--accent); font-weight: 800; }
+.ps-tm-diff { display: inline-block; padding: 1px 7px; border-radius: 5px; font-weight: 800; border: 1px solid transparent; }
+.ps-tm-good { color: var(--good-text); background: rgba(var(--good-rgb), 0.14); border-color: rgba(var(--good-rgb), 0.45); }
+.ps-tm-bad { color: var(--bad-text); background: rgba(var(--bad-rgb), 0.12); border-color: rgba(var(--bad-rgb), 0.45); }
+.ps-tm-flag { display: inline-block; margin: 1px 4px 1px 0; padding: 0 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; color: var(--muted); background: var(--table-head); border: 1px dashed var(--border-strong); white-space: nowrap; cursor: help; }
+.ps-tm-avg td { font-weight: 800; }
+.ps-tm-note { margin: 10px 0 0; font-size: 0.74rem; color: var(--muted); }
 /* Hide Prop Picks: Target / Fade take the whole card (props-summary.js zooms them to fill it) */
 .ps-card.ps-no-rail .sc-body { grid-template-columns: minmax(0, 1fr); }
 /* Garbage-time note: neutral gray, dashed edge, so it reads as a caution, not a rank */

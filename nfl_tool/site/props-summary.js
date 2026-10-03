@@ -750,6 +750,9 @@ function propGarbageTag(team, side, part) {
   return {
     text: `${who} ${pct}% garbage time`,
     garbage: true,
+    team,
+    side,
+    m: part.m,
     title: `${pct}% of the ${stat} ${side === "off" ? `${team} produced` : `${team} allowed`} came with the offense under 10% to win${med !== undefined ? ` (league average: ${Math.round(med * 100)}%)` : ""}. Check the spread: a big favorite can force comeback throwing again.`,
   };
 }
@@ -821,8 +824,8 @@ function propPackages(offTeam, defTeam, game, lines) {
     // best): producing a lot is good for an offense, allowing a lot is bad
     // for a defense.
     const tags = [
-      { text: `${offTeam} ${propRankTag(oPart.o.rk)} ${PROP_STAT_WORDS[oPart.m]}`, q: (32 - oPart.o.rk) / 31 },
-      { text: `${defTeam} D ${propRankTag(dPart.d.rk)} ${PROP_STAT_WORDS[dPart.m]}`, q: (dPart.d.rk - 1) / 31 },
+      { text: `${offTeam} ${propRankTag(oPart.o.rk)} ${PROP_STAT_WORDS[oPart.m]}`, q: (32 - oPart.o.rk) / 31, team: offTeam, side: "off", m: oPart.m },
+      { text: `${defTeam} D ${propRankTag(dPart.d.rk)} ${PROP_STAT_WORDS[dPart.m]}`, q: (dPart.d.rk - 1) / 31, team: defTeam, side: "def", m: dPart.m },
     ];
     // Garbage time only inflates big numbers, so only Targets get the tag.
     if (dir > 0) {
@@ -882,7 +885,12 @@ function propPackageHtml(p, lines) {
   return `<div class="ps-pk">
     <div class="ps-pk-head">${teamLogoMini(p.team, 22)}<span class="ps-pk-name">${p.team} ${p.name}</span><span class="ps-pk-mkts">${p.markets.map((m) => `<span>${m}</span>`).join("")}</span></div>
     <div class="ps-pk-players">${p.players.length ? `<span class="ps-pk-for">${p.lineMarket}</span>` : ""}${players}</div>
-    <div class="ps-pk-tags">${p.tags.map((t) => (t.garbage ? `<span class="ps-pk-gt" title="${t.title.replace(/"/g, "&quot;")}">${t.text}</span>` : `<span style="${propRankShade(t.q)}">${t.text}</span>`)).join("")}</div>
+    <div class="ps-pk-tags">${p.tags.map((t) => {
+      const tag = `data-tag="${encodeDataAttr({ team: t.team, side: t.side, m: t.m })}"`;
+      return t.garbage
+        ? `<span class="ps-pk-gt ps-tag-click" ${tag} title="${t.title.replace(/"/g, "&quot;")} Click for every game.">${t.text}</span>`
+        : `<span class="ps-tag-click" ${tag} style="${propRankShade(t.q)}" title="Click for every game behind this">${t.text}</span>`;
+    }).join("")}</div>
   </div>`;
 }
 
@@ -948,6 +956,135 @@ function propsRail(away, home, linesByTeam, gameKey) {
     ${block(away)}
     ${block(home)}
   </section>`;
+}
+
+// ---- Tag popup: every game behind a tag ----
+// Click a reason tag ("DAL D 1st-most QB rush yds") to see each game's
+// number, the players who produced it, and what that opponent usually does
+// in its other games -- so a schedule full of running QBs (or of bad
+// offenses) shows up at a glance. Rows come from prop_matchup_model.games,
+// the same per-game counts the rank is built from.
+const PROP_STAT_LABELS = {
+  pass_yards: "Passing yards", completions: "Completions", pass_att: "Pass attempts", pass_td: "Passing TDs",
+  expl_pass: "20+ yd completions", rushyds_QB: "QB rushing yards", car_RB: "RB carries", rushyds_RB: "RB rushing yards",
+  expl_rush: "10+ yd runs", rec_RB: "RB catches", recyds_RB: "RB receiving yards", recyds_WR: "WR receiving yards",
+  rec_WR: "WR catches", yds_deep: "Deep (20+ air yd) passing yards", recyds_TE: "TE receiving yards", rec_TE: "TE catches",
+};
+// Passing stats are the ones bad weather / a backup QB weight down.
+const PROP_TAG_PASSING = new Set(["pass_yards", "completions", "pass_att", "pass_td", "expl_pass", "rec_RB", "recyds_RB", "recyds_WR", "rec_WR", "yds_deep", "recyds_TE", "rec_TE"]);
+// The players behind one game's number: [sort value, text] per player.
+function propTagPlayers(m, players) {
+  const recPos = { rec_RB: "RB", recyds_RB: "RB", rec_WR: "WR", recyds_WR: "WR", rec_TE: "TE", recyds_TE: "TE" }[m];
+  const out = [];
+  players.forEach((p) => {
+    const [att, cmp, pyd, ptd] = p.pass || [];
+    const [tgt, rec, ryd, n20, dyd, datt] = p.rec || [];
+    const [car, ruyd, n10] = p.rush || [];
+    if (["pass_yards", "completions", "pass_att", "pass_td"].includes(m) && p.pass && (p.pos === "QB" || att >= 5)) {
+      const key = { pass_yards: pyd, completions: cmp, pass_att: att, pass_td: ptd }[m];
+      out.push([key, p, `${cmp}/${att}, ${pyd} yds${ptd ? `, ${ptd} TD` : ""}`]);
+    } else if (recPos && p.pos === recPos && p.rec) {
+      out.push([m.startsWith("rec_") ? rec : ryd, p, `${rec}-${ryd} (${tgt} tgt)`]);
+    } else if (m === "expl_pass" && n20) {
+      out.push([n20, p, `${n20} catch${n20 > 1 ? "es" : ""} of 20+`]);
+    } else if (m === "yds_deep" && datt) {
+      out.push([dyd, p, `${dyd} yds on ${datt} deep tgt`]);
+    } else if ((m === "rushyds_QB" && p.pos === "QB") || ((m === "car_RB" || m === "rushyds_RB") && p.pos === "RB")) {
+      if (p.rush) out.push([m === "car_RB" ? car : ruyd, p, `${car}-${ruyd}`]);
+    } else if (m === "expl_rush" && n10) {
+      out.push([n10, p, `${n10} run${n10 > 1 ? "s" : ""} of 10+`]);
+    }
+  });
+  return out.sort((a, b) => b[0] - a[0]).filter((x) => x[0] > 0 || out.length === 1).slice(0, 4);
+}
+function propTagAvg(list) {
+  return list.length ? list.reduce((a, b) => a + b, 0) / list.length : null;
+}
+function renderPropTagModal(team, side, m) {
+  const model = propModel();
+  const games = (model.games || []).filter((g) => g[side] === team).sort((a, b) => a.wk - b.wk);
+  const cell = ((model.teams[team] || {})[side] || {})[m];
+  const label = PROP_STAT_LABELS[m] || PROP_STAT_WORDS[m] || m;
+  const unit = side === "def" ? `${team} defense: ${label.toLowerCase()} allowed` : `${team} offense: ${label.toLowerCase()}`;
+  const heading = `<h3 class="td-allowed-heading">${teamLogoMini(team, 24)} ${unit}</h3>`;
+  if (!games.length || !cell) return `${heading}<p class="no-data-note">The game-by-game breakdown appears after the next data refresh.</p>`;
+  const other = side === "def" ? "off" : "def";
+  const L = model.league[m];
+  const passing = PROP_TAG_PASSING.has(m);
+  const dec = L !== undefined && L < 10 ? 1 : 0;
+  const f = (v) => (v === null || v === undefined ? "--" : fmt(v, dec));
+  // Opponent's usual = its average in its OTHER games (the same side of the ball it played here).
+  const usualOf = (opp, gameId) => propTagAvg((model.games || []).filter((x) => x[other] === opp && x.g !== gameId).map((x) => x.v[m] || 0));
+  // Up = more of the stat. Good for an offense, bad for a defense.
+  const tone = (diff, base) => {
+    if (diff === null || Math.abs(diff) < Math.max(0.1 * (base || 1), dec ? 0.3 : 3)) return "";
+    return (diff > 0) === (side === "off") ? "ps-tm-good" : "ps-tm-bad";
+  };
+  const rows = games.map((g) => {
+    const opp = g[other];
+    const val = g.v[m] || 0;
+    const usual = usualOf(opp, g.g);
+    const diff = usual === null ? null : val - usual;
+    const who = propTagPlayers(m, g.p || [])
+      .map(([, p, txt]) => `<span class="ps-tm-player">${playerClick(g.off, p.n, shortName(p.n), g.def)} <b>${txt}</b></span>`)
+      .join("");
+    const flags = [];
+    if (passing && g.wx) flags.push(`<span class="ps-tm-flag" title="Rain, snow or 15+ mph wind: counts 30% in the ranking">Weather</span>`);
+    if (g.bq) flags.push(`<span class="ps-tm-flag" title="${g.off} didn't start its usual QB${passing && side === "def" ? ": counts 30% toward this defense's ranking" : ", so its usual number is from a different QB"}">${g.off} backup QB</span>`);
+    const gt = (g.gt || {})[m];
+    if (gt && val) flags.push(`<span class="ps-tm-flag" title="Part of this game's number that came with the offense under 10% to win">${Math.round((gt / val) * 100)}% garbage</span>`);
+    return `<tr>
+      <td class="num">${g.wk}</td>
+      <td>${teamLogoMini(opp, 16)} ${opp}</td>
+      <td class="ps-tm-who">${who || `<span class="muted">--</span>`}</td>
+      <td class="num"><b>${f(val)}</b></td>
+      <td class="num">${f(usual)}</td>
+      <td class="num"><span class="ps-tm-diff ${tone(diff, L)}">${diff === null ? "--" : `${diff > 0 ? "+" : ""}${f(diff)}`}</span></td>
+      <td>${flags.join("")}</td>
+    </tr>`;
+  });
+  const vals = games.map((g) => g.v[m] || 0);
+  const usuals = games.map((g) => usualOf(g[other], g.g)).filter((u) => u !== null);
+  const avgVal = propTagAvg(vals);
+  const avgUsual = propTagAvg(usuals);
+  const avgDiff = avgUsual === null ? null : avgVal - avgUsual;
+  const oppWord = side === "def" ? "Offenses it faced" : "Defenses it faced";
+  const verdict = avgDiff === null ? "" : `<span class="ps-tm-diff ${tone(avgDiff, L)}">${oppWord} ${side === "def" ? "got" : "gave up"} ${avgDiff > 0 ? "+" : ""}${f(avgDiff)} vs their usual</span>`;
+  const usualHead = side === "def" ? "Opp usually gets" : "Opp usually allows";
+  return `${heading}
+    <div class="ps-tm-summary">
+      <span>Season <b>${f(cell.raw)}</b>/g</span>
+      <span>${propRankTag(cell.rk)} in the NFL</span>
+      <span>League avg <b>${f(L)}</b></span>
+      ${verdict}
+    </div>
+    <table class="data-table ps-tm-table">
+      <thead><tr><th class="num">Wk</th><th>Opp</th><th>Who</th><th class="num">${PROP_STAT_WORDS[m] || "Value"}</th><th class="num" title="That opponent's average in its other games">${usualHead}</th><th class="num">+/-</th><th></th></tr></thead>
+      <tbody>${rows.join("")}
+        <tr class="ps-tm-avg"><td></td><td>Avg</td><td></td><td class="num"><b>${f(avgVal)}</b></td><td class="num">${f(avgUsual)}</td><td class="num"><span class="ps-tm-diff ${tone(avgDiff, L)}">${avgDiff === null ? "--" : `${avgDiff > 0 ? "+" : ""}${f(avgDiff)}`}</span></td><td></td></tr>
+      </tbody>
+    </table>
+    <p class="ps-tm-note">The rank uses an opponent-adjusted version of this, with each game measured against what that opponent usually does${passing ? "; bad-weather games (and backup-QB games, for a defense) count 30%" : ""}.</p>`;
+}
+function openPropTagModal(team, side, m) {
+  let overlay = document.getElementById("ps-tag-modal");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "ps-tag-modal";
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `<div class="modal-box ps-tm-box"><button type="button" class="modal-close" aria-label="Close">&times;</button><div id="ps-tag-modal-content"></div></div>`;
+    document.body.appendChild(overlay);
+    const close = () => (overlay.hidden = true);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) close();
+    });
+    overlay.querySelector(".modal-close").addEventListener("click", close);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") close();
+    });
+  }
+  document.getElementById("ps-tag-modal-content").innerHTML = renderPropTagModal(team, side, m);
+  overlay.hidden = false;
 }
 
 // Hide Prop Picks: a per-device view preference (not synced to the profile).
@@ -1151,6 +1288,12 @@ function refreshPropsAfterPick() {
 }
 
 document.addEventListener("click", (e) => {
+  const tagEl = e.target.closest(".ps-tag-click");
+  if (tagEl) {
+    const { team, side, m } = decodeDataAttr(tagEl.dataset.tag);
+    openPropTagModal(team, side, m);
+    return;
+  }
   if (e.target.closest("#props-rail-btn")) {
     setPropsRailHidden(!propsRailHidden());
     const { away, home } = propsSummaryContext();
