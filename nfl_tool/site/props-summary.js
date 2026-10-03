@@ -997,6 +997,12 @@ function propTagPlayers(m, players) {
   });
   return out.sort((a, b) => b[0] - a[0]).filter((x) => x[0] > 0 || out.length === 1).slice(0, 4);
 }
+// Whose players the "who" column lists, by stat.
+const PROP_TAG_GROUP = {
+  pass_yards: "QB", completions: "QB", pass_att: "QB", pass_td: "QB", rushyds_QB: "QBs",
+  car_RB: "RBs", rushyds_RB: "RBs", rec_RB: "RBs", recyds_RB: "RBs", expl_rush: "runners",
+  rec_WR: "WRs", recyds_WR: "WRs", rec_TE: "TEs", recyds_TE: "TEs", expl_pass: "pass catchers", yds_deep: "pass catchers",
+};
 function propTagAvg(list) {
   return list.length ? list.reduce((a, b) => a + b, 0) / list.length : null;
 }
@@ -1035,8 +1041,8 @@ function renderPropTagModal(team, side, m) {
     if (gt && val) flags.push(`<span class="ps-tm-flag" title="Part of this game's number that came with the offense under 10% to win">${Math.round((gt / val) * 100)}% garbage</span>`);
     return `<tr>
       <td class="num">${g.wk}</td>
-      <td>${teamLogoMini(opp, 16)} ${opp}</td>
-      <td class="ps-tm-who">${who || `<span class="muted">--</span>`}</td>
+      <td class="ps-tm-vs">vs ${teamLogoMini(opp, 16)} ${opp}${side === "off" ? " D" : ""}</td>
+      <td><div class="ps-tm-who">${teamLogoMini(g.off, 16)}${who || `<span class="muted">--</span>`}</div></td>
       <td class="num"><b>${f(val)}</b></td>
       <td class="num">${f(usual)}</td>
       <td class="num"><span class="ps-tm-diff ${tone(diff, L)}">${diff === null ? "--" : `${diff > 0 ? "+" : ""}${f(diff)}`}</span></td>
@@ -1048,9 +1054,16 @@ function renderPropTagModal(team, side, m) {
   const avgVal = propTagAvg(vals);
   const avgUsual = propTagAvg(usuals);
   const avgDiff = avgUsual === null ? null : avgVal - avgUsual;
-  const oppWord = side === "def" ? "Offenses it faced" : "Defenses it faced";
-  const verdict = avgDiff === null ? "" : `<span class="ps-tm-diff ${tone(avgDiff, L)}">${oppWord} ${side === "def" ? "got" : "gave up"} ${avgDiff > 0 ? "+" : ""}${f(avgDiff)} vs their usual</span>`;
-  const usualHead = side === "def" ? "Opp usually gets" : "Opp usually allows";
+  const sign = (v) => `${v > 0 ? "+" : ""}${f(v)}`;
+  const verdict = avgDiff === null ? "" : `<span class="ps-tm-diff ${tone(avgDiff, L)}">${side === "off" ? `${team} gets ${sign(avgDiff)}/g more than those Ds usually allow` : `Offenses get ${sign(avgDiff)}/g more vs ${team} than usual`}</span>`;
+  // Spell out whose numbers each column is (an offense tag lists ITS
+  // players vs each defense; a defense tag lists the opponents' players).
+  const grp = PROP_TAG_GROUP[m] || "players";
+  const word = PROP_STAT_WORDS[m] || "value";
+  const whoHead = side === "off" ? `${team} ${grp}` : `Opponent ${grp}`;
+  const valHead = side === "off" ? `${team} ${word}` : `${word} allowed`;
+  const usualHead = side === "off" ? `That D allows other teams` : `That offense gets vs other Ds`;
+  const usualTip = side === "off" ? `What that defense allowed per game in its other games (vs everyone except ${team})` : `What that offense got per game in its other games (vs everyone except ${team})`;
   return `${heading}
     <div class="ps-tm-summary">
       <span>Season <b>${f(cell.raw)}</b>/g</span>
@@ -1059,12 +1072,12 @@ function renderPropTagModal(team, side, m) {
       ${verdict}
     </div>
     <table class="data-table ps-tm-table">
-      <thead><tr><th class="num">Wk</th><th>Opp</th><th>Who</th><th class="num">${PROP_STAT_WORDS[m] || "Value"}</th><th class="num" title="That opponent's average in its other games">${usualHead}</th><th class="num">+/-</th><th></th></tr></thead>
+      <thead><tr><th class="num">Wk</th><th>Opponent</th><th>${whoHead}</th><th class="num">${valHead}</th><th class="num" title="${usualTip}">${usualHead}</th><th class="num" title="This game minus that usual">+/-</th><th></th></tr></thead>
       <tbody>${rows.join("")}
         <tr class="ps-tm-avg"><td></td><td>Avg</td><td></td><td class="num"><b>${f(avgVal)}</b></td><td class="num">${f(avgUsual)}</td><td class="num"><span class="ps-tm-diff ${tone(avgDiff, L)}">${avgDiff === null ? "--" : `${avgDiff > 0 ? "+" : ""}${f(avgDiff)}`}</span></td><td></td></tr>
       </tbody>
     </table>
-    <p class="ps-tm-note">The rank uses an opponent-adjusted version of this, with each game measured against what that opponent usually does${passing ? "; bad-weather games (and backup-QB games, for a defense) count 30%" : ""}.</p>`;
+    <p class="ps-tm-note">+/- = ${side === "off" ? `what ${team} got minus what that defense allows other teams` : `what that offense got vs ${team} minus what it gets vs other defenses`}. The rank uses an opponent-adjusted version of this, with each game measured against what that opponent usually does${passing ? "; bad-weather games (and backup-QB games, for a defense) count 30%" : ""}.</p>`;
 }
 function openPropTagModal(team, side, m) {
   let overlay = document.getElementById("ps-tag-modal");
