@@ -254,6 +254,14 @@ context. It is the only copy that travels with the repo.
     that unit.
   - No projections, "model edge" numbers or model-picked players anywhere. The user
     draws the conclusions and adds players to the Prop Picks rail themselves.
+  - **Garbage-time tag (2026-10-03, tag only by the user's choice):** a Target's reason stat
+    gets a neutral gray dashed chip ("JAX D 44% garbage time") when 30%+ of it came with the
+    offense under 10% to win (`PROP_GARBAGE_TAG`; league average ~12%). Hover explains it.
+    The numbers themselves are NOT discounted: the user pointed out a team that keeps building
+    leads keeps facing comeback throwing, so the spread decides how much it matters. Data:
+    `prop_matchup_model.teams[t][side][metric].gt` (passing counts only) and `.gt_median`
+    (the league mean, despite the name). Found when JAX D read "2nd-most WR yds" while every
+    other page showed an elite pass D (44% of those yards came in blowouts).
 - **Every matchup call reads BOTH sides (the user's rule, 2026-09-28).** Any Tough / Mismatch /
   Target / Fade / ADV logo / tag must use the offense's number AND the defense's ALLOWED number for
   the same thing. How often a defense shows a look (blitz %, box %) only decides whether the look

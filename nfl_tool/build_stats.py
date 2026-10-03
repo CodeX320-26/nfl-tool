@@ -2324,26 +2324,35 @@ def compute_prop_matchup_model(pbp: pd.DataFrame, pos_lookup) -> dict:
     passes.loc[air >= 20, "depth"] = "deep"
 
     keys = ["game_id", "posteam"]
-    cols: dict = {}
-    pg = passes.groupby(keys)
-    cols["pass_att"] = pg.size()
-    cols["completions"] = pg["complete_pass"].sum()
-    cols["pass_yards"] = pg["cyds"].sum()
-    cols["pass_td"] = pg["pass_touchdown"].sum()
-    cols["ints"] = pg["interception"].sum()
-    cols["expl_pass"] = passes[comp & (passes["yards_gained"] >= PROP_EXPLOSIVE_PASS_YARDS)].groupby(keys).size()
-    cols["long_pass"] = pg["cyds"].max()
+
+    def pass_counts(frame):
+        c: dict = {}
+        pg = frame.groupby(keys)
+        c["pass_att"] = pg.size()
+        c["completions"] = pg["complete_pass"].sum()
+        c["pass_yards"] = pg["cyds"].sum()
+        c["pass_td"] = pg["pass_touchdown"].sum()
+        c["ints"] = pg["interception"].sum()
+        done = frame["complete_pass"] == 1
+        c["expl_pass"] = frame[done & (frame["yards_gained"] >= PROP_EXPLOSIVE_PASS_YARDS)].groupby(keys).size()
+        for pos in ("WR", "TE", "RB"):
+            g = frame[frame["rpos"] == pos].groupby(keys)
+            c[f"tgt_{pos}"] = g.size()
+            c[f"rec_{pos}"] = g["complete_pass"].sum()
+            c[f"recyds_{pos}"] = g["cyds"].sum()
+        for d in ("short", "int", "deep"):
+            g = frame[frame["depth"] == d].groupby(keys)
+            c[f"att_{d}"] = g.size()
+            c[f"yds_{d}"] = g["cyds"].sum()
+        return c
+
+    cols: dict = pass_counts(passes)
+    cols["long_pass"] = passes.groupby(keys)["cyds"].max()
     cols["sacks"] = sacks.groupby(keys).size()
-    for pos in ("WR", "TE", "RB"):
-        sub = passes[passes["rpos"] == pos]
-        g = sub.groupby(keys)
-        cols[f"tgt_{pos}"] = g.size()
-        cols[f"rec_{pos}"] = g["complete_pass"].sum()
-        cols[f"recyds_{pos}"] = g["cyds"].sum()
-    for d in ("short", "int", "deep"):
-        sub = passes[passes["depth"] == d].groupby(keys)
-        cols[f"att_{d}"] = sub.size()
-        cols[f"yds_{d}"] = sub["cyds"].sum()
+    # The same passing counts from garbage-time throws only (the offense
+    # under GARBAGE_WP to win, chasing a big deficit). Not used in the
+    # numbers; the Props Summary tags a stat when much of it came this way.
+    garbage_cols = pass_counts(passes[passes["wp"] < GARBAGE_WP])
     rg = rushes.groupby(keys)
     cols["rush_att"] = rg.size()
     cols["rush_yards"] = rg["yards_gained"].sum()
@@ -2365,6 +2374,8 @@ def compute_prop_matchup_model(pbp: pd.DataFrame, pos_lookup) -> dict:
     idx = pd.MultiIndex.from_frame(sides[["game_id", "off"]])
     for col, series in cols.items():
         sides[col] = series.reindex(idx).fillna(0).astype(float).to_numpy()
+    for col, series in garbage_cols.items():
+        sides[f"gt_{col}"] = series.reindex(idx).fillna(0).astype(float).to_numpy()
     sides["plays"] = sides["pass_att"] + sides["sacks"] + sides["rush_att"]
     # Games with no plays at all (not yet played) would read as zeros.
     sides = sides[sides["plays"] > 0].reset_index(drop=True)
@@ -2459,7 +2470,23 @@ def compute_prop_matchup_model(pbp: pd.DataFrame, pos_lookup) -> dict:
             )
             for rank, (team, _) in enumerate(vals, start=1):
                 out[team][side][metric]["rk"] = rank
-    return {"league": league, "teams": out}
+
+    # "gt" = share of a passing count that came in garbage time (plain
+    # totals, no weights); gt_median = the typical defense's share (the
+    # league mean: rare stats like 20+ yd plays have a median of 0).
+    gt_median: dict = {}
+    for col in garbage_cols:
+        for side in ("off", "def"):
+            tot = sides.groupby(side)[[col, f"gt_{col}"]].sum()
+            shares = []
+            for team, r in tot.iterrows():
+                if r[col] > 0 and col in out.get(team, {}).get(side, {}):
+                    share = float(r[f"gt_{col}"] / r[col])
+                    out[team][side][col]["gt"] = round(share, 3)
+                    shares.append(share)
+            if side == "def" and shares:
+                gt_median[col] = round(float(pd.Series(shares).mean()), 3)
+    return {"league": league, "teams": out, "gt_median": gt_median}
 
 
 # ---- Game Previews: opponent-adjusted team stats (the Raw / vs Opponents

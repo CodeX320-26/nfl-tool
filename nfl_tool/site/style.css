@@ -2721,6 +2721,9 @@ footer { border-top-color: var(--border); }
 
 .ps-pk-tags span { padding: 1px 7px; border-radius: 5px; font-size: 0.68rem; font-weight: 800; }
 :root[data-theme="light"] .ps-pk-tags span { color: var(--text) !important; }
+/* Garbage-time note: neutral gray, dashed edge, so it reads as a caution, not a rank */
+.ps-pk-tags .ps-pk-gt { color: var(--muted); background: var(--table-head); border: 1px dashed var(--border-strong); cursor: help; }
+:root[data-theme="light"] .ps-pk-tags .ps-pk-gt { color: var(--muted) !important; }
 
 /* Schedule strip: finished games show scores under the logos */
 .matchup-card-final .matchup-teams-row { align-items: flex-start; }

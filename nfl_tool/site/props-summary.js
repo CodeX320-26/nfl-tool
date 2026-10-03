@@ -733,7 +733,25 @@ function propRankLean(rk) {
 }
 function propSide(team, side, metric) {
   const cell = ((propModel().teams[team] || {})[side] || {})[metric];
-  return cell ? { raw: cell.raw, rk: cell.rk, lean: propRankLean(cell.rk) } : null;
+  return cell ? { raw: cell.raw, rk: cell.rk, lean: propRankLean(cell.rk), gt: cell.gt } : null;
+}
+// A Target's reason stat gets a neutral "garbage time" tag when this much
+// of it came with the offense under 10% to win (league average ~12%).
+// Information only: a team that keeps building big leads may keep facing
+// comeback throwing, so the spread decides how much it matters.
+const PROP_GARBAGE_TAG = 0.3;
+function propGarbageTag(team, side, part) {
+  const cell = side === "off" ? part.o : part.d;
+  if (!(cell.gt >= PROP_GARBAGE_TAG)) return null;
+  const pct = Math.round(cell.gt * 100);
+  const med = (propModel().gt_median || {})[part.m];
+  const who = side === "off" ? team : `${team} D`;
+  const stat = PROP_STAT_WORDS[part.m];
+  return {
+    text: `${who} ${pct}% garbage time`,
+    garbage: true,
+    title: `${pct}% of the ${stat} ${side === "off" ? `${team} produced` : `${team} allowed`} came with the offense under 10% to win${med !== undefined ? ` (league average: ${Math.round(med * 100)}%)` : ""}. Check the spread: a big favorite can force comeback throwing again.`,
+  };
 }
 function propRankTag(rk) {
   return rk <= 16 ? `${propOrdinal(rk)}-most` : `${propOrdinal(33 - rk)}-fewest`;
@@ -806,6 +824,10 @@ function propPackages(offTeam, defTeam, game, lines) {
       { text: `${offTeam} ${propRankTag(oPart.o.rk)} ${PROP_STAT_WORDS[oPart.m]}`, q: (32 - oPart.o.rk) / 31 },
       { text: `${defTeam} D ${propRankTag(dPart.d.rk)} ${PROP_STAT_WORDS[dPart.m]}`, q: (dPart.d.rk - 1) / 31 },
     ];
+    // Garbage time only inflates big numbers, so only Targets get the tag.
+    if (dir > 0) {
+      [propGarbageTag(offTeam, "off", oPart), propGarbageTag(defTeam, "def", dPart)].forEach((t) => t && tags.push(t));
+    }
     // Players in this package with a posted line: zone-flagged players
     // (Zone Targets says this market fits them) first with a star, then
     // the biggest line.
@@ -860,7 +882,7 @@ function propPackageHtml(p, lines) {
   return `<div class="ps-pk">
     <div class="ps-pk-head">${teamLogoMini(p.team, 22)}<span class="ps-pk-name">${p.team} ${p.name}</span><span class="ps-pk-mkts">${p.markets.map((m) => `<span>${m}</span>`).join("")}</span></div>
     <div class="ps-pk-players">${p.players.length ? `<span class="ps-pk-for">${p.lineMarket}</span>` : ""}${players}</div>
-    <div class="ps-pk-tags">${p.tags.map((t) => `<span style="${propRankShade(t.q)}">${t.text}</span>`).join("")}</div>
+    <div class="ps-pk-tags">${p.tags.map((t) => (t.garbage ? `<span class="ps-pk-gt" title="${t.title.replace(/"/g, "&quot;")}">${t.text}</span>` : `<span style="${propRankShade(t.q)}">${t.text}</span>`)).join("")}</div>
   </div>`;
 }
 
