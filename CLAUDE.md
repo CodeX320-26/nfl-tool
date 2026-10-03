@@ -254,6 +254,12 @@ context. It is the only copy that travels with the repo.
     that unit.
   - No projections, "model edge" numbers or model-picked players anywhere. The user
     draws the conclusions and adds players to the Prop Picks rail themselves.
+  - **Hide Prop Picks toggle (2026-10-03):** a toolbar button (`#props-rail-btn`) drops the
+    right rail so Target / Fade fill the card for bigger, easier-to-read video screenshots.
+    `fitPropsSummaryCard` zooms `.sc-main` to the biggest size that still fits (max
+    `PROPS_WIDE_ZOOM_MAX` 1.6; Week 4 games landed 1.15-1.6x), then the usual shrink-only fit.
+    html-to-image keeps the zoom, so Save image comes out big too (verified). Per-device view
+    pref `nfl-tool.props-summary.railHidden`, not synced.
   - **Garbage-time tag (2026-10-03, tag only by the user's choice):** a Target's reason stat
     gets a neutral gray dashed chip ("JAX D 44% garbage time") when 30%+ of it came with the
     offense under 10% to win (`PROP_GARBAGE_TAG`; league average ~12%). Hover explains it.

@@ -950,6 +950,46 @@ function propsRail(away, home, linesByTeam, gameKey) {
   </section>`;
 }
 
+// Hide Prop Picks: a per-device view preference (not synced to the profile).
+const PROPS_RAIL_HIDDEN_KEY = "nfl-tool.props-summary.railHidden";
+function propsRailHidden() {
+  try {
+    return localStorage.getItem(PROPS_RAIL_HIDDEN_KEY) === "1";
+  } catch (e) {
+    return false;
+  }
+}
+function setPropsRailHidden(hidden) {
+  try {
+    localStorage.setItem(PROPS_RAIL_HIDDEN_KEY, hidden ? "1" : "0");
+  } catch (e) {
+    // localStorage unavailable -- the choice just won't stick across reloads.
+  }
+}
+// With the rail hidden, magnify Target / Fade to fill the freed width: the
+// biggest zoom (up to PROPS_WIDE_ZOOM_MAX; ~1.35 is the old column width
+// blown up to the new one, more when a game has few packages) that still
+// fits the fixed card height. Then the usual
+// fit (which only ever shrinks) and phone preview zoom.
+const PROPS_WIDE_ZOOM_MAX = 1.6;
+function fitPropsSummaryCard() {
+  const card = document.getElementById("summary-card");
+  const inner = card?.querySelector(".sc-inner");
+  const main = inner?.querySelector(".ps-no-rail .sc-main");
+  if (main) {
+    card.style.zoom = "";
+    inner.style.transform = "";
+    inner.style.width = "";
+    let z = PROPS_WIDE_ZOOM_MAX;
+    main.style.zoom = z;
+    while (z > 1 && inner.scrollHeight > card.clientHeight) {
+      z = Math.max(1, Math.round((z - 0.05) * 100) / 100);
+      main.style.zoom = z;
+    }
+  }
+  fitSummaryCard();
+}
+
 function statsNote() {
   return `data through Week ${DATA.through_week}`;
 }
@@ -978,8 +1018,14 @@ function renderPropsSummaryCard(away, home) {
     const v = propTeamTotal(game, t);
     return v === null ? "" : `<span class="ps-tt">${teamLogoMini(t, 16)} ${t} implied ${fmt(v, 1)}</span>`;
   };
+  const railHidden = propsRailHidden();
+  const railBtn = document.getElementById("props-rail-btn");
+  if (railBtn) {
+    railBtn.textContent = railHidden ? "Show Prop Picks" : "Hide Prop Picks";
+    railBtn.classList.toggle("active", railHidden);
+  }
   card.dataset.kind = "props";
-  card.innerHTML = `<div class="sc-inner ps-card">
+  card.innerHTML = `<div class="sc-inner ps-card${railHidden ? " ps-no-rail" : ""}">
     <div class="sc-header">
       <div class="sc-title-row">
         <img src="${teamLogoUrl(away)}" crossorigin="anonymous" class="sc-logo" alt="">
@@ -998,7 +1044,7 @@ function renderPropsSummaryCard(away, home) {
           <section class="sc-section ps-tf-col ps-tf-fade"><div class="sc-section-title">Fade</div>${list(fades, "No clear bad matchups")}</section>
         </div>
       </div>
-      ${propsRail(away, home, linesByTeam, gameKey)}
+      ${railHidden ? "" : propsRail(away, home, linesByTeam, gameKey)}
     </div>
 
     <div class="sc-footer">
@@ -1006,8 +1052,8 @@ function renderPropsSummaryCard(away, home) {
       <span>${statsNote()}</span>
     </div>
   </div>`;
-  fitSummaryCard();
-  card.querySelectorAll("img").forEach((img) => img.addEventListener("load", fitSummaryCard, { once: true }));
+  fitPropsSummaryCard();
+  card.querySelectorAll("img").forEach((img) => img.addEventListener("load", fitPropsSummaryCard, { once: true }));
 }
 
 // ---- Picker: every line in the game, by section, then by player ----
@@ -1105,6 +1151,12 @@ function refreshPropsAfterPick() {
 }
 
 document.addEventListener("click", (e) => {
+  if (e.target.closest("#props-rail-btn")) {
+    setPropsRailHidden(!propsRailHidden());
+    const { away, home } = propsSummaryContext();
+    renderPropsSummaryCard(away, home);
+    return;
+  }
   if (e.target.closest(".ps-open, #props-pick-btn")) openPropsPicker();
   const outBtn = e.target.closest(".ps-out-btn");
   if (outBtn) {

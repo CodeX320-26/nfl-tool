@@ -2721,6 +2721,8 @@ footer { border-top-color: var(--border); }
 
 .ps-pk-tags span { padding: 1px 7px; border-radius: 5px; font-size: 0.68rem; font-weight: 800; }
 :root[data-theme="light"] .ps-pk-tags span { color: var(--text) !important; }
+/* Hide Prop Picks: Target / Fade take the whole card (props-summary.js zooms them to fill it) */
+.ps-card.ps-no-rail .sc-body { grid-template-columns: minmax(0, 1fr); }
 /* Garbage-time note: neutral gray, dashed edge, so it reads as a caution, not a rank */
 .ps-pk-tags .ps-pk-gt { color: var(--muted); background: var(--table-head); border: 1px dashed var(--border-strong); cursor: help; }
 :root[data-theme="light"] .ps-pk-tags .ps-pk-gt { color: var(--muted) !important; }
@@ -2985,7 +2987,7 @@ footer { border-top-color: var(--border); }
 .recent-games-table td.tier-good, .recent-games-table td.tier-bad, .recent-games-table td.tier-mid { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; }
 .recent-game-row { cursor: pointer; }
 .recent-game-row:hover td:first-child, .recent-game-row:hover td:nth-child(2) { color: var(--accent); }
-.summary-toolbar .summary-save-btn { white-space: nowrap; flex: 0 0 auto; }
+.summary-toolbar .summary-save-btn, .summary-toolbar .view-toggle-btn { white-space: nowrap; flex: 0 0 auto; }
 
 /* Paired league-rank popup: TEAM | offense | defense | TEAM, equal halves */
 #stat-rank-modal .modal-box.prk-box { width: auto; overflow-x: auto; }
