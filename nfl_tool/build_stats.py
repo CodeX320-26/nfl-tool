@@ -2293,6 +2293,143 @@ PROP_PASSING_METRICS = {
 }
 
 
+# ---- Promo Tools: King of the Endzone (DraftKings' longest-TD promo) ----
+# Who has the upside to score the game's LONGEST touchdown: each player's
+# TD lengths plus the long-play profile that produces long TDs (20+/40+
+# runs and catches, deep targets, ADOT), each defense's big plays and long
+# TDs allowed, and every team's D/ST TDs (the promo counts D/ST: pick-sixes,
+# fumble returns, kick and punt returns).
+KOE_BIG = 20
+KOE_HUGE = 40
+KOE_DEEP_AIR = 20
+
+
+def compute_koe(pbp: pd.DataFrame, pos_lookup) -> dict:
+    plays = pbp[(pbp["two_point_attempt"] != 1) & pbp["posteam"].notna() & pbp["defteam"].notna()].copy()
+    yds = plays["yards_gained"].fillna(0)
+    games = pbp.groupby("game_id").agg(home=("home_team", "first"), away=("away_team", "first"), week=("week", "first"))
+    played = {}
+    for g in games.itertuples():
+        played.setdefault(g.home, set()).add(g.Index)
+        played.setdefault(g.away, set()).add(g.Index)
+
+    rush = plays[(plays["rush_attempt"] == 1) & plays["rusher_player_id"].notna()]
+    tgt = plays[(plays["pass_attempt"] == 1) & (plays["sack"] != 1) & plays["receiver_player_id"].notna()]
+    catch = tgt[tgt["complete_pass"] == 1]
+    off_td = plays[((plays["rush_touchdown"] == 1) | (plays["pass_touchdown"] == 1)) & (plays["td_team"] == plays["posteam"]) & plays["td_player_id"].notna()]
+
+    out_players: dict = {}
+
+    def row(team, pid, week):
+        pos, _, name = pos_lookup(pid, week)
+        pos = bucket_position(pos) if pos else None
+        if pos not in POSITION_BUCKETS:
+            return None
+        rows = out_players.setdefault(team, {})
+        if pid not in rows:
+            rows[pid] = {"name": name or pid, "position": pos, "g": set(), "car": 0, "tgt": 0, "rec": 0,
+                         "r10": 0, "r20": 0, "r40": 0, "c20": 0, "c40": 0, "long_rush": 0, "long_rec": 0,
+                         "air": 0.0, "air_n": 0, "deep_tgt": 0, "deep_rec": 0, "tds": []}
+        return rows[pid]
+
+    for r in rush.itertuples():
+        p = row(r.posteam, r.rusher_player_id, r.week)
+        if not p:
+            continue
+        y = r.yards_gained if pd.notna(r.yards_gained) else 0
+        p["g"].add(r.game_id)
+        p["car"] += 1
+        p["r10"] += y >= 10
+        p["r20"] += y >= KOE_BIG
+        p["r40"] += y >= KOE_HUGE
+        p["long_rush"] = max(p["long_rush"], y)
+    for r in tgt.itertuples():
+        p = row(r.posteam, r.receiver_player_id, r.week)
+        if not p:
+            continue
+        p["g"].add(r.game_id)
+        p["tgt"] += 1
+        if pd.notna(r.air_yards):
+            p["air"] += r.air_yards
+            p["air_n"] += 1
+            if r.air_yards >= KOE_DEEP_AIR:
+                p["deep_tgt"] += 1
+                p["deep_rec"] += r.complete_pass == 1
+        if r.complete_pass == 1:
+            y = r.yards_gained if pd.notna(r.yards_gained) else 0
+            p["rec"] += 1
+            p["c20"] += y >= KOE_BIG
+            p["c40"] += y >= KOE_HUGE
+            p["long_rec"] = max(p["long_rec"], y)
+    for r in off_td.itertuples():
+        p = row(r.posteam, r.td_player_id, r.week)
+        if p:
+            p["g"].add(r.game_id)
+            p["tds"].append(int(r.yards_gained) if pd.notna(r.yards_gained) else 0)
+
+    players = {}
+    for team, rows in out_players.items():
+        lst = []
+        for p in rows.values():
+            n = len(p["g"])
+            if not n:
+                continue
+            lst.append({
+                "name": p["name"], "position": p["position"], "games": n,
+                "carries": p["car"], "targets": p["tgt"], "receptions": p["rec"],
+                "runs10": int(p["r10"]), "runs20": int(p["r20"]), "runs40": int(p["r40"]),
+                "catches20": int(p["c20"]), "catches40": int(p["c40"]),
+                "long_rush": int(p["long_rush"]), "long_rec": int(p["long_rec"]),
+                "adot": round(p["air"] / p["air_n"], 1) if p["air_n"] else None,
+                "deep_targets": p["deep_tgt"], "deep_catches": int(p["deep_rec"]),
+                "tds": sorted(p["tds"], reverse=True),
+            })
+        players[team] = sorted(lst, key=lambda x: -(x["carries"] + x["targets"]))
+
+    # Defense: big plays and long TDs allowed. Offense: big plays made.
+    big = plays[((plays["rush_attempt"] == 1) | (plays["complete_pass"] == 1)) & (yds >= KOE_BIG)]
+    teams: dict = {}
+    for t, gs in played.items():
+        teams[t] = {"games": len(gs), "runs20_allowed": 0, "catches20_allowed": 0, "plays40_allowed": 0,
+                    "tds_allowed": [], "big_plays": 0, "plays40": 0, "dst_tds": [], "dst_tds_allowed": []}
+    for r in big.itertuples():
+        y = r.yards_gained
+        d, o = teams.get(r.defteam), teams.get(r.posteam)
+        if d:
+            d["runs20_allowed" if r.rush_attempt == 1 else "catches20_allowed"] += 1
+            d["plays40_allowed"] += y >= KOE_HUGE
+        if o:
+            o["big_plays"] += 1
+            o["plays40"] += y >= KOE_HUGE
+    for r in off_td.itertuples():
+        if r.defteam in teams:
+            teams[r.defteam]["tds_allowed"].append(int(r.yards_gained) if pd.notna(r.yards_gained) else 0)
+
+    # D/ST TDs: any return TD (interception, fumble, kickoff, punt, blocked kick).
+    ret = pbp[(pbp["return_touchdown"] == 1) & pbp["td_team"].notna()]
+    for r in ret.itertuples():
+        ry = r.return_yards if pd.notna(r.return_yards) and r.return_yards > 0 else r.fumble_recovery_1_yards
+        length = int(ry) if pd.notna(ry) else 0
+        if r.play_type == "kickoff":
+            kind = "KR"
+        elif r.play_type == "punt":
+            kind = "PR"
+        elif r.interception == 1:
+            kind = "INT"
+        elif r.fumble == 1 or r.fumble_lost == 1:
+            kind = "FUM"
+        else:
+            kind = "RET"
+        scorer, victim = r.td_team, (r.home_team if r.td_team == r.away_team else r.away_team)
+        if scorer in teams:
+            teams[scorer]["dst_tds"].append({"yds": length, "kind": kind, "week": int(r.week), "opp": victim})
+        if victim in teams:
+            teams[victim]["dst_tds_allowed"].append({"yds": length, "kind": kind, "week": int(r.week), "opp": scorer})
+    for t in teams.values():
+        t["tds_allowed"].sort(reverse=True)
+    return {"players": players, "teams": teams, "big": KOE_BIG, "huge": KOE_HUGE, "deep_air": KOE_DEEP_AIR}
+
+
 def compute_prop_matchup_model(pbp: pd.DataFrame, pos_lookup) -> dict:
     """Returns {"league": {metric: value}, "teams": {team: {"off": {...},
     "def": {...}}}} where each side's metric is {"v": adjusted value,
@@ -4730,6 +4867,7 @@ def main():
         **(lambda m: {"td_matchup_model": m["teams"], "player_xtd": m["players"]})(compute_td_matchup_model(pbp, scoring_df, pos_lookup)),
         "pre_first_td_usage": pre_first_td_usage,
         "prop_matchup_model": compute_prop_matchup_model(pbp, pos_lookup),
+        "koe": compute_koe(pbp, pos_lookup),
         "team_stats_adj": compute_opponent_adjusted_stats(pbp, ftn, team_stats),
         "schedule": schedule,
         "current_week": current_week,

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GMG's NFL Suite &mdash; Promo Tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow+Semi+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+<script>try{if(localStorage.getItem("nfl-tool.theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="topbar">
+  <a class="brand" href="game-overview.html" aria-label="GMG's NFL Suite home"><span class="brand-mark">GMG</span><span class="brand-name">NFL <b>Suite</b></span></a>
+  <nav class="page-nav">
+    <a href="game-overview.html">Game Previews</a>
+    <a href="index.html">TD Data</a>
+    <a href="player-props.html">Player Props</a>
+    <a href="possible-plays.html">Possible Plays</a>
+    <span class="page-nav-current">Promo Tools</span>
+  </nav>
+  <div class="topbar-actions">
+    <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch light/dark theme" title="Switch light/dark theme">&#9788;</button>
+    <a href="https://github.com/GreenMeansGoBetting/nfl-tool/actions/workflows/deploy.yml" target="_blank" rel="noopener" class="update-odds-link" title="Opens GitHub Actions in a new tab -- click &quot;Run workflow&quot; there to fetch fresh odds right now">&#128260; Update Odds</a>
+  </div>
+</div>
+
+<main>
+  <div class="view-toggle promo-views">
+    <button type="button" class="view-toggle-btn active" data-promo="koe">King of the Endzone</button>
+  </div>
+
+  <section id="koe" class="koe">
+    <div class="koe-intro">
+      <h2 class="koe-title">King of the Endzone</h2>
+      <p class="section-note">DraftKings pays out on whoever scores the game's <b>longest TD</b> (D/ST included). Long TDs come from long plays, so this ranks every player by long-play upside: TD lengths so far, 20+ and 40+ yard plays, how deep they're used, and how many big plays this week's defense gives up.</p>
+    </div>
+
+    <div class="koe-panel">
+      <div class="koe-panel-head">
+        <span class="koe-label">Teams</span>
+        <span id="koe-week" class="koe-week"></span>
+        <button type="button" class="view-toggle-btn" id="koe-all">All games</button>
+        <button type="button" class="view-toggle-btn" id="koe-none">Clear</button>
+      </div>
+      <div id="koe-games" class="koe-games"></div>
+    </div>
+
+    <div class="koe-filters">
+      <span class="koe-label">Position</span>
+      <span id="koe-pos" class="koe-pos"></span>
+      <span id="koe-count" class="koe-count"></span>
+    </div>
+
+    <div id="koe-players"></div>
+    <div id="koe-dst"></div>
+  </section>
+</main>
+
+<footer>
+  Long-TD upside, not a pick. Per-game numbers so far this season; Upside is a league percentile (hover it for the parts).
+</footer>
+
+<script src="sync.js"></script>
+<script src="teams.js"></script>
+<script src="common.js"></script>
+<script src="player-card.js"></script>
+<script src="promo-tools.js"></script>
+</body>
+</html>

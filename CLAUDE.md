@@ -44,6 +44,22 @@ context. It is the only copy that travels with the repo.
   - `player-props.html/.js` + `props-summary.js`: **Player Props** (Receiving/Rushing/Passing + Summary card).
   - `possible-plays.html/.js`: the Possible Plays list.
   - `picks.js`: the Pick Tracker.
+  - `promo-tools.html/.js`: **Promo Tools** tab (added 2026-10-05). First section: **King of the
+    Endzone** (DraftKings' weekly promo paying on the game's LONGEST TD, D/ST included).
+    - Team checklist for this week's games (per-device, `nfl-tool.koe.teams`), position filter.
+    - Player table: TDs (count / avg / long), TDs by distance (1-10, 11-20, 21-40, 41+), big
+      plays (20+/g, 40+ count, longest play), role (touches/g, 20+ runs / catches, ADOT for
+      WR/TE only, deep targets/g), and this week's defense (20+ plays allowed/g matched to runs
+      or catches by the player's mix, 20+ TDs allowed, avg TD length allowed). Colors vs the
+      whole league. Ruled-out players hidden; QBs = current starter only.
+    - **Upside** = league percentile of weighted z's (`KOE_UPSIDE_PARTS`: 20+ plays 35%, 40+
+      plays 15%, deep role 15%, TD length 10%, opponent big plays allowed 25%), rates shrunk by
+      `KOE_PRIOR_GAMES` 2. First-guess weights; the user said "we can adjust if needed".
+    - D/ST table: return TDs (INT / FUM / KR / PR with yards), takeaways/g, opponent giveaways/g,
+      D/ST TDs the opponent has allowed. No Upside score for D/ST yet.
+    - Data: `build_stats.py compute_koe` -> `DATA.koe` (players per team, team big plays allowed,
+      `dst_tds` / `dst_tds_allowed`; return TD length = `return_yards`, else
+      `fumble_recovery_1_yards`).
   - `common.js`: shared helpers — tiers, possible plays, modals, the summary-card
     photo/banner/fit/**Save image** helpers, and lineup weights.
   - `player-card.js`: **the player card**, the ONE popup for every player name or photo on every

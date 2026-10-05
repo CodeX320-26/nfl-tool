@@ -3266,6 +3266,44 @@ main { max-width: 1840px; }
    Approach: nothing gets hidden -- wide tables/grids scroll sideways
    inside their own box, with the first (name) column pinned.
    ==================================================================== */
+/* ---- Promo Tools: King of the Endzone (promo-tools.html/.js, 2026-10-05) ---- */
+.koe-intro { margin-bottom: 12px; }
+.koe-title { margin: 0 0 4px; font-family: var(--font-display); font-size: 1.6rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.koe-panel { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: var(--panel); margin-bottom: 12px; }
+.koe-panel-head, .koe-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.koe-panel-head { margin-bottom: 8px; }
+.koe-filters { margin: 0 0 12px; }
+.koe-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.koe-week { font-family: var(--font-display); font-weight: 800; margin-right: auto; }
+.koe-pos { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.koe-count { margin-left: auto; font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.koe-games { display: flex; flex-wrap: wrap; gap: 8px; }
+.koe-game { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-2); }
+.koe-game-on { border-color: var(--accent); }
+.koe-team { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--muted); font: inherit; font-weight: 800; cursor: pointer; }
+.koe-team:hover { color: var(--text); }
+.koe-team.active { color: var(--text); background: rgba(var(--accent-rgb), 0.16); border-color: rgba(var(--accent-rgb), 0.55); }
+.koe-at { border: none; background: none; color: var(--muted); font: inherit; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 2px 3px; }
+.koe-at:hover { color: var(--accent); }
+.koe-section { margin-bottom: 16px; min-width: 0; overflow-x: auto; }
+.koe-sub { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 8px; font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+.koe-table { width: 100%; }
+.koe-table th.koe-group { text-align: center; font-size: 0.62rem; }
+.koe-group-row th:empty { background: transparent; }
+.koe-sort { cursor: pointer; white-space: nowrap; }
+.koe-sort:hover { color: var(--text); }
+.koe-sorted { color: var(--accent); }
+.koe-sorted::after { content: " \25BE"; }
+.koe-sorted.koe-asc::after { content: " \25B4"; }
+.koe-player { min-width: 210px; }
+.koe-player .player-click { display: inline-flex; align-items: center; gap: 8px; }
+.koe-name { font-weight: 800; }
+.koe-meta { display: flex; align-items: center; gap: 4px; margin: 2px 0 0 38px; font-size: 0.72rem; color: var(--muted); font-weight: 700; }
+.koe-opp { white-space: nowrap; font-weight: 700; }
+.koe-upside { display: inline-block; min-width: 38px; padding: 2px 8px; border-radius: 6px; border: 1px solid; font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; cursor: help; }
+.koe-dst-team { display: inline-flex; align-items: center; gap: 6px; }
+.koe-dst-td { display: inline-block; margin: 1px 4px 1px 0; padding: 1px 7px; border-radius: 5px; font-size: 0.74rem; font-weight: 700; color: var(--good-text); background: rgba(var(--good-rgb), 0.12); border: 1px solid rgba(var(--good-rgb), 0.45); }
+
 @media (max-width: 760px) {
   main { padding: 12px 12px 28px; }
 
