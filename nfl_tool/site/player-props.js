@@ -424,9 +424,11 @@ function setShowBackupQbs(value) {
 // Every render function on this tab that lists passers pulls from this
 // one place, so the toggle only has to be handled once.
 function qualifyingPassers(team) {
+  // Current starter first (common.js currentStarterQb), then by attempts.
+  const starter = normName(currentStarterQb(team, DATA.current_week) || "");
   const all = (DATA.player_props[team] || [])
     .filter((p) => p.pass_att >= 10)
-    .sort((a, b) => b.pass_att - a.pass_att);
+    .sort((a, b) => (normName(b.name) === starter) - (normName(a.name) === starter) || b.pass_att - a.pass_att);
   return showBackupQbs ? all.slice(0, 2) : all.slice(0, 1);
 }
 

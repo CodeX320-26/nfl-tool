@@ -295,7 +295,13 @@ function modelTargetGroups(offTeam, defTeam) {
   return groups.map((g) => ({ ...g, items: g.items.filter((i) => !i.defLed || keepSoft.has(i)) }));
 }
 
+// No DST targets anywhere (user 2026-10-02, extended to the TD Targets panel
+// 2026-10-05): defensive/return TDs are random and nobody's betting them.
+// The DST stat rows in the tables stay -- they're data, not a target.
 function targetGroups(offTeam, defTeam) {
+  return targetGroupsAll(offTeam, defTeam).map((g) => ({ ...g, items: g.items.filter((i) => i.metric !== "DST" && i.label !== "DST") }));
+}
+function targetGroupsAll(offTeam, defTeam) {
   if (DATA.td_matchup_model?.[offTeam] && DATA.td_matchup_model?.[defTeam]) return modelTargetGroups(offTeam, defTeam);
   const stat = (key) => (t) => DATA.team_stats[t][key];
   const type = [
@@ -1237,9 +1243,20 @@ function keyTop(pool, score, n = 2, min = 1) {
     .map((x) => x.p.name);
 }
 
+// The current starter (common.js currentStarterQb) when he's in the pool.
+function keyStarterQb(pool, team, week) {
+  const starter = currentStarterQb(team, week);
+  const hit = starter && pool.find((p) => p.position === "QB" && normName(p.name) === normName(starter));
+  return hit ? [hit.name] : null;
+}
+
 function keyPlayersForTarget(metric, pool, team, defTeam, week) {
   const rzUse = (p) => p.rz_targets + p.rz_carries;
   const deep = (p) => p.deep_targets + p.ez_targets + p.explosive_rushes;
+  if (metric === "QB") {
+    const starter = keyStarterQb(pool, team, week);
+    if (starter) return starter;
+  }
   if (["QB", "RB", "WR", "TE"].includes(metric)) {
     return keyTop(pool.filter((p) => p.position === metric), (p) => p.xtd_pg * 10 + p.targets * 0.05 + p.carries * 0.02, metric === "QB" ? 1 : 2, 0.5);
   }
@@ -1254,9 +1271,9 @@ function keyPlayersForTarget(metric, pool, team, defTeam, week) {
   return [];
 }
 
-function keyPlayersForTag(label, pool, team) {
+function keyPlayersForTag(label, pool, team, week) {
   const rzUse = (p) => p.rz_targets + p.rz_carries;
-  const qb = () => keyTop(pool.filter((p) => p.position === "QB"), (p) => p.pass_att, 1, 10);
+  const qb = () => keyStarterQb(pool, team, week) || keyTop(pool.filter((p) => p.position === "QB"), (p) => p.pass_att, 1, 10);
   if (["RZ leak", "RZ wall", "RZ volume", "Few RZ trips"].includes(label)) return keyTop(pool, rzUse, 2, 2);
   if (label === "RZ pass edge") return keyTop(pool, (p) => p.rz_targets, 2, 1);
   if (label.startsWith("Weak spot: ")) {
@@ -1297,11 +1314,7 @@ function summarySeasonColumn(offTeam, defTeam, week) {
       if (kind !== "warn") e.good = true;
     });
   let n = 0;
-  // No DST on the summary (user 2026-10-02): defensive/return TDs are random
-  // and nobody's betting them. The TD Data page itself still shows DST rows.
-  const items = targetGroups(offTeam, defTeam)
-    .flatMap((g) => g.items)
-    .filter((i) => i.metric !== "DST" && i.label !== "DST");
+  const items = targetGroups(offTeam, defTeam).flatMap((g) => g.items); // DST already dropped
   const targetRows = items.length
     ? items
         .map((i) => {
@@ -1323,7 +1336,7 @@ function summarySeasonColumn(offTeam, defTeam, week) {
     ? tags
         .map((t) => {
           n += 1;
-          link(keyPlayersForTag(t.label, pool, offTeam), n, t.kind);
+          link(keyPlayersForTag(t.label, pool, offTeam, week), n, t.kind);
           return `<li><span class="sc-tag-head">${numBadge(n)}<span class="tag-chip tag-chip-${t.kind}">${t.label}</span></span><span class="sc-tag-text">${t.title}</span></li>`;
         })
         .join("")

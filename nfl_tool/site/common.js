@@ -1433,6 +1433,24 @@ function lineupOutOn(team, name, week) {
   const hit = list.find((i) => normName(i.full_name) === normName(name));
   return !!hit && /out|doubtful|reserve|injured|suspend/i.test(hit.report_status || "");
 }
+// The team's current starting QB: whoever threw the most in its most
+// recent game, unless he's ruled out for `week` -- then the starter before
+// that. A fill-in with more season attempts doesn't outrank the healthy
+// starter (user 2026-10-05: Cooper Rush showed for ATL after Penix was back).
+function currentStarterQb(team, week) {
+  const byWeek = {};
+  Object.entries((DATA.player_game_logs || {})[team] || {}).forEach(([name, games]) =>
+    games.forEach((g) => {
+      if ((g.pass_att || 0) >= 10) (byWeek[g.week] = byWeek[g.week] || []).push([name, g.pass_att]);
+    })
+  );
+  const weeks = Object.keys(byWeek).map(Number).sort((a, b) => b - a);
+  for (const wk of weeks) {
+    const [name] = byWeek[wk].sort((a, b) => b[1] - a[1])[0];
+    if (!lineupOutOn(team, name, week)) return name;
+  }
+  return null;
+}
 function lineupMedian(xs) {
   const v = xs.slice().sort((a, b) => a - b);
   return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;

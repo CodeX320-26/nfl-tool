@@ -179,6 +179,12 @@ context. It is the only copy that travels with the repo.
   - TD Data uses `lineupWeights` / `lineupAdjustedXtd` in common.js; Props uses
     `propBaselineGames`.
   - **Never surface a backup off one fill-in game.**
+  - **Starting QB = `currentStarterQb(team, week)` (common.js, 2026-10-05):** whoever threw the
+    most in the team's most recent game, unless ruled out this week (then the starter before).
+    Used for the TD summary's QB Key Player chips and to order the Player Props QB cards. Fixes
+    Cooper Rush (2 fill-in starts while Penix was Out) outranking Penix on season attempts.
+    Returns null when every recent starter is out (TB Week 4: Mayfield Out, backup never
+    started); callers then fall back to most attempts.
 - **Zone Targets** (`zoneTargets` / `renderZoneTargets` in props-summary.js): pass catchers whose targets land where the defense is soft.
   - **Downfield exception (2026-10-02, Lamb vs HOU):** a player's zone fit is a target-weighted
     blend, so a receiver split half short (where the D is tough) and half downfield (where it's
@@ -340,9 +346,10 @@ context. It is the only copy that travels with the repo.
     the offense's usage (the user wants the tendency visible), but the line prints the offense's
     own share of TDs at that position, so both sides are on the card. Key players: that
     position's top usage players. Week 4: 9 tags across 32 sides.
-  - **No DST anywhere on the TD Summary card (user 2026-10-02):** defensive/return TDs are random
-    and not bet, so `summarySeasonColumn` filters DST targets (First TD position targets already
-    skipped DST). The TD Data page itself keeps its DST rows.
+  - **No DST targets anywhere (user 2026-10-02; TD Targets panel too since 2026-10-05):**
+    defensive/return TDs are random and not bet, so `targetGroups` (app.js) drops DST items for
+    both the TD Targets panel and the Summary card (First TD position targets already skipped
+    DST). The DST stat rows in the TD Data tables stay; they're data, not a target.
 - The Game Previews Summary card:
   - **Layout (2026-10-05, from the user's marked-up screenshot; approved from a mockup):**
     main column = injuries strip; W&L vs the spread; Matchups with A–F grades and
