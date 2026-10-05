@@ -3290,14 +3290,14 @@ main { max-width: 1840px; }
 /* Fixed column sizes: every stat box the same width and height; a narrow player column; empty
    gap columns between groups. Group header bubbles span their columns. */
 .koe-table { table-layout: fixed; width: max-content; }
-.koe-table col.koe-c-player { width: 172px; }
+.koe-table col.koe-c-player { width: 230px; }
 .koe-table col.koe-c-opp { width: 66px; }
 .koe-table col.koe-c-stat { width: 58px; }
 .koe-table col.koe-c-gap { width: 8px; }
 .koe-table col.koe-c-up { width: 66px; }
 .koe-table col.koe-c-list { width: 230px; }
 .koe-table col.koe-c-wide { width: 120px; }
-.koe-table td { height: 44px; }
+.koe-table td { height: 32px; padding-top: 2px; padding-bottom: 2px; }
 .koe-table td.num { text-align: center; }
 .koe-table th, .koe-table td { overflow: hidden; }
 .koe-table .koe-gap { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
@@ -3322,10 +3322,11 @@ main { max-width: 1840px; }
 .koe-sorted::after { content: " \25BE"; }
 .koe-sorted.koe-asc::after { content: " \25B4"; }
 .koe-player { white-space: nowrap; }
+.koe-who { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .koe-player .player-click { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .koe-player .koe-name { overflow: hidden; text-overflow: ellipsis; }
 .koe-name { font-weight: 800; }
-.koe-meta { display: flex; align-items: center; gap: 4px; margin: 1px 0 0 36px; font-size: 0.68rem; color: var(--muted); font-weight: 700; }
+.koe-meta { display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto; margin-left: auto; font-size: 0.68rem; color: var(--muted); font-weight: 800; }
 .koe-opp { white-space: nowrap; font-weight: 700; }
 .koe-upside { display: inline-block; min-width: 38px; padding: 2px 8px; border-radius: 6px; border: 1px solid; font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; cursor: help; }
 .koe-dst-team { display: inline-flex; align-items: center; gap: 6px; }

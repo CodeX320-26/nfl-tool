@@ -209,9 +209,9 @@ function renderKoePlayers() {
     <tr class="koe-label-row"><th class="koe-sort${sortCls("name")}" data-sort="name">Player</th><th>Opp</th>${groups.map((g) => `${gap("th")}${g.cols.map((c) => `<th class="num koe-sort ${gcls(g.name)}${sortCls(c.key)}" data-sort="${c.key}" title="${c.title}">${c.label}</th>`).join("")}`).join("")}${gap("th")}<th class="num koe-sort koe-g-up${sortCls("upside")}" data-sort="upside" title="${upTitle}">0-100</th></tr>`;
   const body = rows
     .map((r) => {
-      const who = playerClick(r.team, r.name, `${summaryHeadshot(r.team, r.name, 30)}<span class="koe-name">${r.name}</span>`, r.opp);
+      const who = playerClick(r.team, r.name, `${summaryHeadshot(r.team, r.name, 24)}<span class="koe-name">${r.name}</span>`, r.opp);
       return `<tr>
-        <td class="koe-player">${who}<span class="koe-meta">${teamLogoMini(r.team, 14)} ${r.team} &middot; ${r.pos}</span></td>
+        <td class="koe-player"><span class="koe-who">${who}<span class="koe-meta">${teamLogoMini(r.team, 14)}${r.pos}</span></span></td>
         <td class="koe-opp">${r.opp ? `${teamLogoMini(r.opp, 18)} ${r.opp}` : "--"}</td>
         ${groups.map((g) => `${gap("td")}${g.cols.map((c) => koeCell(c, r, league)).join("")}`).join("")}
         ${gap("td")}${koeUpsideCell(r)}
