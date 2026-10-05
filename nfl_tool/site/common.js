@@ -1192,6 +1192,62 @@ function fitSummaryCard() {
   zoomSummaryCardForPhone();
 }
 
+// ---- Hide the picks column on a Summary card ----
+// Every Summary card (TD, Game, Props) has a picks column on the right. A
+// toolbar button (#summary-rail-btn) drops it; the card gets .sc-no-rail,
+// the main content takes the full width, and fitWideSummaryCard zooms it to
+// the biggest size that still fits so the saved image is easier to read.
+// Per-device view preference, one per card kind (not synced).
+const SUMMARY_RAIL_KEYS = {
+  props: "nfl-tool.props-summary.railHidden",
+  game: "nfl-tool.game-summary.railHidden",
+  td: "nfl-tool.td-summary.railHidden",
+};
+function summaryRailHidden(kind) {
+  try {
+    return localStorage.getItem(SUMMARY_RAIL_KEYS[kind]) === "1";
+  } catch (e) {
+    return false;
+  }
+}
+function setSummaryRailHidden(kind, hidden) {
+  try {
+    localStorage.setItem(SUMMARY_RAIL_KEYS[kind], hidden ? "1" : "0");
+  } catch (e) {
+    // localStorage unavailable -- the choice just won't stick across reloads.
+  }
+}
+// Sync the toolbar button's label ("Hide My Picks" / "Show My Picks").
+function syncSummaryRailButton(kind, label) {
+  const btn = document.getElementById("summary-rail-btn");
+  if (!btn) return;
+  const hidden = summaryRailHidden(kind);
+  btn.textContent = `${hidden ? "Show" : "Hide"} ${label}`;
+  btn.classList.toggle("active", hidden);
+}
+// ~1.35 is the old main column blown up to the full width; more when the
+// content is short. The loop backs off until the card fits, then the usual
+// shrink-only fit and phone preview zoom run. html-to-image keeps the zoom.
+const SUMMARY_WIDE_ZOOM_MAX = 1.6;
+function fitWideSummaryCard() {
+  const card = document.getElementById("summary-card");
+  const inner = card?.querySelector(".sc-inner");
+  const main = inner?.classList.contains("sc-no-rail") ? inner.querySelector(".sc-main") : null;
+  // A hidden card measures 0 tall, which would read as "fits at max zoom".
+  if (main && card.clientHeight > 0) {
+    card.style.zoom = "";
+    inner.style.transform = "";
+    inner.style.width = "";
+    let z = SUMMARY_WIDE_ZOOM_MAX;
+    main.style.zoom = z;
+    while (z > 1 && inner.scrollHeight > card.clientHeight) {
+      z = Math.max(1, Math.round((z - 0.05) * 100) / 100);
+      main.style.zoom = z;
+    }
+  }
+  fitSummaryCard();
+}
+
 // Phones only (same 760px breakpoint as the mobile block at the end of
 // style.css): the Summary card is a fixed 1160px video-template image, so
 // shrink the whole card to the screen width as a preview. Desktop never gets

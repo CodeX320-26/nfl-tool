@@ -2740,8 +2740,8 @@ footer { border-top-color: var(--border); }
 .ps-tm-next td { background: rgba(var(--accent-rgb), 0.08); border-top: 2px solid rgba(var(--accent-rgb), 0.45); }
 .ps-tm-next-tag { display: inline-block; padding: 1px 8px; border-radius: 5px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); background: rgba(var(--accent-rgb), 0.12); border: 1px solid rgba(var(--accent-rgb), 0.5); }
 .ps-tm-note { margin: 10px 0 0; font-size: 0.74rem; color: var(--muted); }
-/* Hide Prop Picks: Target / Fade take the whole card (props-summary.js zooms them to fill it) */
-.ps-card.ps-no-rail .sc-body { grid-template-columns: minmax(0, 1fr); }
+/* Hide the picks column (any Summary card): the main content takes the whole card (common.js fitWideSummaryCard zooms it to fill) */
+.sc-inner.sc-no-rail .sc-body { grid-template-columns: minmax(0, 1fr); }
 /* Garbage-time note: neutral gray, dashed edge, so it reads as a caution, not a rank */
 .ps-pk-tags .ps-pk-gt { color: var(--muted); background: var(--table-head); border: 1px dashed var(--border-strong); cursor: help; }
 :root[data-theme="light"] .ps-pk-tags .ps-pk-gt { color: var(--muted) !important; }

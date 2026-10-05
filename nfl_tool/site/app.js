@@ -1541,6 +1541,12 @@ function refreshSummaryAfterPick() {
 }
 
 document.addEventListener("click", (e) => {
+  if (e.target.closest("#summary-rail-btn")) {
+    setSummaryRailHidden("td", !summaryRailHidden("td"));
+    const { away, home } = summaryPickerContext();
+    renderSummaryCard(away, home);
+    return;
+  }
   if (e.target.closest(".sc-odds-open, #summary-pick-btn")) openSummaryPicker();
   if (e.target.closest(".sc-picker-clear")) {
     const { gameKey } = summaryPickerContext();
@@ -1580,7 +1586,9 @@ function renderSummaryCard(away, home) {
   ].filter(Boolean).join(" &middot; ");
   const rgbA = teamAccentRgb(away);
   const rgbH = teamAccentRgb(home);
-  card.innerHTML = `<div class="sc-inner">
+  const railHidden = summaryRailHidden("td");
+  syncSummaryRailButton("td", "TD Odds");
+  card.innerHTML = `<div class="sc-inner${railHidden ? " sc-no-rail" : ""}">
     <div class="sc-header">
       <div class="sc-title-row">
         <img src="${teamLogoUrl(away)}" crossorigin="anonymous" class="sc-logo" alt="">
@@ -1615,7 +1623,7 @@ function renderSummaryCard(away, home) {
           </div>
         </section>
       </div>
-      ${summaryOddsRail(away, home, week)}
+      ${railHidden ? "" : summaryOddsRail(away, home, week)}
     </div>
 
     <div class="sc-footer">
@@ -1623,9 +1631,9 @@ function renderSummaryCard(away, home) {
       <span>Model % = chance to score the game's first TD &middot; highlighted rows: model above the odds' implied %</span>
     </div>
   </div>`;
-  fitSummaryCard();
+  fitWideSummaryCard();
   // Logos/photos load after the first measurement; re-fit once they have.
-  card.querySelectorAll("img").forEach((img) => img.addEventListener("load", fitSummaryCard, { once: true }));
+  card.querySelectorAll("img").forEach((img) => img.addEventListener("load", fitWideSummaryCard, { once: true }));
 }
 
 // ---- Season TDs / First TD view toggle (localStorage so it survives a

@@ -268,12 +268,8 @@ context. It is the only copy that travels with the repo.
     An **Up next** row under Avg shows the card's opponent and only its usual (other cells
     blank, per the user), so it lines up against past opponents; it's skipped once that game
     is played.
-  - **Hide Prop Picks toggle (2026-10-03):** a toolbar button (`#props-rail-btn`) drops the
-    right rail so Target / Fade fill the card for bigger, easier-to-read video screenshots.
-    `fitPropsSummaryCard` zooms `.sc-main` to the biggest size that still fits (max
-    `PROPS_WIDE_ZOOM_MAX` 1.6; Week 4 games landed 1.15-1.6x), then the usual shrink-only fit.
-    html-to-image keeps the zoom, so Save image comes out big too (verified). Per-device view
-    pref `nfl-tool.props-summary.railHidden`, not synced.
+  - **Hide Prop Picks toggle (2026-10-03):** Target / Fade fill the card and zoom 1.15-1.6x.
+    It's the shared picks-column toggle below (kind `props`).
   - **Garbage-time tag (2026-10-03, tag only by the user's choice):** a Target's reason stat
     gets a neutral gray dashed chip ("JAX D 44% garbage time") when 30%+ of it came with the
     offense under 10% to win (`PROP_GARBAGE_TAG`; league average ~12%). Hover explains it.
@@ -370,6 +366,15 @@ context. It is the only copy that travels with the repo.
       composite (it has its own grade row).
   - Right side: My Picks rail with the Novig ad.
   - "Scheme" is labeled "Blitz & Box" on the card.
+- **Hide the picks column on any Summary card (2026-10-05):** a toolbar button `#summary-rail-btn`
+  ("Hide Prop Picks" / "Hide My Picks" / "Hide TD Odds") drops the right rail; the card gets
+  `.sc-no-rail`, and `fitWideSummaryCard` (common.js) zooms `.sc-main` to the biggest size that
+  still fits (max `SUMMARY_WIDE_ZOOM_MAX` 1.6), then the usual shrink-only fit. html-to-image
+  keeps the zoom, so saved images come out big too. Per-device view pref per card
+  (`SUMMARY_RAIL_KEYS`), not synced. On Game Previews this also hides the Novig ad (it lives in
+  that rail). The Props card has spare height so it grows a lot; the Game and TD cards are
+  already height-bound (Game ~1030px of content for 980, TD 1.0-1.15x), so hiding the rail
+  mostly widens them -- making them bigger needs less content or a different layout.
 - **One look across the whole site (the summary-card look), set 2026-09-28.** It lives in the
   "Facelift v2" block at the end of `style.css`:
   - Every `.data-table` is rounded tiles with 3px gaps, not hairline grid lines.

@@ -337,10 +337,12 @@ function renderGameSummaryCard(game) {
   if (!card || !game) return;
   const { away, home } = game;
   const when = game.date ? new Date(game.date + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : "";
+  const railHidden = summaryRailHidden("game");
+  syncSummaryRailButton("game", "My Picks");
   card.dataset.kind = "game";
   card.dataset.away = away;
   card.dataset.home = home;
-  card.innerHTML = `<div class="sc-inner gs-card">
+  card.innerHTML = `<div class="sc-inner gs-card${railHidden ? " sc-no-rail" : ""}">
     <div class="sc-header">
       <div class="sc-title-row">
         <img src="${teamLogoUrl(away)}" crossorigin="anonymous" class="sc-logo" alt="">
@@ -362,19 +364,25 @@ function renderGameSummaryCard(game) {
           <div class="sc-cols">${gsMatchupColumn(away, home)}${gsMatchupColumn(home, away)}</div>
         </section>
       </div>
-      ${gsPickRail(game)}
+      ${railHidden ? "" : gsPickRail(game)}
     </div>
     <div class="sc-footer">
       <span><span class="gs-res gs-res-q gs-res-w"><b>W</b></span> quality <span class="gs-res gs-res-n gs-res-w"><b>W</b></span> neutral <span class="gs-res gs-res-b gs-res-w"><b>W</b></span> bad (vs the spread) &middot; grades A-F vs the league</span>
       <span>Ratings 1-100 vs the league (ESPN FPI) &middot; SOS 1st = toughest schedule so far &middot; <span class="gs-val gs-good">green</span> good for that side &middot; <span class="gs-val gs-bad">red</span> bad &middot; Blitz / Box rows: offense's result vs the defense's result in that look, % = how often the defense shows it</span>
     </div>
   </div>`;
-  fitSummaryCard();
-  card.querySelectorAll("img").forEach((img) => img.addEventListener("load", fitSummaryCard, { once: true }));
+  fitWideSummaryCard();
+  card.querySelectorAll("img").forEach((img) => img.addEventListener("load", fitWideSummaryCard, { once: true }));
 }
 
 // Pick clicks: a side, then a confidence saves it; clicking the chosen side
 // again clears it; changing either on a saved pick updates it in place.
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#summary-rail-btn")) return;
+  setSummaryRailHidden("game", !summaryRailHidden("game"));
+  const game = currentGame();
+  if (game) renderGameSummaryCard(game);
+});
 document.addEventListener("click", (e) => {
   const btn = e.target.closest("#summary-card .gs-pick-side, #summary-card .gs-pick-color");
   if (!btn) return;
