@@ -55,6 +55,9 @@ context. It is the only copy that travels with the repo.
     - **Upside** = league percentile of weighted z's (`KOE_UPSIDE_PARTS`: 20+ plays 35%, 40+
       plays 15%, deep role 15%, TD length 10%, opponent big plays allowed 25%), rates shrunk by
       `KOE_PRIOR_GAMES` 2. First-guess weights; the user said "we can adjust if needed".
+    - Layout (user 2026-10-05): each column group has a colored header bubble spanning its columns
+      (`KOE_GROUP_CLASS`, `.koe-g-*` colors), empty 8px gap columns split the groups, and every
+      stat box is a fixed 58px (`table-layout: fixed`, colgroup); the player column is 172px.
     - D/ST table: return TDs (INT / FUM / KR / PR with yards), takeaways/g, opponent giveaways/g,
       D/ST TDs the opponent has allowed. No Upside score for D/ST yet.
     - Data: `build_stats.py compute_koe` -> `DATA.koe` (players per team, team big plays allowed,

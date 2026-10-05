@@ -159,6 +159,8 @@ const KOE_COLS = [
   { key: "opp_avg_td", label: "Avg TD", group: "vs this week's D", fmt: (v) => (v === null ? "" : fmt(v, 0)), title: "Average length of TDs this defense has allowed" },
 ];
 
+const KOE_GROUP_CLASS = { Touchdowns: "td", "TDs by distance": "dist", "Big plays": "big", Role: "role", "vs this week's D": "def" };
+
 function koeCell(col, r, league) {
   const v = r[col.key];
   if (v === null || v === undefined) return `<td class="num"></td>`;
@@ -194,24 +196,30 @@ function renderKoePlayers() {
   const { key, dir } = koeSort;
   rows.sort((a, b) => dir * (((a[key] ?? -1e9) > (b[key] ?? -1e9)) - ((a[key] ?? -1e9) < (b[key] ?? -1e9))) || b.upside - a.upside);
   document.getElementById("koe-count").textContent = `${rows.length} players${out ? ` · ${out} ruled out hidden` : ""}`;
+  // Column groups become header bubbles spanning their columns, with an
+  // empty gap column between groups so each reads as its own block.
   const groups = [];
-  KOE_COLS.forEach((c) => (groups.length && groups[groups.length - 1].name === c.group ? groups[groups.length - 1].n++ : groups.push({ name: c.group, n: 1 })));
+  KOE_COLS.forEach((c) => (groups.length && groups[groups.length - 1].name === c.group ? groups[groups.length - 1].cols.push(c) : groups.push({ name: c.group, cols: [c] })));
+  const gcls = (name) => `koe-g-${KOE_GROUP_CLASS[name]}`;
   const sortCls = (k) => (koeSort.key === k ? ` koe-sorted${koeSort.dir > 0 ? " koe-asc" : ""}` : "");
-  const head = `<tr class="koe-group-row"><th colspan="2"></th>${groups.map((g) => `<th colspan="${g.n}" class="koe-group">${g.name}</th>`).join("")}<th></th></tr>
-    <tr><th class="koe-sort${sortCls("name")}" data-sort="name">Player</th><th>Opp</th>${KOE_COLS.map((c) => `<th class="num koe-sort${sortCls(c.key)}" data-sort="${c.key}" title="${c.title}">${c.label}</th>`).join("")}<th class="num koe-sort${sortCls("upside")}" data-sort="upside" title="Long-TD upside: league percentile of 20+ yd plays (35%), 40+ yd plays (15%), deep role (15%), TD length (10%) and this week's defense's big plays allowed (25%)">Upside</th></tr>`;
+  const gap = (tag) => `<${tag} class="koe-gap"></${tag}>`;
+  const upTitle = "Long-TD upside: league percentile of 20+ yd plays (35%), 40+ yd plays (15%), deep role (15%), TD length (10%) and this week's defense's big plays allowed (25%)";
+  const cols = `<colgroup><col class="koe-c-player"><col class="koe-c-opp">${groups.map((g) => `<col class="koe-c-gap">${g.cols.map(() => `<col class="koe-c-stat">`).join("")}`).join("")}<col class="koe-c-gap"><col class="koe-c-up"></colgroup>`;
+  const head = `<tr class="koe-group-row"><th></th><th></th>${groups.map((g) => `${gap("th")}<th colspan="${g.cols.length}" class="koe-group ${gcls(g.name)}"><span>${g.name}</span></th>`).join("")}${gap("th")}<th class="koe-group koe-g-up"><span>Upside</span></th></tr>
+    <tr class="koe-label-row"><th class="koe-sort${sortCls("name")}" data-sort="name">Player</th><th>Opp</th>${groups.map((g) => `${gap("th")}${g.cols.map((c) => `<th class="num koe-sort ${gcls(g.name)}${sortCls(c.key)}" data-sort="${c.key}" title="${c.title}">${c.label}</th>`).join("")}`).join("")}${gap("th")}<th class="num koe-sort koe-g-up${sortCls("upside")}" data-sort="upside" title="${upTitle}">0-100</th></tr>`;
   const body = rows
     .map((r) => {
       const who = playerClick(r.team, r.name, `${summaryHeadshot(r.team, r.name, 30)}<span class="koe-name">${r.name}</span>`, r.opp);
       return `<tr>
-        <td class="koe-player">${who}<span class="koe-meta">${teamLogoMini(r.team, 16)} ${r.team} &middot; ${r.pos}</span></td>
+        <td class="koe-player">${who}<span class="koe-meta">${teamLogoMini(r.team, 14)} ${r.team} &middot; ${r.pos}</span></td>
         <td class="koe-opp">${r.opp ? `${teamLogoMini(r.opp, 18)} ${r.opp}` : "--"}</td>
-        ${KOE_COLS.map((c) => koeCell(c, r, league)).join("")}
-        ${koeUpsideCell(r)}
+        ${groups.map((g) => `${gap("td")}${g.cols.map((c) => koeCell(c, r, league)).join("")}`).join("")}
+        ${gap("td")}${koeUpsideCell(r)}
       </tr>`;
     })
     .join("");
   el.innerHTML = rows.length
-    ? `<section class="koe-section"><table class="data-table koe-table"><thead>${head}</thead><tbody>${body}</tbody></table></section>`
+    ? `<section class="koe-section"><table class="data-table koe-table">${cols}<thead>${head}</thead><tbody>${body}</tbody></table></section>`
     : `<p class="no-data-note">No players at this position on the checked teams.</p>`;
   wrapWideTablesForPhone();
 }
@@ -237,16 +245,19 @@ function renderKoeDst() {
       return `<tr>
         <td class="koe-player"><span class="koe-dst-team">${teamLogoMini(team, 26)} <b>${team}</b> D/ST</span></td>
         <td class="koe-opp">${opp ? `${teamLogoMini(opp, 18)} ${opp}` : "--"}</td>
+        <td class="koe-gap"></td>
         <td>${k.dst_tds.length ? k.dst_tds.map(chip).join("") : `<span class="muted">none</span>`}</td>
+        <td class="koe-gap"></td>
         ${tier((ts[team] || {}).takeaways_per_g, "takeaways_per_g")}
         ${tier(opp ? (ts[opp] || {}).turnovers_per_g : null, "turnovers_per_g")}
+        <td class="koe-gap"></td>
         <td>${ok && ok.dst_tds_allowed.length ? ok.dst_tds_allowed.map(chip).join("") : `<span class="muted">none</span>`}</td>
       </tr>`;
     })
     .join("");
   el.innerHTML = `<section class="koe-section">
     <h3 class="koe-sub">D/ST <span class="section-note">counts in the promo: pick-sixes, fumble returns, kick and punt returns</span></h3>
-    <table class="data-table koe-table koe-dst"><thead><tr><th>D/ST</th><th>Opp</th><th>D/ST TDs (yds)</th><th class="num" title="Interceptions + fumble recoveries per game">Takeaways/g</th><th class="num" title="This week's opponent: giveaways per game">Opp giveaways/g</th><th title="D/ST TDs this week's opponent has given up">Opp has allowed</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="data-table koe-table koe-dst"><colgroup><col class="koe-c-player"><col class="koe-c-opp"><col class="koe-c-gap"><col class="koe-c-list"><col class="koe-c-gap"><col class="koe-c-wide"><col class="koe-c-wide"><col class="koe-c-gap"><col class="koe-c-list"></colgroup><thead><tr class="koe-label-row"><th>D/ST</th><th>Opp</th><th class="koe-gap"></th><th class="koe-g-td">D/ST TDs (yds)</th><th class="koe-gap"></th><th class="num koe-g-big" title="Interceptions + fumble recoveries per game">Takeaways/g</th><th class="num koe-g-big" title="This week's opponent: giveaways per game">Opp giveaways/g</th><th class="koe-gap"></th><th class="koe-g-def" title="D/ST TDs this week's opponent has given up">Opp has allowed</th></tr></thead><tbody>${rows}</tbody></table>
   </section>`;
 }
 

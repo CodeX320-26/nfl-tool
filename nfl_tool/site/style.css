@@ -3287,18 +3287,45 @@ main { max-width: 1840px; }
 .koe-at:hover { color: var(--accent); }
 .koe-section { margin-bottom: 16px; min-width: 0; overflow-x: auto; }
 .koe-sub { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 8px; font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
-.koe-table { width: 100%; }
-.koe-table th.koe-group { text-align: center; font-size: 0.62rem; }
+/* Fixed column sizes: every stat box the same width and height; a narrow player column; empty
+   gap columns between groups. Group header bubbles span their columns. */
+.koe-table { table-layout: fixed; width: max-content; }
+.koe-table col.koe-c-player { width: 172px; }
+.koe-table col.koe-c-opp { width: 66px; }
+.koe-table col.koe-c-stat { width: 58px; }
+.koe-table col.koe-c-gap { width: 8px; }
+.koe-table col.koe-c-up { width: 66px; }
+.koe-table col.koe-c-list { width: 230px; }
+.koe-table col.koe-c-wide { width: 120px; }
+.koe-table td { height: 44px; }
+.koe-table td.num { text-align: center; }
+.koe-table th, .koe-table td { overflow: hidden; }
+.koe-table .koe-gap { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+.koe-table tr:hover > td.koe-gap { background: transparent !important; }
 .koe-group-row th:empty { background: transparent; }
+.koe-table th.koe-group { padding: 0 0 2px; }
+.koe-table th.koe-group span { display: block; padding: 5px 4px; border-radius: 8px; border: 1px solid; text-align: center; font-size: 0.7rem; letter-spacing: 0.08em; color: var(--text); white-space: nowrap; }
+.koe-label-row th { text-align: center; white-space: normal; line-height: 1.15; vertical-align: bottom; }
+.koe-label-row th:first-child { text-align: left; }
+/* Group colors: bubble (strong) and its column labels (light) */
+.koe-g-td { --g: 59, 130, 246; }
+.koe-g-dist { --g: 14, 165, 233; }
+.koe-g-big { --g: 249, 115, 22; }
+.koe-g-role { --g: 168, 85, 247; }
+.koe-g-def { --g: 20, 184, 166; }
+.koe-g-up { --g: var(--accent-rgb); }
+.koe-table th.koe-group span { background: rgba(var(--g), 0.2); border-color: rgba(var(--g), 0.6); }
+.koe-table .koe-label-row th[class*="koe-g-"] { background: rgba(var(--g), 0.08); box-shadow: inset 0 -2px 0 rgba(var(--g), 0.55); }
 .koe-sort { cursor: pointer; white-space: nowrap; }
 .koe-sort:hover { color: var(--text); }
 .koe-sorted { color: var(--accent); }
 .koe-sorted::after { content: " \25BE"; }
 .koe-sorted.koe-asc::after { content: " \25B4"; }
-.koe-player { min-width: 210px; }
-.koe-player .player-click { display: inline-flex; align-items: center; gap: 8px; }
+.koe-player { white-space: nowrap; }
+.koe-player .player-click { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.koe-player .koe-name { overflow: hidden; text-overflow: ellipsis; }
 .koe-name { font-weight: 800; }
-.koe-meta { display: flex; align-items: center; gap: 4px; margin: 2px 0 0 38px; font-size: 0.72rem; color: var(--muted); font-weight: 700; }
+.koe-meta { display: flex; align-items: center; gap: 4px; margin: 1px 0 0 36px; font-size: 0.68rem; color: var(--muted); font-weight: 700; }
 .koe-opp { white-space: nowrap; font-weight: 700; }
 .koe-upside { display: inline-block; min-width: 38px; padding: 2px 8px; border-radius: 6px; border: 1px solid; font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; cursor: help; }
 .koe-dst-team { display: inline-flex; align-items: center; gap: 6px; }
