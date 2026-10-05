@@ -3273,6 +3273,13 @@ main { max-width: 1840px; }
 .koe-panel-head, .koe-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .koe-panel-head { margin-bottom: 8px; }
 .koe-filters { margin: 0 0 12px; }
+/* Save image: the capture block hugs the table so the PNG has no empty right side */
+.koe-capture { width: max-content; max-width: 100%; }
+.koe-capture.koe-capturing { max-width: none; padding: 10px 12px; }
+.koe-capture-head { display: none; align-items: center; gap: 8px; margin-bottom: 8px; }
+.koe-capturing .koe-capture-head { display: flex; }
+.koe-capturing .koe-section { overflow: visible; }
+.koe-capture-title { font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
 .koe-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .koe-week { font-family: var(--font-display); font-weight: 800; margin-right: auto; }
 .koe-pos { display: inline-flex; gap: 6px; flex-wrap: wrap; }
@@ -3290,15 +3297,18 @@ main { max-width: 1840px; }
 /* Fixed column sizes: every stat box the same width and height; a narrow player column; empty
    gap columns between groups. Group header bubbles span their columns. */
 .koe-table { table-layout: fixed; width: max-content; }
-.koe-table col.koe-c-player { width: 230px; }
-.koe-table col.koe-c-opp { width: 66px; }
-.koe-table col.koe-c-stat { width: 58px; }
-.koe-table col.koe-c-gap { width: 8px; }
-.koe-table col.koe-c-up { width: 66px; }
+.koe-table col.koe-c-player { width: 214px; }
+.koe-table col.koe-c-stat { width: 44px; }
+.koe-table col.koe-c-dist { width: 38px; }
+.koe-table col.koe-c-gap { width: 5px; }
+.koe-table col.koe-c-up { width: 54px; }
 .koe-table col.koe-c-list { width: 230px; }
 .koe-table col.koe-c-wide { width: 120px; }
 .koe-table td { height: 32px; padding-top: 2px; padding-bottom: 2px; }
-.koe-table td.num { text-align: center; }
+.koe-table td.num { text-align: center; font-size: 0.88rem; padding-left: 1px; padding-right: 1px; }
+.koe-label-row th { font-size: 0.56rem !important; letter-spacing: 0.02em !important; padding: 3px 1px !important; }
+.koe-table th.koe-group span { font-size: 0.62rem; letter-spacing: 0.05em; padding: 4px 2px; }
+.koe-upside { min-width: 0; padding: 1px 6px; font-size: 0.95rem; }
 .koe-table th, .koe-table td { overflow: hidden; }
 .koe-table .koe-gap { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
 .koe-table tr:hover > td.koe-gap { background: transparent !important; }

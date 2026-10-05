@@ -204,15 +204,14 @@ function renderKoePlayers() {
   const sortCls = (k) => (koeSort.key === k ? ` koe-sorted${koeSort.dir > 0 ? " koe-asc" : ""}` : "");
   const gap = (tag) => `<${tag} class="koe-gap"></${tag}>`;
   const upTitle = "Long-TD upside: league percentile of 20+ yd plays (35%), 40+ yd plays (15%), deep role (15%), TD length (10%) and this week's defense's big plays allowed (25%)";
-  const cols = `<colgroup><col class="koe-c-player"><col class="koe-c-opp">${groups.map((g) => `<col class="koe-c-gap">${g.cols.map(() => `<col class="koe-c-stat">`).join("")}`).join("")}<col class="koe-c-gap"><col class="koe-c-up"></colgroup>`;
-  const head = `<tr class="koe-group-row"><th></th><th></th>${groups.map((g) => `${gap("th")}<th colspan="${g.cols.length}" class="koe-group ${gcls(g.name)}"><span>${g.name}</span></th>`).join("")}${gap("th")}<th class="koe-group koe-g-up"><span>Upside</span></th></tr>
-    <tr class="koe-label-row"><th class="koe-sort${sortCls("name")}" data-sort="name">Player</th><th>Opp</th>${groups.map((g) => `${gap("th")}${g.cols.map((c) => `<th class="num koe-sort ${gcls(g.name)}${sortCls(c.key)}" data-sort="${c.key}" title="${c.title}">${c.label}</th>`).join("")}`).join("")}${gap("th")}<th class="num koe-sort koe-g-up${sortCls("upside")}" data-sort="upside" title="${upTitle}">0-100</th></tr>`;
+  const cols = `<colgroup><col class="koe-c-player">${groups.map((g) => `<col class="koe-c-gap">${g.cols.map(() => `<col class="${g.name === "TDs by distance" ? "koe-c-dist" : "koe-c-stat"}">`).join("")}`).join("")}<col class="koe-c-gap"><col class="koe-c-up"></colgroup>`;
+  const head = `<tr class="koe-group-row"><th></th>${groups.map((g) => `${gap("th")}<th colspan="${g.cols.length}" class="koe-group ${gcls(g.name)}"><span>${g.name}</span></th>`).join("")}${gap("th")}<th class="koe-group koe-g-up"><span>Upside</span></th></tr>
+    <tr class="koe-label-row"><th class="koe-sort${sortCls("name")}" data-sort="name">Player</th>${groups.map((g) => `${gap("th")}${g.cols.map((c) => `<th class="num koe-sort ${gcls(g.name)}${sortCls(c.key)}" data-sort="${c.key}" title="${c.title}">${c.label}</th>`).join("")}`).join("")}${gap("th")}<th class="num koe-sort koe-g-up${sortCls("upside")}" data-sort="upside" title="${upTitle}">0-100</th></tr>`;
   const body = rows
     .map((r) => {
       const who = playerClick(r.team, r.name, `${summaryHeadshot(r.team, r.name, 24)}<span class="koe-name">${r.name}</span>`, r.opp);
       return `<tr>
         <td class="koe-player"><span class="koe-who">${who}<span class="koe-meta">${teamLogoMini(r.team, 14)}${r.pos}</span></span></td>
-        <td class="koe-opp">${r.opp ? `${teamLogoMini(r.opp, 18)} ${r.opp}` : "--"}</td>
         ${groups.map((g) => `${gap("td")}${g.cols.map((c) => koeCell(c, r, league)).join("")}`).join("")}
         ${gap("td")}${koeUpsideCell(r)}
       </tr>`;
@@ -244,7 +243,6 @@ function renderKoeDst() {
       const ok = opp ? DATA.koe.teams[opp] : null;
       return `<tr>
         <td class="koe-player"><span class="koe-dst-team">${teamLogoMini(team, 26)} <b>${team}</b> D/ST</span></td>
-        <td class="koe-opp">${opp ? `${teamLogoMini(opp, 18)} ${opp}` : "--"}</td>
         <td class="koe-gap"></td>
         <td>${k.dst_tds.length ? k.dst_tds.map(chip).join("") : `<span class="muted">none</span>`}</td>
         <td class="koe-gap"></td>
@@ -257,7 +255,7 @@ function renderKoeDst() {
     .join("");
   el.innerHTML = `<section class="koe-section">
     <h3 class="koe-sub">D/ST <span class="section-note">counts in the promo: pick-sixes, fumble returns, kick and punt returns</span></h3>
-    <table class="data-table koe-table koe-dst"><colgroup><col class="koe-c-player"><col class="koe-c-opp"><col class="koe-c-gap"><col class="koe-c-list"><col class="koe-c-gap"><col class="koe-c-wide"><col class="koe-c-wide"><col class="koe-c-gap"><col class="koe-c-list"></colgroup><thead><tr class="koe-label-row"><th>D/ST</th><th>Opp</th><th class="koe-gap"></th><th class="koe-g-td">D/ST TDs (yds)</th><th class="koe-gap"></th><th class="num koe-g-big" title="Interceptions + fumble recoveries per game">Takeaways/g</th><th class="num koe-g-big" title="This week's opponent: giveaways per game">Opp giveaways/g</th><th class="koe-gap"></th><th class="koe-g-def" title="D/ST TDs this week's opponent has given up">Opp has allowed</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="data-table koe-table koe-dst"><colgroup><col class="koe-c-player"><col class="koe-c-gap"><col class="koe-c-list"><col class="koe-c-gap"><col class="koe-c-wide"><col class="koe-c-wide"><col class="koe-c-gap"><col class="koe-c-list"></colgroup><thead><tr class="koe-label-row"><th>D/ST</th><th class="koe-gap"></th><th class="koe-g-td">D/ST TDs (yds)</th><th class="koe-gap"></th><th class="num koe-g-big" title="Interceptions + fumble recoveries per game">Takeaways/g</th><th class="num koe-g-big" title="This week's opponent: giveaways per game">Opp giveaways/g</th><th class="koe-gap"></th><th class="koe-g-def" title="D/ST TDs this week's opponent has given up">Opp has allowed</th></tr></thead><tbody>${rows}</tbody></table>
   </section>`;
 }
 
@@ -280,11 +278,59 @@ function renderKoe() {
     return;
   }
   renderKoeTeamPicker();
+  // Saved-image title: the checked games ("ATL @ NO") and the week.
+  const games = koeWeekGames().filter((g) => koeTeams.has(g.away) || koeTeams.has(g.home));
+  const label = games.length && games.length <= 3 ? games.map((g) => `${g.away} @ ${g.home}`).join(" · ") : `${games.length} games`;
+  document.getElementById("koe-capture-title").textContent = `King of the Endzone · ${label} · Week ${games[0]?.week || DATA.current_week}`;
   renderKoePlayers();
   renderKoeDst();
 }
 
+async function saveKoeImage() {
+  const btn = document.getElementById("koe-save");
+  const el = document.getElementById("koe-capture");
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+  try {
+    if (!window.htmlToImage) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js";
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    // Capture at the table's full width even if the window is narrower.
+    el.classList.add("koe-capturing");
+    const url = await window.htmlToImage.toPng(el, {
+      pixelRatio: 2,
+      backgroundColor: getComputedStyle(document.body).backgroundColor,
+      fontEmbedCSS: await summaryFontCSS(),
+      includeQueryParams: true,
+      width: el.scrollWidth,
+      height: el.scrollHeight,
+    });
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `king-of-the-endzone-${[...koeTeams].sort().join("-") || "week"}.png`;
+    a.click();
+    btn.textContent = "Saved";
+  } catch (e) {
+    btn.textContent = "Couldn't save -- screenshot instead";
+  }
+  el.classList.remove("koe-capturing");
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.textContent = "Save image";
+  }, 2500);
+}
+
 document.addEventListener("click", (e) => {
+  if (e.target.closest("#koe-save")) {
+    saveKoeImage();
+    return;
+  }
   const team = e.target.closest(".koe-team");
   const game = e.target.closest(".koe-at");
   const pos = e.target.closest("[data-pos]");
