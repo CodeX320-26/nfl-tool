@@ -252,10 +252,11 @@ function gsRatings(away, home) {
     const t = r[team];
     return `<div class="gs-rt-row"><span class="gs-res-team">${teamLogoMini(team, 18)} ${team}</span>${gsRatingTile(t.off_rating, t.off)}${gsRatingTile(t.def_rating, t.def)}${gsRatingTile(t.fpi_rating, t.fpi)}${gsSosTile(t.sos_rank)}</div>`;
   };
-  return `<section class="sc-section gs-compact"><div class="sc-section-title">Ratings</div>
-    <div class="gs-rt-row gs-rt-head"><span></span><span>Offensive Rating</span><span>Defensive Rating</span><span>FPI Rating</span><span>SOS</span></div>
+  return `<div class="gs-ratings"><div class="sc-section-title">Ratings</div>
+    <div class="gs-rt-row gs-rt-head"><span></span><span title="ESPN FPI offense, 1-100 vs the league">Off</span><span title="ESPN FPI defense, 1-100 vs the league">Def</span><span title="ESPN FPI overall, 1-100 vs the league">FPI</span><span title="Strength of schedule so far (1st = toughest)">SOS</span></div>
     ${row(away)}${row(home)}
-  </section>`;
+    <div class="gs-rt-note">1-100 vs the league (ESPN FPI) &middot; SOS 1st = toughest so far</div>
+  </div>`;
 }
 
 // ---- wins & losses vs the spread ----
@@ -322,7 +323,10 @@ function gsPickMarket(game, m) {
 function gsPickRail(game) {
   regradeAllPicks(DATA.schedule);
   return `<section class="sc-section sc-section-odds gs-picks">
-    <div class="sc-section-title">My Picks</div>
+    <div class="sc-section-title">Lines</div>
+    ${gsLines(game)}
+    ${gsRatings(game.away, game.home)}
+    <div class="sc-section-title gs-picks-title">My Picks</div>
     ${MARKETS.map((m) => gsPickMarket(game, m)).join("")}
     <div class="gs-novig">
       <div class="gs-novig-head"><img src="novig-logo.jpg" alt="Novig" class="gs-novig-logo"><span>Odds provided by <b>Novig</b></span></div>
@@ -342,7 +346,7 @@ function renderGameSummaryCard(game) {
   card.dataset.kind = "game";
   card.dataset.away = away;
   card.dataset.home = home;
-  card.innerHTML = `<div class="sc-inner gs-card${railHidden ? " sc-no-rail" : ""}">
+  card.innerHTML = `<div class="sc-inner gs-card sc-grow${railHidden ? " sc-no-rail" : ""}">
     <div class="sc-header">
       <div class="sc-title-row">
         <img src="${teamLogoUrl(away)}" crossorigin="anonymous" class="sc-logo" alt="">
@@ -355,11 +359,11 @@ function renderGameSummaryCard(game) {
     <div class="sc-body">
       <div class="sc-main">
         <section class="sc-section gs-compact"><div class="sc-section-title">Key Injuries</div><div class="gs-two">${gsInjuries(away, game.week)}${gsInjuries(home, game.week)}</div></section>
-        <div class="gs-top">
-          <section class="sc-section gs-compact"><div class="sc-section-title">Lines</div>${gsLines(game)}</section>
+        <div class="gs-top${railHidden ? " gs-top-3" : " gs-top-1"}">
+          ${railHidden ? `<section class="sc-section gs-compact"><div class="sc-section-title">Lines</div>${gsLines(game)}</section>` : ""}
           <section class="sc-section gs-compact"><div class="sc-section-title">Wins &amp; Losses vs the Spread</div>${gsResumeRow(away, game.week)}${gsResumeRow(home, game.week)}</section>
+          ${railHidden ? `<section class="sc-section gs-compact">${gsRatings(away, home)}</section>` : ""}
         </div>
-        ${gsRatings(away, home)}
         <section class="sc-section gs-matchups"><div class="sc-section-title">Matchups</div>
           <div class="sc-cols">${gsMatchupColumn(away, home)}${gsMatchupColumn(home, away)}</div>
         </section>
@@ -368,7 +372,7 @@ function renderGameSummaryCard(game) {
     </div>
     <div class="sc-footer">
       <span><span class="gs-res gs-res-q gs-res-w"><b>W</b></span> quality <span class="gs-res gs-res-n gs-res-w"><b>W</b></span> neutral <span class="gs-res gs-res-b gs-res-w"><b>W</b></span> bad (vs the spread) &middot; grades A-F vs the league</span>
-      <span>Ratings 1-100 vs the league (ESPN FPI) &middot; SOS 1st = toughest schedule so far &middot; <span class="gs-val gs-good">green</span> good for that side &middot; <span class="gs-val gs-bad">red</span> bad &middot; Blitz / Box rows: offense's result vs the defense's result in that look, % = how often the defense shows it</span>
+      <span><span class="gs-val gs-good">green</span> good for that side &middot; <span class="gs-val gs-bad">red</span> bad &middot; Blitz / Box rows: offense's result vs the defense's result in that look, % = how often the defense shows it</span>
     </div>
   </div>`;
   fitWideSummaryCard();

@@ -1232,15 +1232,20 @@ const SUMMARY_WIDE_ZOOM_MAX = 1.6;
 function fitWideSummaryCard() {
   const card = document.getElementById("summary-card");
   const inner = card?.querySelector(".sc-inner");
-  const main = inner?.classList.contains("sc-no-rail") ? inner.querySelector(".sc-main") : null;
+  // .sc-grow cards (Game Summary) also grow with the rail showing.
+  const grow = inner && (inner.classList.contains("sc-no-rail") || inner.classList.contains("sc-grow"));
+  const main = grow ? inner.querySelector(".sc-main") : null;
   // A hidden card measures 0 tall, which would read as "fits at max zoom".
   if (main && card.clientHeight > 0) {
     card.style.zoom = "";
     inner.style.transform = "";
     inner.style.width = "";
+    // Too big also means something got squeezed sideways: a row label cut
+    // off with "...", or a line / rating tile too narrow for its numbers.
+    const squeezed = () => [...main.querySelectorAll(".gs-row-label, .gs-ml, .gs-rt")].some((el) => el.scrollWidth > el.clientWidth + 1);
     let z = SUMMARY_WIDE_ZOOM_MAX;
     main.style.zoom = z;
-    while (z > 1 && inner.scrollHeight > card.clientHeight) {
+    while (z > 1 && (inner.scrollHeight > card.clientHeight || squeezed())) {
       z = Math.max(1, Math.round((z - 0.05) * 100) / 100);
       main.style.zoom = z;
     }

@@ -344,8 +344,15 @@ context. It is the only copy that travels with the repo.
     and not bet, so `summarySeasonColumn` filters DST targets (First TD position targets already
     skipped DST). The TD Data page itself keeps its DST rows.
 - The Game Previews Summary card:
-  - Order: injuries strip; Lines + W&L vs the spread side by side; Ratings box; Matchups
-    with A–F grades and Mismatch/Tough/Good vs Good/Bad vs Bad tags.
+  - **Layout (2026-10-05, from the user's marked-up screenshot; approved from a mockup):**
+    main column = injuries strip; W&L vs the spread; Matchups with A–F grades and
+    Mismatch/Tough/Good vs Good/Bad vs Bad tags. Right rail = Lines, compact Ratings
+    (Off/Def/FPI/SOS tiles, number over change, with the "1-100 vs the league" note under them),
+    My Picks (slimmer buttons), Novig ad. Rail is 256px. The card is `.sc-grow`, so
+    `fitWideSummaryCard` zooms the main column up when there's room (it also backs off if a
+    row label would get cut off). Week 4: every game fit at 100% (ATL @ NO was shrunk to 86%
+    before). Hiding My Picks puts Lines and Ratings back in the main column's top row.
+    The user's rule: never drop data to make it bigger; rearrange into dead space instead.
   - The A–F grade boxes (`.gs-grade.tier-*`) use the same tinted fill + edge as the full
     preview's Team Grades cells (A/B green, C yellow, D/F red, A and F strongest), per the user
     2026-09-30. Keep the two in sync if either changes.
@@ -364,7 +371,7 @@ context. It is the only copy that travels with the repo.
       parts (Pass pro vs rush, Run block vs run D). Turnovers show only as good vs bad (mostly
       random; never Bad vs Bad filler). Skipped: Plays/Game, quarter splits, the Red Zone
       composite (it has its own grade row).
-  - Right side: My Picks rail with the Novig ad.
+  - Right side: Lines, Ratings, My Picks and the Novig ad (see Layout above).
   - "Scheme" is labeled "Blitz & Box" on the card.
 - **Hide the picks column on any Summary card (2026-10-05):** a toolbar button `#summary-rail-btn`
   ("Hide Prop Picks" / "Hide My Picks" / "Hide TD Odds") drops the right rail; the card gets

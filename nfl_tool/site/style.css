@@ -2740,6 +2740,37 @@ footer { border-top-color: var(--border); }
 .ps-tm-next td { background: rgba(var(--accent-rgb), 0.08); border-top: 2px solid rgba(var(--accent-rgb), 0.45); }
 .ps-tm-next-tag { display: inline-block; padding: 1px 8px; border-radius: 5px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); background: rgba(var(--accent-rgb), 0.12); border: 1px solid rgba(var(--accent-rgb), 0.5); }
 .ps-tm-note { margin: 10px 0 0; font-size: 0.74rem; color: var(--muted); }
+/* Game Summary layout (2026-10-05, from the user's marked-up screenshot): Lines sit in the
+   picks rail above My Picks, Ratings shrink to a block beside W&L vs the spread, and the
+   main column zooms to fill the freed height (common.js fitWideSummaryCard, .sc-grow). */
+.gs-card .sc-body { grid-template-columns: minmax(0, 1fr) 256px; }
+.gs-card .gs-col { padding-left: 9px; padding-right: 9px; }
+.gs-card .gs-top.gs-top-1 { grid-template-columns: minmax(0, 1fr); }
+.gs-card .gs-top.gs-top-3 { grid-template-columns: auto minmax(0, 1fr) auto; }
+.gs-ratings .gs-rt-row { grid-template-columns: 46px repeat(4, 74px); gap: 5px; padding: 1px 0; }
+.gs-ratings .gs-rt-head span { font-size: 0.62rem; }
+.gs-ratings .gs-rt { height: 30px; gap: 4px; }
+.gs-ratings .gs-rt b { font-size: 1.15rem; line-height: 30px; }
+.gs-ratings .gs-rt small { font-size: 0.6rem; }
+/* In the rail: number on top, change / easy-tough underneath, so four fit across */
+.gs-picks .gs-ratings .gs-rt-row { grid-template-columns: 40px repeat(4, minmax(0, 1fr)); gap: 4px; }
+.gs-picks .gs-ratings .gs-rt { flex-direction: column; align-items: center; justify-content: center; gap: 0; height: 40px; }
+.gs-picks .gs-ratings .gs-rt b { line-height: 1.05; font-size: 1.15rem; }
+.gs-picks .gs-ratings .gs-rt small { line-height: 1.1; }
+.gs-picks .gs-ratings .gs-res-team { font-size: 0.82rem; gap: 3px; }
+.gs-rt-note { margin-top: 3px; font-size: 0.6rem; color: var(--muted); text-align: center; }
+.gs-picks .gs-lines { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 5px; justify-content: stretch; }
+.gs-picks .gs-tile { min-width: 0; padding: 4px 6px 5px; }
+.gs-picks .gs-tile-big { font-size: 1.1rem; }
+.gs-picks .gs-ml { font-size: 0.76rem; }
+.gs-picks .gs-ml span { font-size: 0.66rem; margin-left: 4px; padding-left: 0; }
+.gs-picks { gap: 6px; }
+.gs-picks .gs-picks-title, .gs-picks .gs-ratings .sc-section-title { margin-top: 4px; }
+.gs-picks .gs-pick { padding: 4px 6px 6px; }
+.gs-picks .gs-pick-label { margin-bottom: 3px; }
+.gs-picks .gs-pick-side { padding: 4px 3px; font-size: 0.76rem; }
+.gs-picks .gs-pick-colors { margin-top: 3px; }
+.gs-picks .gs-pick-color { padding: 2px; }
 /* Hide the picks column (any Summary card): the main content takes the whole card (common.js fitWideSummaryCard zooms it to fill) */
 .sc-inner.sc-no-rail .sc-body { grid-template-columns: minmax(0, 1fr); }
 /* Garbage-time note: neutral gray, dashed edge, so it reads as a caution, not a rank */
