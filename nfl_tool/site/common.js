@@ -1472,7 +1472,22 @@ function teamPlayedWeeks(team, beforeWeek) {
     .filter((g) => g.status === "final" && g.week < beforeWeek && (g.away === team || g.home === team))
     .map((g) => g.week);
 }
-function lineupWeights(team, name, position, week) {
+// Who threw the most for `team` in week `wk` (null if nobody threw 10+).
+function leadPasserOn(team, wk) {
+  let best = null;
+  Object.entries((DATA.player_game_logs || {})[team] || {}).forEach(([name, games]) =>
+    games.forEach((g) => {
+      if (g.week === wk && (g.pass_att || 0) >= 10 && (!best || g.pass_att > best[1])) best = [name, g.pass_att];
+    })
+  );
+  return best ? best[0] : null;
+}
+// opts.qbStarter (First TD model only): a pass catcher's games thrown by
+// someone other than the current starter count LINEUP_QB_CHANGE_WEIGHT --
+// London's 4-5 targets from Rush/Strand shouldn't set his role with Penix
+// back (user 2026-10-05).
+const LINEUP_QB_CHANGE_WEIGHT = 0.5;
+function lineupWeights(team, name, position, week, opts = {}) {
   const idx = lineupSnapIndex(team);
   const mine = idx[normName(name)];
   const weeks = teamPlayedWeeks(team, week);
@@ -1490,6 +1505,10 @@ function lineupWeights(team, name, position, week) {
       else if (s !== undefined && isRegular(mine) && !lineupPlayedNormal(mine, wk)) w = 0;
     }
     if (w && regulars.some(([, t]) => !lineupPlayedNormal(t, wk))) w *= LINEUP_DISCOUNT;
+    if (w && opts.qbStarter && (position === "WR" || position === "TE")) {
+      const lead = leadPasserOn(team, wk);
+      if (lead && normName(lead) !== normName(opts.qbStarter)) w *= LINEUP_QB_CHANGE_WEIGHT;
+    }
     out[wk] = w;
   });
   if (!Object.values(out).some((w) => w > 0)) weeks.forEach((wk) => (out[wk] = 1));
@@ -1502,11 +1521,11 @@ function lineupWeights(team, name, position, week) {
 // they stay on the season scale every threshold on the page expects.
 // Adds `touches` (targets + carries) on the same basis.
 const LINEUP_FIELDS = ["xtd", "early_xtd", "targets", "carries", "rz_targets", "rz_carries", "ez_targets", "deep_targets", "tds", "first_tds"];
-function lineupAdjustedXtd(team, week) {
+function lineupAdjustedXtd(team, week, opts = {}) {
   const rows = (DATA.player_xtd || {})[team] || [];
   return rows.map((p) => {
     if (!p.by_week) return { ...p, touches: (p.targets || 0) + (p.carries || 0) };
-    const weights = lineupWeights(team, p.name, p.position, week);
+    const weights = lineupWeights(team, p.name, p.position, week, opts);
     const weeks = Object.keys(weights);
     const wSum = weeks.reduce((s, wk) => s + weights[wk], 0) || 1;
     const avg = LINEUP_FIELDS.map((_, i) => weeks.reduce((s, wk) => s + weights[wk] * ((p.by_week[wk] || [])[i] || 0), 0) / wSum);

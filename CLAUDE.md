@@ -332,6 +332,15 @@ context. It is the only copy that travels with the repo.
       0.3-1.4%, Allen 12.3%; model position totals RB 43 / WR 36 / TE 16 / QB 4.5 vs actual 39 / 37 /
       17 / 6.5. Calibration check: sum the model's first-TD % by position across a full slate and
       compare with the season's actual first-TD scorers by position.
+    - **QB change + market prior (2026-10-05, user: "Drake London has higher than a 3% chance"):**
+      London had 19 targets but 0 RZ looks, so Hooper's single end-zone target outranked him, and
+      his 4-5 target games came with Rush/Strand before Penix returned (10 of Penix's 25 throws).
+      (1) `lineupAdjustedXtd(team, week, { qbStarter })`: a WR/TE game thrown by someone other
+      than `currentStarterQb` counts `LINEUP_QB_CHANGE_WEIGHT` 0.5 (First TD model only). (2) Each
+      player's share blends in his share of the team's ANYTIME TD odds with weight
+      `FIRST_TD_MARKET_PRIOR_GAMES` 2 / (2 + games): ~40% after 3 games, the user's pick over 50%
+      ("keep 40 for now"). Anytime is a different market from the First TD odds the model is
+      compared to. ATL: London 3.4% -> 5.5% (odds 10%), Hooper 4.1 -> 4.3, Bijan 24.5 -> 19.6.
   - **"Soft D" targets (2026-10-02, NE @ BUF):** a clearly soft defense (model z >= 1.0) flags even
     when the offense hasn't produced there (offense floor relaxed to −1.5 instead of −0.3). BUF had
     allowed 5 RB TDs (3rd most) while NE's backs had 1 against SEA/PIT/JAX. These are marked

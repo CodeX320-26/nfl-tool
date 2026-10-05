@@ -998,12 +998,13 @@ const FIRST_TD_W = { touches: 0.15, rz: 0.3, xtd: 0.4, early: 0.15 };
 // so each starts at the touch share and earns its own number as the team's
 // RZ looks (FIRST_TD_RZ_PRIOR plays) and xTD (FIRST_TD_XTD_PRIOR) pile up.
 const FIRST_TD_RZ_PRIOR = 12;
+const FIRST_TD_MARKET_PRIOR_GAMES = 2; // see firstTdPlayerTargets
 const FIRST_TD_XTD_PRIOR = 1.0;
 function firstTdPlayerTargets(offTeam, defTeam, teamChance, week) {
   const injured = firstTdInjuryStatus(offTeam, week);
   // Lineup-weighted (see common.js lineupAdjustedXtd): a starter's game
   // cut short and a backup's fill-in game don't set anyone's role.
-  const players = lineupAdjustedXtd(offTeam, week).filter((p) => injured[normName(p.name)] !== "out");
+  const players = lineupAdjustedXtd(offTeam, week, { qbStarter: currentStarterQb(offTeam, week) }).filter((p) => injured[normName(p.name)] !== "out");
   if (!players.length) return [];
   // Overall involvement: share of the team's targets + carries -- a starter
   // who hasn't drawn goal-line looks yet still plays every snap and can
@@ -1012,6 +1013,16 @@ function firstTdPlayerTargets(offTeam, defTeam, teamChance, week) {
   const rzOpp = (p) => (p.rz_targets || 0) + (p.rz_carries || 0);
   const totals = { early: sum("early_xtd_pg"), xtd: sum("xtd_pg"), touches: sum("touches"), rz: players.reduce((s, p) => s + rzOpp(p), 0) || 1 };
   const defPosZ = {};
+  const games = DATA.team_stats[offTeam]?.games_played || 1;
+  // Market prior: each player's share of the team's anytime-TD odds, blended
+  // in while the sample is tiny (weight FIRST_TD_MARKET_PRIOR_GAMES /
+  // (that + games): ~40% after 3 games, under 20% by midseason). The anytime
+  // market knows London is a WR1 when three games of usage don't; it's a
+  // different market from the First TD odds this model is compared to.
+  const anyOdds = {};
+  ((DATA.player_td_odds || {})[offTeam] || []).forEach((o) => (anyOdds[normName(o.name)] = o.implied_prob || 0));
+  const mkTotal = players.reduce((s, p) => s + (anyOdds[normName(p.name)] || 0), 0);
+  const mkW = mkTotal > 0 ? FIRST_TD_MARKET_PRIOR_GAMES / (FIRST_TD_MARKET_PRIOR_GAMES + games) : 0;
   const raw = players.map((p) => {
     if (!(p.position in defPosZ)) {
       const allowed = (DATA.team_stats[defTeam]?.def_position_td_allowed || {})[p.position] || 0;
@@ -1027,12 +1038,12 @@ function firstTdPlayerTargets(offTeam, defTeam, teamChance, week) {
     // Whole-offense usage, not who has already scored (user 2026-10-02:
     // Ayomanor at 9 targets and Ward off one goal-line game were topping TEN
     // on a few end-zone looks). TDs scored carry no weight at all.
-    const share =
+    const usageShare =
       FIRST_TD_W.touches * touchShare +
       FIRST_TD_W.rz * rzShare +
       FIRST_TD_W.xtd * fullShare +
       FIRST_TD_W.early * earlyShare;
-    const games = DATA.team_stats[offTeam]?.games_played || 1;
+    const share = (1 - mkW) * usageShare + mkW * ((anyOdds[normName(p.name)] || 0) / (mkTotal || 1));
     let qbRun = 1;
     if (p.position === "QB") {
       const prop = ((DATA.player_props || {})[offTeam] || []).find((x) => normName(x.name) === normName(p.name));
