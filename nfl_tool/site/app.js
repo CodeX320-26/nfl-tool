@@ -1167,7 +1167,7 @@ function renderRzUsageTable(team) {
 // Fixed 1160x980 (1.18:1 -- the video template's full left area), so a
 // screenshot or the Save image PNG drops straight in.
 // Content that runs long is scaled down to fit instead of being cut off.
-const SUMMARY_FIRST_TD_PLAYERS = 3;
+const SUMMARY_FIRST_TD_PLAYERS = 5; // user 2026-10-05 (was 3)
 
 // The chart numbers behind one target: [offense, defense allows].
 // The chart numbers behind one target -- [offense cell, defense cell] as
@@ -1298,6 +1298,14 @@ function keyPlayersForTag(label, pool, team, week) {
   return []; // game-level tags (pace, short fields) have no single player
 }
 
+// shortName for each name, except two that would collide ("B. Robinson"
+// for Bijan and Brian) keep their full names.
+function uniqueShortNames(names) {
+  const counts = {};
+  names.forEach((n) => (counts[shortName(n)] = (counts[shortName(n)] || 0) + 1));
+  return Object.fromEntries(names.map((n) => [n, counts[shortName(n)] > 1 ? n : shortName(n)]));
+}
+
 function numBadge(n) {
   return `<span class="sc-num">${n}</span>`;
 }
@@ -1341,10 +1349,12 @@ function summarySeasonColumn(offTeam, defTeam, week) {
         })
         .join("")
     : `<li class="target-none">No tags</li>`;
-  const keyPlayers = Object.values(byPlayer)
+  const keyList = Object.values(byPlayer)
     .sort((a, b) => b.nums.length - a.nums.length || a.nums[0] - b.nums[0])
-    .slice(0, KEY_PLAYERS_MAX)
-    .map((e) => `<span class="sc-key${e.good ? "" : " sc-key-warn"}">${playerClick(offTeam, e.name, `${summaryHeadshot(offTeam, e.name, 18)}${shortName(e.name)}`, defTeam)}${e.nums.map(numBadge).join("")}</span>`)
+    .slice(0, KEY_PLAYERS_MAX);
+  const keyNames = uniqueShortNames(keyList.map((e) => e.name));
+  const keyPlayers = keyList
+    .map((e) => `<span class="sc-key${e.good ? "" : " sc-key-warn"}">${playerClick(offTeam, e.name, `${summaryHeadshot(offTeam, e.name, 18)}${keyNames[e.name]}`, defTeam)}${e.nums.map(numBadge).join("")}</span>`)
     .join("");
   // Four fixed blocks (banner / targets / tags / key players) -- the two
   // team columns share row lines (CSS subgrid), so each block starts at
@@ -1364,13 +1374,14 @@ function summaryFirstTdColumn(offTeam, defTeam, chance, week) {
   const posChips = firstTdPositionTargets(offTeam, defTeam)
     .map((i) => `<span class="target-chip${i.score >= TARGET_STRONG_SCORE ? " target-chip-strong" : ""}">${i.label}</span>`)
     .join("");
-  const players = firstTdPlayerTargets(offTeam, defTeam, chance, week)
-    .slice(0, SUMMARY_FIRST_TD_PLAYERS)
+  const list = firstTdPlayerTargets(offTeam, defTeam, chance, week).slice(0, SUMMARY_FIRST_TD_PLAYERS);
+  const short = uniqueShortNames(list.map((p) => p.name));
+  const players = list
     .map((p) => {
       const edgeCls = p.edge === null ? "" : p.edge >= 1.25 ? "ftd-edge-strong" : p.edge >= 1 ? "ftd-edge-lean" : "";
       const odds = p.odds === null ? "--" : `${p.odds > 0 ? "+" : ""}${p.odds} <span class="muted">${pct(p.implied)}</span>`;
       const inj = p.injury ? ` <span class="ftd-inj">${p.injury}</span>` : "";
-      return `<tr class="${edgeCls}"><td><span class="sc-player player-click" data-entry="${encodeDataAttr({ team: offTeam, name: p.name, oppTeam: defTeam })}">${summaryHeadshot(offTeam, p.name, 24)}<span>${p.name} <span class="muted">${p.position}</span>${inj}</span></span></td><td class="num ftd-est">${pct(p.est)}</td><td class="num">${odds}</td></tr>`;
+      return `<tr class="${edgeCls}"><td><span class="sc-player player-click" data-entry="${encodeDataAttr({ team: offTeam, name: p.name, oppTeam: defTeam })}">${summaryHeadshot(offTeam, p.name, 24)}<span>${short[p.name]} <span class="muted">${p.position}</span>${inj}</span></span></td><td class="num ftd-est">${pct(p.est)}</td><td class="num ftd-odds">${odds}</td></tr>`;
     })
     .join("");
   return `<div class="sc-col">
@@ -1460,12 +1471,12 @@ function summaryOddsRail(away, home, week) {
       })
       .join("");
     const rgb = teamAccentRgb(team);
-    return `<div class="sc-odds-team" style="border-left:4px solid rgb(${rgb.join(",")})">
+    return `<div class="sc-odds-block"><div class="sc-odds-team" style="border-left:4px solid rgb(${rgb.join(",")})">
         <img src="${teamLogoUrl(team)}" crossorigin="anonymous" class="sc-team-logo" alt=""><span class="sc-ftd-team">${team}</span>
       </div>
       ${rows
         ? `<table class="sc-table sc-odds"><thead><tr><th>Player</th><th class="num">Anytime</th><th class="num">1st TD</th></tr></thead><tbody>${rows}</tbody></table>`
-        : `<p class="sc-odds-empty">Click TD Odds to pick players</p>`}`;
+        : `<p class="sc-odds-empty">Click TD Odds to pick players</p>`}</div>`;
   };
   return `<section class="sc-section sc-section-odds">
     <button type="button" class="sc-section-title sc-odds-open" title="Pick which players show here">TD Odds</button>
@@ -1601,7 +1612,7 @@ function renderSummaryCard(away, home) {
   const rgbH = teamAccentRgb(home);
   const railHidden = summaryRailHidden("td");
   syncSummaryRailButton("td", "TD Odds");
-  card.innerHTML = `<div class="sc-inner${railHidden ? " sc-no-rail" : ""}">
+  card.innerHTML = `<div class="sc-inner td-card sc-grow${railHidden ? " sc-no-rail" : ""}">
     <div class="sc-header">
       <div class="sc-title-row">
         <img src="${teamLogoUrl(away)}" crossorigin="anonymous" class="sc-logo" alt="">
@@ -1614,7 +1625,7 @@ function renderSummaryCard(away, home) {
 
     <div class="sc-body">
       <div class="sc-main">
-        <section class="sc-section">
+        <section class="sc-section sc-zoom-target">
           <div class="sc-section-title">Season TD Targets</div>
           <div class="sc-cols sc-grid4">
             ${summarySeasonColumn(away, home, week)}
@@ -1622,6 +1633,7 @@ function renderSummaryCard(away, home) {
           </div>
         </section>
 
+        <div class="td-bottom">
         <section class="sc-section sc-section-ftd">
           <div class="sc-section-title">First TD</div>
           <div class="sc-split">
@@ -1635,8 +1647,9 @@ function renderSummaryCard(away, home) {
             ${summaryFirstTdColumn(home, away, 1 - pAway, week)}
           </div>
         </section>
+        ${railHidden ? "" : summaryOddsRail(away, home, week)}
+        </div>
       </div>
-      ${railHidden ? "" : summaryOddsRail(away, home, week)}
     </div>
 
     <div class="sc-footer">

@@ -346,6 +346,14 @@ context. It is the only copy that travels with the repo.
     the offense's usage (the user wants the tendency visible), but the line prints the offense's
     own share of TDs at that position, so both sides are on the card. Key players: that
     position's top usage players. Week 4: 9 tags across 32 sides.
+  - **TD Summary layout (2026-10-05, from the user's marked-up screenshot; approved from a
+    mockup):** Season TD Targets spans the card (`.td-card`), and in each team column Key Players
+    sit in a short list beside the Matchup Tags. The bottom row is First TD (compact, both teams
+    side by side, `SUMMARY_FIRST_TD_PLAYERS` = 5, odds and implied % on one line) next to TD Odds
+    (the picks, teams side by side). Only Season TD Targets grows (`.sc-zoom-target`, read by
+    `fitWideSummaryCard`): Week 4 games landed 1.0-1.25x. Hiding TD Odds gives First TD the
+    whole bottom row. Colliding short names (Bijan / Brian Robinson) show in full
+    (`uniqueShortNames`).
   - **No DST targets anywhere (user 2026-10-02; TD Targets panel too since 2026-10-05):**
     defensive/return TDs are random and not bet, so `targetGroups` (app.js) drops DST items for
     both the TD Targets panel and the Summary card (First TD position targets already skipped

@@ -2771,6 +2771,35 @@ footer { border-top-color: var(--border); }
 .gs-picks .gs-pick-side { padding: 4px 3px; font-size: 0.76rem; }
 .gs-picks .gs-pick-colors { margin-top: 3px; }
 .gs-picks .gs-pick-color { padding: 2px; }
+/* TD Summary layout (2026-10-05, from the user's marked-up screenshot): Season TD Targets
+   spans the card; First TD (compact, 5 players a team) and TD Odds share the bottom row;
+   blocks size to their content and the whole main column zooms to fill (.sc-grow). */
+.td-card .sc-body { grid-template-columns: minmax(0, 1fr); }
+.td-card .sc-main { justify-content: flex-start; }
+.td-card .sc-main > .sc-section:first-child { flex: 0 0 auto; }
+.td-card .sc-main > .sc-section:first-child > .sc-grid4 { flex: 0 0 auto; grid-template-rows: auto auto auto 0; }
+/* In each team column: banner and targets across the top, then Matchup Tags with Key Players
+   listed beside them (not in a row of their own underneath) */
+.td-card .sc-grid4 > .sc-col { grid-template-columns: minmax(0, 1fr) auto; column-gap: 14px; }
+.td-card .sc-grid4 > .sc-col > :nth-child(1), .td-card .sc-grid4 > .sc-col > :nth-child(2) { grid-column: 1 / -1; }
+.td-card .sc-grid4 > .sc-col > :nth-child(3) { grid-row: 3; grid-column: 1; }
+.td-card .sc-grid4 > .sc-col > :nth-child(4) { grid-row: 3; grid-column: 2; }
+.td-card .sc-grid4 .sc-keys { flex-direction: column; align-items: flex-start; }
+.td-card .sc-block > .sc-label:first-child { margin-top: 0; }
+.td-card .td-bottom { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: stretch; }
+.td-card.sc-no-rail .td-bottom { grid-template-columns: minmax(0, 1fr); }
+.td-card .td-bottom > .sc-section { min-width: 0; }
+.td-card .sc-section-ftd .sc-split .ftd-split-bar { max-width: none; flex: 1 1 auto; }
+.td-card .sc-section-ftd .sc-split-label { margin-bottom: 6px; }
+.td-card .sc-ftd { font-size: 0.9rem; }
+.td-card .sc-ftd td { padding: 4px 4px; }
+.td-card .sc-ftd .sc-player { gap: 5px; }
+.td-card .sc-ftd .ftd-odds { white-space: nowrap; }
+.td-card .sc-ftd .ftd-odds .muted { margin-left: 3px; font-size: 0.72rem; }
+.td-card .sc-section-odds { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-content: start; column-gap: 10px; }
+.td-card .sc-section-odds > .sc-section-title { grid-column: 1 / -1; }
+.td-card .sc-odds-block { min-width: 0; }
+.td-card .sc-odds-team { margin-top: 0; }
 /* Hide the picks column (any Summary card): the main content takes the whole card (common.js fitWideSummaryCard zooms it to fill) */
 .sc-inner.sc-no-rail .sc-body { grid-template-columns: minmax(0, 1fr); }
 /* Garbage-time note: neutral gray, dashed edge, so it reads as a caution, not a rank */
