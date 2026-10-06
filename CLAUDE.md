@@ -44,6 +44,10 @@ context. It is the only copy that travels with the repo.
   - `player-props.html/.js` + `props-summary.js`: **Player Props** (Receiving/Rushing/Passing + Summary card).
   - `possible-plays.html/.js`: the Possible Plays list.
   - `picks.js`: the Pick Tracker.
+  - `possible-plays.js` **View Results** (2026-10-06): checkboxes on each bet, a select-all box, and
+    "Select by game" chips; when any shown bet is checked, the summary covers only the checked ones
+    ("Summary of N selected bets" + Clear selection). In-memory per visit (`resultsSelected`). The
+    user wanted to recap just MNF.
   - `promo-tools.html/.js`: **Promo Tools** tab (added 2026-10-05). First section: **King of the
     Endzone** (DraftKings' weekly promo paying on the game's LONGEST TD, D/ST included).
     - Team checklist for this week's games (per-device, `nfl-tool.koe.teams`), position filter.

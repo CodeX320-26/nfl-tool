@@ -485,6 +485,23 @@ function renderResultsSummary(list) {
   return `${overallLine}${typeRows ? `<div class="results-type-summary">${typeRows}</div>` : ""}`;
 }
 
+// Hand-picked bets (user 2026-10-06: "just summarize last night's MNF").
+// When any visible bet is checked, the summary covers only the checked
+// ones. Kept for this page visit only.
+const resultsSelected = new Set();
+function renderResultsQuickSelect(list) {
+  const counts = {};
+  list.forEach((p) => (counts[p.matchup] = (counts[p.matchup] || 0) + 1));
+  const chips = Object.entries(counts)
+    .map(([m, n]) => {
+      const ids = list.filter((p) => p.matchup === m).map((p) => p.id);
+      const on = ids.every((id) => resultsSelected.has(id));
+      return `<button type="button" class="results-game-chip${on ? " active" : ""}" data-matchup="${encodeURIComponent(m)}">${m} <span class="muted-label">(${n})</span></button>`;
+    })
+    .join("");
+  return `<div class="results-quick-select"><span class="results-quick-label">Select by game</span>${chips}</div>`;
+}
+
 function renderResultsModalContent() {
   const allPlays = loadPossiblePlays();
   if (!allPlays.length) {
@@ -495,7 +512,11 @@ function renderResultsModalContent() {
   if (!list.length) {
     return `<h3>Possible Plays &mdash; Results</h3>${filterBar}<p class="no-data-note">No plays match these filters.</p>`;
   }
-  const summary = renderResultsSummary(list);
+  const picked = list.filter((p) => resultsSelected.has(p.id));
+  const summary = picked.length
+    ? `<div class="results-selected-note">Summary of <b>${picked.length}</b> selected bet${picked.length === 1 ? "" : "s"} <button type="button" class="results-clear-selection">Clear selection</button></div>${renderResultsSummary(picked)}`
+    : renderResultsSummary(list);
+  const allOn = list.every((p) => resultsSelected.has(p.id));
   const headerCells = RESULT_SORT_COLUMNS.map((c) => `<th class="results-sort-th" data-col="${c.key}">${c.label}${sortArrowFor(c.key)}</th>`).join("");
   const rows = sortResultsPlays(list)
     .map((p) => {
@@ -504,7 +525,9 @@ function renderResultsModalContent() {
       const overrideBtns = ["win", "loss", "void"]
         .map((r) => `<button type="button" class="result-override-btn${p.result === r && p.result_source === "manual" ? " active" : ""}" data-id="${p.id}" data-result="${r}">${RESULT_LABELS[r]}</button>`)
         .join("");
-      return `<tr class="result-row-${p.result || "pending"}">
+      const sel = resultsSelected.has(p.id);
+      return `<tr class="result-row-${p.result || "pending"}${sel ? " result-row-selected" : ""}">
+        <td><input type="checkbox" class="results-select" data-id="${p.id}"${sel ? " checked" : ""} aria-label="Include in summary"></td>
         <td>${p.week}</td>
         <td>${p.matchup}</td>
         <td>${p.category}</td>
@@ -518,10 +541,11 @@ function renderResultsModalContent() {
     .join("");
   return `<h3>Possible Plays &mdash; Results</h3>
     ${filterBar}
+    ${renderResultsQuickSelect(list)}
     ${summary}
     <div class="results-table-scroll">
       <table class="data-table results-table">
-        <thead><tr>${headerCells}<th>Override</th></tr></thead>
+        <thead><tr><th><input type="checkbox" class="results-select-all"${allOn ? " checked" : ""} title="Select / clear every bet shown" aria-label="Select all"></th>${headerCells}<th>Override</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`;
@@ -539,6 +563,35 @@ document.addEventListener("change", (e) => {
     if (typeCb.checked) resultsTypeFilters.add(typeCb.dataset.type);
     else resultsTypeFilters.delete(typeCb.dataset.type);
     document.getElementById("results-modal-content").innerHTML = renderResultsModalContent();
+  }
+});
+
+function refreshResultsModal() {
+  document.getElementById("results-modal-content").innerHTML = renderResultsModalContent();
+}
+document.addEventListener("change", (e) => {
+  const cb = e.target.closest(".results-select");
+  const all = e.target.closest(".results-select-all");
+  if (cb) {
+    if (cb.checked) resultsSelected.add(cb.dataset.id);
+    else resultsSelected.delete(cb.dataset.id);
+    refreshResultsModal();
+  } else if (all) {
+    filteredResultsPlays().forEach((p) => (all.checked ? resultsSelected.add(p.id) : resultsSelected.delete(p.id)));
+    refreshResultsModal();
+  }
+});
+document.addEventListener("click", (e) => {
+  const chip = e.target.closest(".results-game-chip");
+  if (chip) {
+    const m = decodeURIComponent(chip.dataset.matchup);
+    const ids = filteredResultsPlays().filter((p) => p.matchup === m).map((p) => p.id);
+    const on = ids.every((id) => resultsSelected.has(id));
+    ids.forEach((id) => (on ? resultsSelected.delete(id) : resultsSelected.add(id)));
+    refreshResultsModal();
+  } else if (e.target.closest(".results-clear-selection")) {
+    resultsSelected.clear();
+    refreshResultsModal();
   }
 });
 
