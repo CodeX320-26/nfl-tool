@@ -181,7 +181,12 @@ function gradeTdPlay(play, tdResults) {
   const teamResults = weekResults && weekResults[play.team];
   if (!teamResults) return null;
   const field = play.category === "First TD" ? "first_td" : "any_td";
-  return teamResults[field].includes(play.description) ? "win" : "loss";
+  // Loose name match (common.js normName: no Jr./Sr./II, punctuation or
+  // case) -- the bet keeps the sportsbook's "Brian Robinson Jr." while the
+  // results list nflverse's "Brian Robinson"; an exact match graded his
+  // MNF TD a loss (user 2026-10-06).
+  const target = normName(play.description);
+  return teamResults[field].some((n) => normName(n) === target) ? "win" : "loss";
 }
 
 // Player-prop O/U markets (Player Props page's "Add to Possible Plays"

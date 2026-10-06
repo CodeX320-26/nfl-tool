@@ -48,6 +48,12 @@ context. It is the only copy that travels with the repo.
     "Select by game" chips; when any shown bet is checked, the summary covers only the checked ones
     ("Summary of N selected bets" + Clear selection). In-memory per visit (`resultsSelected`). The
     user wanted to recap just MNF.
+  - **TD bets grade on a loose name match** (`gradeTdPlay`, `normName`, 2026-10-06): bets keep the
+    sportsbook's spelling ("Brian Robinson Jr.") while TD results use nflverse's ("Brian Robinson");
+    an exact match graded his MNF TD a loss. Already-graded auto losses flip to wins on next load.
+  - Local builds: `nfl_tool/build_stats.py` only downloads a data file if it's missing
+    (`download_if_missing`), so a local `data/` folder goes stale. Delete `data/*_2026*` and
+    `data/games.csv` before a local build that needs the latest games. CI always starts fresh.
   - `promo-tools.html/.js`: **Promo Tools** tab (added 2026-10-05). First section: **King of the
     Endzone** (DraftKings' weekly promo paying on the game's LONGEST TD, D/ST included).
     - Team checklist for this week's games (per-device, `nfl-tool.koe.teams`), position filter.
